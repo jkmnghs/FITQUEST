@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ACHIEVEMENTS } from '../data/gameData';
+import { ACHIEVEMENTS, EXERCISES } from '../data/gameData';
 
 // ─── ACHIEVEMENTS TAB ───
 export function AchievementsTab({ state }) {
@@ -209,7 +209,9 @@ export function SummaryTab({ state }) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, notifStatus, onRequestNotif }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif }) {
+  const [backfillW, setBackfillW] = useState(1);
+  const [backfillCount, setBackfillCount] = useState(3);
   return (
     <div>
       <div style={{
@@ -278,6 +280,53 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, notifStatu
             ✓ You'll receive workout and check-in reminders
           </div>
         )}
+      </div>
+
+      {/* Backfill History */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid rgba(179,136,255,0.2)',
+        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Backfill Past Weeks</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
+          Lost your data? Mark weeks you already completed.
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
+            <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>Week {i + 1}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Sessions done</div>
+            <select value={backfillCount} onChange={e => setBackfillCount(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
+              <option value={1}>1 / 3</option>
+              <option value={2}>2 / 3</option>
+              <option value={3}>3 / 3 ✓</option>
+            </select>
+          </div>
+        </div>
+        {/* Show current status for selected week */}
+        {(() => {
+          const wp = state.weekProgress?.[backfillW];
+          return wp ? (
+            <div style={{ fontSize: 11, color: 'var(--cyan)', marginBottom: 8 }}>
+              Currently: {wp.count}/3 sessions {wp.completed ? '✓ complete' : ''}
+            </div>
+          ) : null;
+        })()}
+        <button
+          onClick={() => onBackfillWeek(backfillW, backfillCount)}
+          style={{
+            width: '100%', padding: 10, border: 'none', borderRadius: 10,
+            background: 'linear-gradient(135deg, var(--purple2), var(--purple))',
+            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+            color: '#fff', letterSpacing: 0.5, cursor: 'pointer'
+          }}
+        >APPLY WEEK {backfillW}</button>
       </div>
 
       {/* Reset Today */}

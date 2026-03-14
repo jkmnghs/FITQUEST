@@ -328,6 +328,47 @@ export function useGameState() {
     }));
   }, [setState]);
 
+  // Retroactively mark sessions for a past week (for backfilling lost data)
+  const backfillWeek = useCallback((week, sessionCount) => {
+    setState(prev => {
+      const weekProgress = { ...prev.weekProgress };
+      const completed = sessionCount >= 3;
+      const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
+      const sessions = fakeDates.map(d => ({
+        date: `Week ${week} ${d} (backfilled)`,
+        exercisesDone: [],
+        completion: 100
+      }));
+
+      weekProgress[week] = {
+        count: sessionCount,
+        dates: fakeDates,
+        completed,
+        sessions
+      };
+
+      // If this completes a week, advance currentWeek if needed
+      const nextWeek = completed && week >= prev.currentWeek
+        ? Math.min(12, week + 1)
+        : prev.currentWeek;
+
+      // Award XP: ~300 per completed session
+      const xpGain = sessionCount * 300;
+      const { xp, totalXp, level } = applyXP(prev, xpGain);
+
+      showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`);
+
+      return {
+        ...prev,
+        xp, totalXp, level,
+        weekProgress,
+        currentWeek: nextWeek,
+        totalSessions: prev.totalSessions + sessionCount,
+        perfectWeeks: completed ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
+      };
+    });
+  }, [setState, showToast]);
+
   return {
     state, setState,
     toast, showToast,
@@ -335,6 +376,7 @@ export function useGameState() {
     resetAll,
     resetToday,
     startSession,
+    backfillWeek,
     completeExercise,
     finishSession,
     submitCheckin,

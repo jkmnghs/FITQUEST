@@ -34,7 +34,7 @@ export default function App() {
     state, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
-    resetAll, resetToday, startSession, addAIHistory
+    resetAll, resetToday, startSession, backfillWeek, addAIHistory
   } = useGameState();
 
   // Register service worker on mount
@@ -132,6 +132,7 @@ export default function App() {
               onUpdate={updateSetting}
               onReset={resetAll}
               onResetToday={resetToday}
+              onBackfillWeek={backfillWeek}
               notifStatus={notifStatus}
               onRequestNotif={handleRequestNotif}
             />
