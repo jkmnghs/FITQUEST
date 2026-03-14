@@ -112,6 +112,7 @@ export function useGameState() {
 
   const resetAll = useCallback(() => {
     storageClear();
+    backfillApplied.current = {};
     setStateRaw({ ...DEFAULT_STATE });
     showToast('Progress reset!');
   }, [showToast]);
@@ -340,14 +341,20 @@ export function useGameState() {
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
-    // Synchronous ref check — runs BEFORE React batching/scheduling so no
-    // amount of rapid clicking can bypass this guard.
+    // --- Guard layer 1: read localStorage directly (synchronous, always current) ---
+    const savedNow = storageGet();
+    const storedCount = savedNow?.weekProgress?.[week]?.count ?? 0;
+    if (sessionCount <= storedCount) {
+      showToast(`Week ${week}: already recorded ${storedCount}/3 sessions`);
+      return;
+    }
+
+    // --- Guard layer 2: ref lock (catches rapid double-clicks before localStorage saves) ---
     const prevApplied = backfillApplied.current[week] ?? 0;
     if (sessionCount <= prevApplied) {
       showToast(`Week ${week}: already recorded ${prevApplied}/3 sessions`);
       return;
     }
-    // Lock immediately so concurrent/rapid calls are blocked at the ref level.
     backfillApplied.current[week] = sessionCount;
 
     setStateRaw(prev => {
@@ -355,7 +362,7 @@ export function useGameState() {
       const prevSessionCount = existing?.count ?? 0;
       const prevCompleted = existing?.completed ?? false;
 
-      // Secondary guard inside updater (defensive — ref should have caught this)
+      // --- Guard layer 3: inside updater against latest committed state ---
       const newSessions = Math.max(0, sessionCount - prevSessionCount);
       if (newSessions === 0) return prev;
 
