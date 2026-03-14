@@ -331,17 +331,19 @@ export function useGameState() {
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
-    setState(prev => {
-      const weekProgress = { ...prev.weekProgress };
-      const existing = weekProgress[week];
+    // Read current state snapshot synchronously before entering setState to
+    // avoid side effects inside the updater (mirrors the finishSession pattern).
+    setStateRaw(prev => {
+      const existing = prev.weekProgress?.[week];
       const prevSessionCount = existing?.count ?? 0;
       const prevCompleted = existing?.completed ?? false;
 
       // Only award XP/stats for net-new sessions to prevent XP farming
       const newSessions = Math.max(0, sessionCount - prevSessionCount);
 
-      if (newSessions === 0 && sessionCount <= prevSessionCount) {
-        showToast(`Week ${week}: already recorded ${prevSessionCount}/3 sessions`);
+      if (newSessions === 0) {
+        // No new sessions — schedule toast outside updater and return unchanged
+        setTimeout(() => showToast(`Week ${week}: already recorded ${prevSessionCount}/3 sessions`), 0);
         return prev;
       }
 
@@ -353,7 +355,7 @@ export function useGameState() {
         completion: completionPct
       }));
 
-      weekProgress[week] = { count: sessionCount, dates: fakeDates, completed, sessions };
+      const weekProgress = { ...prev.weekProgress, [week]: { count: sessionCount, dates: fakeDates, completed, sessions } };
 
       const nextWeek = completed && week >= prev.currentWeek
         ? Math.min(12, week + 1)
@@ -371,11 +373,10 @@ export function useGameState() {
         addedVolume += sets * ex * wt * newSessions;
       });
 
-      // XP only for net-new sessions
+      // XP only for net-new sessions — schedule toast outside updater
       const xpGain = newSessions * Math.round(300 * (completionPct / 100));
       const { xp, totalXp, level } = applyXP(prev, xpGain);
-
-      showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`);
+      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
 
       return {
         ...prev,
@@ -389,7 +390,7 @@ export function useGameState() {
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
     });
-  }, [setState, showToast]);
+  }, [setStateRaw, showToast]);
 
   return {
     state, setState,

@@ -395,26 +395,35 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           );
         })()}
 
-        <button
-          onClick={() => {
-            const done = Object.values(backfillSets).filter(s => s > 0).length;
-            const autoPct = Math.round(done / EXERCISES.length * 100);
-            const custom = {};
-            EXERCISES.filter(e => !e.isPlank).forEach(ex => {
-              const v = parseFloat(backfillWeights[ex.id]);
-              if (!isNaN(v) && v > 0) {
-                custom[ex.id] = state.unit === 'lbs' ? v / 2.205 : v;
-              }
-            });
-            onBackfillWeek(backfillW, backfillCount, autoPct, custom, backfillSets, backfillDuration);
-          }}
-          style={{
-            width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
-            background: 'linear-gradient(135deg, var(--purple2), var(--purple))',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
-            color: '#fff', letterSpacing: 0.5, cursor: 'pointer'
-          }}
-        >APPLY WEEK {backfillW}</button>
+        {(() => {
+          const alreadyDone = (state.weekProgress?.[backfillW]?.count ?? 0) >= backfillCount;
+          return (
+            <button
+              disabled={alreadyDone}
+              onClick={() => {
+                const done = Object.values(backfillSets).filter(s => s > 0).length;
+                const autoPct = Math.round(done / EXERCISES.length * 100);
+                const custom = {};
+                EXERCISES.filter(e => !e.isPlank).forEach(ex => {
+                  const v = parseFloat(backfillWeights[ex.id]);
+                  if (!isNaN(v) && v > 0) {
+                    custom[ex.id] = state.unit === 'lbs' ? v / 2.205 : v;
+                  }
+                });
+                onBackfillWeek(backfillW, backfillCount, autoPct, custom, backfillSets, backfillDuration);
+              }}
+              style={{
+                width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
+                background: alreadyDone
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'linear-gradient(135deg, var(--purple2), var(--purple))',
+                fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                color: alreadyDone ? 'var(--text3)' : '#fff',
+                letterSpacing: 0.5, cursor: alreadyDone ? 'not-allowed' : 'pointer'
+              }}
+            >{alreadyDone ? `WEEK ${backfillW} ALREADY AT ${backfillCount}/3` : `APPLY WEEK ${backfillW}`}</button>
+          );
+        })()}
       </div>
 
       {/* Reset Today */}
