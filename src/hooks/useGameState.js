@@ -31,6 +31,15 @@ export function useGameState() {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
+  // Ref-based synchronous lock for backfill — tracks the highest session count
+  // already applied per week. Updated synchronously before setState so rapid
+  // re-clicks are blocked even before React commits the state update.
+  const backfillApplied = useRef((() => {
+    const saved = storageGet();
+    const wp = saved?.weekProgress ?? {};
+    return Object.fromEntries(Object.entries(wp).map(([w, d]) => [w, d.count ?? 0]));
+  })());
+
   // Auto-save on state change
   useEffect(() => {
     storageSet(state);
@@ -331,21 +340,24 @@ export function useGameState() {
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
-    // Read current state snapshot synchronously before entering setState to
-    // avoid side effects inside the updater (mirrors the finishSession pattern).
+    // Synchronous ref check — runs BEFORE React batching/scheduling so no
+    // amount of rapid clicking can bypass this guard.
+    const prevApplied = backfillApplied.current[week] ?? 0;
+    if (sessionCount <= prevApplied) {
+      showToast(`Week ${week}: already recorded ${prevApplied}/3 sessions`);
+      return;
+    }
+    // Lock immediately so concurrent/rapid calls are blocked at the ref level.
+    backfillApplied.current[week] = sessionCount;
+
     setStateRaw(prev => {
       const existing = prev.weekProgress?.[week];
       const prevSessionCount = existing?.count ?? 0;
       const prevCompleted = existing?.completed ?? false;
 
-      // Only award XP/stats for net-new sessions to prevent XP farming
+      // Secondary guard inside updater (defensive — ref should have caught this)
       const newSessions = Math.max(0, sessionCount - prevSessionCount);
-
-      if (newSessions === 0) {
-        // No new sessions — schedule toast outside updater and return unchanged
-        setTimeout(() => showToast(`Week ${week}: already recorded ${prevSessionCount}/3 sessions`), 0);
-        return prev;
-      }
+      if (newSessions === 0) return prev;
 
       const completed = sessionCount >= 3;
       const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
@@ -361,10 +373,8 @@ export function useGameState() {
         ? Math.min(12, week + 1)
         : prev.currentWeek;
 
-      // Merge custom weights
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
-      // Compute volume from sets * weight * reps only for net-new sessions
       let addedVolume = 0;
       Object.entries(customSets).forEach(([exId, sets]) => {
         if (!sets || sets <= 0) return;
@@ -373,7 +383,6 @@ export function useGameState() {
         addedVolume += sets * ex * wt * newSessions;
       });
 
-      // XP only for net-new sessions — schedule toast outside updater
       const xpGain = newSessions * Math.round(300 * (completionPct / 100));
       const { xp, totalXp, level } = applyXP(prev, xpGain);
       setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
@@ -390,7 +399,7 @@ export function useGameState() {
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
     });
-  }, [setStateRaw, showToast]);
+  }, [backfillApplied, setStateRaw, showToast]);
 
   return {
     state, setState,
