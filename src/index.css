@@ -1,0 +1,87 @@
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0e1a;
+  --bg2: #0f1528;
+  --bg3: #151d35;
+  --cyan: #00e5ff;
+  --cyan2: #00b8d4;
+  --cyan-glow: rgba(0, 229, 255, 0.15);
+  --purple: #b388ff;
+  --purple2: #7c4dff;
+  --purple-glow: rgba(179, 136, 255, 0.15);
+  --fire: #ff6d00;
+  --fire2: #ff9100;
+  --fire-glow: rgba(255, 109, 0, 0.12);
+  --green: #00e676;
+  --green2: #69f0ae;
+  --green-glow: rgba(0, 230, 118, 0.12);
+  --red: #ff1744;
+  --red-glow: rgba(255, 23, 68, 0.12);
+  --gold: #ffd600;
+  --gold-glow: rgba(255, 214, 0, 0.1);
+  --text: #e8eaf6;
+  --text2: #9fa8da;
+  --text3: #5c6bc0;
+  --card: rgba(15, 21, 40, 0.85);
+  --card-border: rgba(0, 229, 255, 0.08);
+  --safe-top: env(safe-area-inset-top, 20px);
+  --safe-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+}
+
+body {
+  font-family: 'Rajdhani', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { opacity: 0; }
+  50%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(15px, -25px) scale(1.08); }
+}
+@keyframes rankPulse {
+  0%, 100% { box-shadow: 0 0 8px var(--cyan-glow); }
+  50%       { box-shadow: 0 0 22px var(--cyan-glow); }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.fi { animation: fadeIn 0.4s ease-out both; }
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.1s; }
+.d3 { animation-delay: 0.15s; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.15); border-radius: 4px; }
+
+/* Input reset */
+input, select, button { font-family: inherit; }
+button { cursor: pointer; }
+input:focus, select:focus { outline: none; }
