@@ -211,13 +211,14 @@ export function SummaryTab({ state }) {
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif }) {
   const [backfillW, setBackfillW] = useState(1);
-  const [backfillCount, setBackfillCount] = useState(3);
+  const [backfillCount, setBackfillCount] = useState(1);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState(() =>
     Object.fromEntries(EXERCISES.filter(e => !e.isPlank).map(e => [e.id, '']))
   );
+  // Default all sets to 0 — user opts in to exercise detail, sessions apply without data by default
   const [backfillSets, setBackfillSets] = useState(() =>
-    Object.fromEntries(EXERCISES.map(e => [e.id, e.sets]))
+    Object.fromEntries(EXERCISES.map(e => [e.id, 0]))
   );
   return (
     <div>

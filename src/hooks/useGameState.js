@@ -4,6 +4,13 @@ import { storageGet, storageSet, storageClear } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 
+// Module-level guard — lives completely outside React, reset only on page reload.
+// Initialized from localStorage so page reloads are also covered.
+const _initSaved = storageGet();
+const _backfillGuard = Object.fromEntries(
+  Object.entries(_initSaved?.weekProgress ?? {}).map(([w, d]) => [w, d.count ?? 0])
+);
+
 function mergeState(saved) {
   return { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...saved };
 }
@@ -113,6 +120,7 @@ export function useGameState() {
   const resetAll = useCallback(() => {
     storageClear();
     backfillApplied.current = {};
+    Object.keys(_backfillGuard).forEach(k => delete _backfillGuard[k]);
     setStateRaw({ ...DEFAULT_STATE });
     showToast('Progress reset!');
   }, [showToast]);
@@ -341,14 +349,19 @@ export function useGameState() {
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
+    // --- Module-level guard (outermost, synchronous, outside React entirely) ---
+    const key = String(week);
+    const guardCount = _backfillGuard[key] ?? 0;
+    if (sessionCount <= guardCount) {
+      showToast(`Week ${week}: already recorded ${guardCount}/3 sessions`);
+      return;
+    }
+    _backfillGuard[key] = sessionCount; // lock immediately
+
     setStateRaw(prev => {
-      // backfillLock is stored in game state — atomic, persisted, survives reloads.
-      // It records the highest sessionCount ever applied for each week.
+      // --- State-level guard (atomic, persisted in localStorage via state) ---
       const lockedCount = prev.backfillLock?.[week] ?? 0;
-      if (sessionCount <= lockedCount) {
-        setTimeout(() => showToast(`Week ${week}: already recorded ${lockedCount}/3 sessions`), 0);
-        return prev; // no change
-      }
+      if (sessionCount <= lockedCount) return prev;
 
       const prevSessionCount = prev.weekProgress?.[week]?.count ?? 0;
       const prevCompleted = prev.weekProgress?.[week]?.completed ?? false;
@@ -357,9 +370,15 @@ export function useGameState() {
 
       const completed = sessionCount >= 3;
       const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
+
+      // Populate exercisesDone with exercises that had sets > 0 in the form
+      const doneExIds = Object.entries(customSets)
+        .filter(([, sets]) => sets > 0)
+        .map(([exId]) => exId);
+
       const sessions = fakeDates.map(d => ({
         date: `Week ${week} ${d} (backfilled)`,
-        exercisesDone: [],
+        exercisesDone: doneExIds,
         completion: completionPct
       }));
 
@@ -367,10 +386,6 @@ export function useGameState() {
         ...prev.weekProgress,
         [week]: { count: sessionCount, dates: fakeDates, completed, sessions }
       };
-
-      // Do NOT advance currentWeek from backfill — advancing causes the workout
-      // tab to jump away from the backfilled week, making Wed/Fri appear unchecked.
-      // The user can manually set their current week via Settings → Current Week.
 
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
