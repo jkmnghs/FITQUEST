@@ -36,19 +36,40 @@ export function useGameState() {
     storageSet(state);
   }, [state]);
 
+  // Re-run day reset whenever the app becomes visible or the minute ticks over midnight
+  useEffect(() => {
+    function maybeDayReset() {
+      setStateRaw(prev => {
+        const next = checkDayReset(prev);
+        // Only trigger a re-render if something actually changed
+        return next.todayExDate !== prev.todayExDate ? next : prev;
+      });
+    }
+
+    // Check on tab focus (user comes back to app)
+    const onVisible = () => { if (document.visibilityState === 'visible') maybeDayReset(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    // Also check every minute (catches midnight without needing a reload)
+    const interval = setInterval(maybeDayReset, 60_000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Fire open notification
   useEffect(() => {
     maybeFireOpenNotification(state);
   }, []); // eslint-disable-line
 
-  // Save on visibility change / unload
+  // Save on page hide / unload
   useEffect(() => {
     const save = () => storageSet(state);
-    document.addEventListener('visibilitychange', save);
     window.addEventListener('pagehide', save);
     window.addEventListener('beforeunload', save);
     return () => {
-      document.removeEventListener('visibilitychange', save);
       window.removeEventListener('pagehide', save);
       window.removeEventListener('beforeunload', save);
     };
