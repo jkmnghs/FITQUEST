@@ -341,28 +341,17 @@ export function useGameState() {
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
-    // --- Guard layer 1: read localStorage directly (synchronous, always current) ---
-    const savedNow = storageGet();
-    const storedCount = savedNow?.weekProgress?.[week]?.count ?? 0;
-    if (sessionCount <= storedCount) {
-      showToast(`Week ${week}: already recorded ${storedCount}/3 sessions`);
-      return;
-    }
-
-    // --- Guard layer 2: ref lock (catches rapid double-clicks before localStorage saves) ---
-    const prevApplied = backfillApplied.current[week] ?? 0;
-    if (sessionCount <= prevApplied) {
-      showToast(`Week ${week}: already recorded ${prevApplied}/3 sessions`);
-      return;
-    }
-    backfillApplied.current[week] = sessionCount;
-
     setStateRaw(prev => {
-      const existing = prev.weekProgress?.[week];
-      const prevSessionCount = existing?.count ?? 0;
-      const prevCompleted = existing?.completed ?? false;
+      // backfillLock is stored in game state — atomic, persisted, survives reloads.
+      // It records the highest sessionCount ever applied for each week.
+      const lockedCount = prev.backfillLock?.[week] ?? 0;
+      if (sessionCount <= lockedCount) {
+        setTimeout(() => showToast(`Week ${week}: already recorded ${lockedCount}/3 sessions`), 0);
+        return prev; // no change
+      }
 
-      // --- Guard layer 3: inside updater against latest committed state ---
+      const prevSessionCount = prev.weekProgress?.[week]?.count ?? 0;
+      const prevCompleted = prev.weekProgress?.[week]?.completed ?? false;
       const newSessions = Math.max(0, sessionCount - prevSessionCount);
       if (newSessions === 0) return prev;
 
@@ -374,20 +363,23 @@ export function useGameState() {
         completion: completionPct
       }));
 
-      const weekProgress = { ...prev.weekProgress, [week]: { count: sessionCount, dates: fakeDates, completed, sessions } };
+      const weekProgress = {
+        ...prev.weekProgress,
+        [week]: { count: sessionCount, dates: fakeDates, completed, sessions }
+      };
 
-      const nextWeek = completed && week >= prev.currentWeek
-        ? Math.min(12, week + 1)
-        : prev.currentWeek;
+      // Do NOT advance currentWeek from backfill — advancing causes the workout
+      // tab to jump away from the backfilled week, making Wed/Fri appear unchecked.
+      // The user can manually set their current week via Settings → Current Week.
 
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
       let addedVolume = 0;
       Object.entries(customSets).forEach(([exId, sets]) => {
         if (!sets || sets <= 0) return;
-        const ex = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
+        const reps = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
         const wt = customWeights[exId] ?? prev.liftWeights?.[exId] ?? 0;
-        addedVolume += sets * ex * wt * newSessions;
+        addedVolume += sets * reps * wt * newSessions;
       });
 
       const xpGain = newSessions * Math.round(300 * (completionPct / 100));
@@ -399,14 +391,14 @@ export function useGameState() {
         xp, totalXp, level,
         weekProgress,
         liftWeights,
-        currentWeek: nextWeek,
+        backfillLock: { ...prev.backfillLock, [week]: sessionCount },
         totalSessions: prev.totalSessions + newSessions,
         totalMinutes: prev.totalMinutes + newSessions * durationMins,
         totalVolume: prev.totalVolume + addedVolume,
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
     });
-  }, [backfillApplied, setStateRaw, showToast]);
+  }, [setStateRaw, showToast]);
 
   return {
     state, setState,

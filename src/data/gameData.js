@@ -112,6 +112,7 @@ export const DEFAULT_STATE = {
   log: [],
   achDone: [],
   weekProgress: {},
+  backfillLock: {},
   todayExDone: [],
   todayExDate: null,
   todayExDetails: {},
