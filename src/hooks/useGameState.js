@@ -397,11 +397,10 @@ export function useGameState() {
         addedVolume += sets * reps * wt * newSessions;
       });
 
-      const xpGain = newSessions * Math.round(300 * (completionPct / 100));
+      const xpGain = newSessions * Math.round(60 * (completionPct / 100));
       const { xp, totalXp, level } = applyXP(prev, xpGain);
-      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
 
-      return {
+      const updatedState = {
         ...prev,
         xp, totalXp, level,
         weekProgress,
@@ -412,6 +411,15 @@ export function useGameState() {
         totalVolume: prev.totalVolume + addedVolume,
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
+
+      const newlyUnlocked = checkAchievements(updatedState);
+      if (newlyUnlocked.length > 0) {
+        updatedState.achDone = [...(prev.achDone || []), ...newlyUnlocked];
+        setTimeout(() => showToast(`🏆 Achievement unlocked!`), 1500);
+      }
+
+      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
+      return updatedState;
     });
   }, [setStateRaw, showToast]);
 
