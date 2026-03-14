@@ -213,8 +213,12 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(3);
   const [backfillPct, setBackfillPct] = useState(100);
+  const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState(() =>
     Object.fromEntries(EXERCISES.filter(e => !e.isPlank).map(e => [e.id, '']))
+  );
+  const [backfillSets, setBackfillSets] = useState(() =>
+    Object.fromEntries(EXERCISES.map(e => [e.id, e.sets]))
   );
   return (
     <div>
@@ -334,21 +338,54 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </div>
         </div>
 
-        {/* Per-exercise weights */}
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-          Weights used (leave blank to keep current)
+        {/* Session duration */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Session duration (per session)</div>
+            <div style={{ fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700, color: 'var(--cyan)' }}>
+              {backfillDuration} min
+            </div>
+          </div>
+          <input type="range" min={20} max={120} step={5} value={backfillDuration}
+            onChange={e => setBackfillDuration(Number(e.target.value))}
+            style={{ width: '100%', accentColor: 'var(--cyan)' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+            <span>20 min</span><span>120 min</span>
+          </div>
         </div>
-        {EXERCISES.filter(e => !e.isPlank).map(ex => (
-          <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <div style={{ flex: 1, fontSize: 12, color: 'var(--text2)' }}>{ex.name}</div>
+
+        {/* Per-exercise weights + sets */}
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
+          Exercise details (leave weight blank to keep current)
+        </div>
+        {/* Header */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 4 }}>
+          {['Exercise', state.unit.toUpperCase(), 'Sets'].map(h => (
+            <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Orbitron', fontWeight: 600 }}>{h}</div>
+          ))}
+        </div>
+        {EXERCISES.map(ex => (
+          <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text2)' }}>{ex.name}</div>
+            {ex.isPlank ? (
+              <div style={{ fontSize: 10, color: 'var(--text3)', textAlign: 'center' }}>—</div>
+            ) : (
+              <input
+                type="number" inputMode="decimal"
+                placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
+                value={backfillWeights[ex.id]}
+                onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
+                style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
+              />
+            )}
             <input
-              type="number" inputMode="decimal"
-              placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
-              value={backfillWeights[ex.id]}
-              onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
-              style={{ ...inputStyle, width: 70 }}
+              type="number" inputMode="numeric"
+              min={0} max={ex.sets + 2}
+              value={backfillSets[ex.id]}
+              onChange={e => setBackfillSets(prev => ({ ...prev, [ex.id]: Number(e.target.value) }))}
+              style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
             />
-            <div style={{ fontSize: 11, color: 'var(--text3)', width: 24 }}>{state.unit}</div>
           </div>
         ))}
 
@@ -369,7 +406,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 custom[ex.id] = state.unit === 'lbs' ? v / 2.205 : v;
               }
             });
-            onBackfillWeek(backfillW, backfillCount, backfillPct, custom);
+            onBackfillWeek(backfillW, backfillCount, backfillPct, custom, backfillSets, backfillDuration);
           }}
           style={{
             width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,

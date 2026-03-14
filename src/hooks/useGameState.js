@@ -329,8 +329,8 @@ export function useGameState() {
   }, [setState]);
 
   // Retroactively mark sessions for a past week (for backfilling lost data)
-  // completionPct: 0-100, customWeights: { [exId]: kg }
-  const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}) => {
+  // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
+  const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
     setState(prev => {
       const weekProgress = { ...prev.weekProgress };
       const completed = sessionCount >= 3;
@@ -341,19 +341,23 @@ export function useGameState() {
         completion: completionPct
       }));
 
-      weekProgress[week] = {
-        count: sessionCount,
-        dates: fakeDates,
-        completed,
-        sessions
-      };
+      weekProgress[week] = { count: sessionCount, dates: fakeDates, completed, sessions };
 
       const nextWeek = completed && week >= prev.currentWeek
         ? Math.min(12, week + 1)
         : prev.currentWeek;
 
-      // Merge custom weights — only overwrite if provided
+      // Merge custom weights
       const liftWeights = { ...prev.liftWeights, ...customWeights };
+
+      // Compute volume from sets * weight * reps for each exercise
+      let addedVolume = 0;
+      Object.entries(customSets).forEach(([exId, sets]) => {
+        if (!sets || sets <= 0) return;
+        const ex = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
+        const wt = customWeights[exId] ?? prev.liftWeights?.[exId] ?? 0;
+        addedVolume += sets * ex * wt * sessionCount;
+      });
 
       // XP scaled by completion
       const xpGain = sessionCount * Math.round(300 * (completionPct / 100));
@@ -368,6 +372,8 @@ export function useGameState() {
         liftWeights,
         currentWeek: nextWeek,
         totalSessions: prev.totalSessions + sessionCount,
+        totalMinutes: prev.totalMinutes + sessionCount * durationMins,
+        totalVolume: prev.totalVolume + addedVolume,
         perfectWeeks: completed ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
     });
