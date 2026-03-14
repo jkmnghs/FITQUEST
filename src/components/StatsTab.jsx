@@ -55,7 +55,7 @@ export default function StatsTab({ state }) {
             <div style={{ height: 5, background: 'rgba(0,229,255,0.08)', borderRadius: 6, overflow: 'hidden' }}>
               <div style={{
                 height: '100%', borderRadius: 6, background: 'var(--cyan)',
-                width: `${Math.min(100, ((wt - ex.startKg + 5) / 20) * 100)}%`,
+                width: `${Math.min(100, Math.max(0, ((wt - ex.startKg) / 20) * 100))}%`,
                 transition: 'width 0.6s'
               }} />
             </div>
