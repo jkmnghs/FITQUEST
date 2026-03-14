@@ -3,7 +3,7 @@ import { EXERCISES } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 
-export default function WorkoutTab({ state, onCompleteExercise, onFinishSession, onStartSession }) {
+export default function WorkoutTab({ state, onCompleteExercise, onFinishSession, onStartSession, onModalChange }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -14,6 +14,11 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
   useEffect(() => {
     setViewingWeek(state.currentWeek);
   }, [state.currentWeek]);
+
+  // Tell App when any modal/overlay is open so it can hide the tab bar
+  useEffect(() => {
+    onModalChange?.(!!activeExId || showFinishConfirm);
+  }, [activeExId, showFinishConfirm]);
 
   const w = viewingWeek;
   const isCurrentWeek = w === state.currentWeek;

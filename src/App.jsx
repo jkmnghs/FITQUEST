@@ -25,6 +25,7 @@ const TABS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('workout');
+  const [modalOpen, setModalOpen] = useState(false);
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
@@ -61,12 +62,14 @@ export default function App() {
         minHeight: '100dvh', display: 'flex', flexDirection: 'column',
         paddingTop: 'var(--safe-top)'
       }}>
-        {/* Header */}
-        <Header state={state} />
+        {/* Header — hidden when modal is open */}
+        <div style={{ display: modalOpen ? 'none' : 'block' }}>
+          <Header state={state} />
+        </div>
 
-        {/* Tab bar */}
+        {/* Tab bar — hidden when modal is open */}
         <div style={{
-          display: 'flex', gap: 4, padding: '8px 12px',
+          display: modalOpen ? 'none' : 'flex', gap: 4, padding: '8px 12px',
           overflowX: 'auto', WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
           position: 'sticky', top: 0, zIndex: 10,
@@ -106,6 +109,7 @@ export default function App() {
               onCompleteExercise={completeExercise}
               onFinishSession={finishSession}
               onStartSession={startSession}
+              onModalChange={setModalOpen}
             />
           </div>
           {activeTab === 'coach' && (
