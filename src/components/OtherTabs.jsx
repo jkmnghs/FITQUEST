@@ -212,7 +212,6 @@ export function SummaryTab({ state }) {
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif }) {
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(3);
-  const [backfillPct, setBackfillPct] = useState(100);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState(() =>
     Object.fromEntries(EXERCISES.filter(e => !e.isPlank).map(e => [e.id, '']))
@@ -320,23 +319,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </div>
         </div>
 
-        {/* Completion % */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg exercise completion</div>
-            <div style={{ fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700,
-              color: backfillPct >= 95 ? 'var(--green)' : backfillPct >= 70 ? 'var(--cyan)' : 'var(--fire2)' }}>
-              {backfillPct}%
-            </div>
-          </div>
-          <input type="range" min={10} max={100} step={5} value={backfillPct}
-            onChange={e => setBackfillPct(Number(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--purple)' }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-            <span>Partial</span><span>Full (7/7)</span>
-          </div>
-        </div>
+
 
         {/* Session duration */}
         <div style={{ marginBottom: 12 }}>
@@ -357,11 +340,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
 
         {/* Per-exercise weights + sets */}
         <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-          Exercise details (leave weight blank to keep current)
+          Exercise details — leave weight blank to keep current. Set sets to <span style={{ color: 'var(--fire2)', fontWeight: 700 }}>0</span> for any exercise you skipped.
         </div>
         {/* Header */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 4 }}>
-          {['Exercise', state.unit.toUpperCase(), 'Sets'].map(h => (
+          {['Exercise', state.unit.toUpperCase(), 'Sets (0=skip)'].map(h => (
             <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Orbitron', fontWeight: 600 }}>{h}</div>
           ))}
         </div>
@@ -397,8 +380,25 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </div>
         )}
 
+        {/* Auto-computed completion */}
+        {(() => {
+          const done = Object.values(backfillSets).filter(s => s > 0).length;
+          const pct = Math.round(done / EXERCISES.length * 100);
+          return (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text3)' }}>Completion (auto)</div>
+              <div style={{ fontSize: 12, fontFamily: 'Orbitron', fontWeight: 700,
+                color: pct >= 95 ? 'var(--green)' : pct >= 70 ? 'var(--cyan)' : 'var(--fire2)' }}>
+                {done}/{EXERCISES.length} &nbsp;{pct}%
+              </div>
+            </div>
+          );
+        })()}
+
         <button
           onClick={() => {
+            const done = Object.values(backfillSets).filter(s => s > 0).length;
+            const autoPct = Math.round(done / EXERCISES.length * 100);
             const custom = {};
             EXERCISES.filter(e => !e.isPlank).forEach(ex => {
               const v = parseFloat(backfillWeights[ex.id]);
@@ -406,7 +406,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 custom[ex.id] = state.unit === 'lbs' ? v / 2.205 : v;
               }
             });
-            onBackfillWeek(backfillW, backfillCount, backfillPct, custom, backfillSets, backfillDuration);
+            onBackfillWeek(backfillW, backfillCount, autoPct, custom, backfillSets, backfillDuration);
           }}
           style={{
             width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
