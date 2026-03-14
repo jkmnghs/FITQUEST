@@ -329,7 +329,8 @@ export function useGameState() {
   }, [setState]);
 
   // Retroactively mark sessions for a past week (for backfilling lost data)
-  const backfillWeek = useCallback((week, sessionCount) => {
+  // completionPct: 0-100, customWeights: { [exId]: kg }
+  const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}) => {
     setState(prev => {
       const weekProgress = { ...prev.weekProgress };
       const completed = sessionCount >= 3;
@@ -337,7 +338,7 @@ export function useGameState() {
       const sessions = fakeDates.map(d => ({
         date: `Week ${week} ${d} (backfilled)`,
         exercisesDone: [],
-        completion: 100
+        completion: completionPct
       }));
 
       weekProgress[week] = {
@@ -347,13 +348,15 @@ export function useGameState() {
         sessions
       };
 
-      // If this completes a week, advance currentWeek if needed
       const nextWeek = completed && week >= prev.currentWeek
         ? Math.min(12, week + 1)
         : prev.currentWeek;
 
-      // Award XP: ~300 per completed session
-      const xpGain = sessionCount * 300;
+      // Merge custom weights — only overwrite if provided
+      const liftWeights = { ...prev.liftWeights, ...customWeights };
+
+      // XP scaled by completion
+      const xpGain = sessionCount * Math.round(300 * (completionPct / 100));
       const { xp, totalXp, level } = applyXP(prev, xpGain);
 
       showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`);
@@ -362,6 +365,7 @@ export function useGameState() {
         ...prev,
         xp, totalXp, level,
         weekProgress,
+        liftWeights,
         currentWeek: nextWeek,
         totalSessions: prev.totalSessions + sessionCount,
         perfectWeeks: completed ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,

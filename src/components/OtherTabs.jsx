@@ -212,6 +212,10 @@ export function SummaryTab({ state }) {
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif }) {
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(3);
+  const [backfillPct, setBackfillPct] = useState(100);
+  const [backfillWeights, setBackfillWeights] = useState(() =>
+    Object.fromEntries(EXERCISES.filter(e => !e.isPlank).map(e => [e.id, '']))
+  );
   return (
     <div>
       <div style={{
@@ -289,9 +293,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Backfill Past Weeks</div>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
-          Lost your data? Mark weeks you already completed.
+          Lost your data? Set sessions done, completion, and weights you were lifting.
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+
+        {/* Week + sessions row */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
             <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
@@ -309,19 +315,64 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             </select>
           </div>
         </div>
-        {/* Show current status for selected week */}
-        {(() => {
-          const wp = state.weekProgress?.[backfillW];
-          return wp ? (
-            <div style={{ fontSize: 11, color: 'var(--cyan)', marginBottom: 8 }}>
-              Currently: {wp.count}/3 sessions {wp.completed ? '✓ complete' : ''}
+
+        {/* Completion % */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Avg exercise completion</div>
+            <div style={{ fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700,
+              color: backfillPct >= 95 ? 'var(--green)' : backfillPct >= 70 ? 'var(--cyan)' : 'var(--fire2)' }}>
+              {backfillPct}%
             </div>
-          ) : null;
-        })()}
+          </div>
+          <input type="range" min={10} max={100} step={5} value={backfillPct}
+            onChange={e => setBackfillPct(Number(e.target.value))}
+            style={{ width: '100%', accentColor: 'var(--purple)' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+            <span>Partial</span><span>Full (7/7)</span>
+          </div>
+        </div>
+
+        {/* Per-exercise weights */}
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
+          Weights used (leave blank to keep current)
+        </div>
+        {EXERCISES.filter(e => !e.isPlank).map(ex => (
+          <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ flex: 1, fontSize: 12, color: 'var(--text2)' }}>{ex.name}</div>
+            <input
+              type="number" inputMode="decimal"
+              placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
+              value={backfillWeights[ex.id]}
+              onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
+              style={{ ...inputStyle, width: 70 }}
+            />
+            <div style={{ fontSize: 11, color: 'var(--text3)', width: 24 }}>{state.unit}</div>
+          </div>
+        ))}
+
+        {/* Current status */}
+        {state.weekProgress?.[backfillW] && (
+          <div style={{ fontSize: 11, color: 'var(--cyan)', margin: '8px 0' }}>
+            Currently: {state.weekProgress[backfillW].count}/3 sessions
+            {state.weekProgress[backfillW].completed ? ' ✓ complete' : ''}
+          </div>
+        )}
+
         <button
-          onClick={() => onBackfillWeek(backfillW, backfillCount)}
+          onClick={() => {
+            const custom = {};
+            EXERCISES.filter(e => !e.isPlank).forEach(ex => {
+              const v = parseFloat(backfillWeights[ex.id]);
+              if (!isNaN(v) && v > 0) {
+                custom[ex.id] = state.unit === 'lbs' ? v / 2.205 : v;
+              }
+            });
+            onBackfillWeek(backfillW, backfillCount, backfillPct, custom);
+          }}
           style={{
-            width: '100%', padding: 10, border: 'none', borderRadius: 10,
+            width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
             background: 'linear-gradient(135deg, var(--purple2), var(--purple))',
             fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
             color: '#fff', letterSpacing: 0.5, cursor: 'pointer'
