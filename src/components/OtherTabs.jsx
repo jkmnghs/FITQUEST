@@ -373,10 +373,10 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         ))}
 
         {/* Current status */}
-        {state.weekProgress?.[backfillW] && (
+        {(state.weekProgress?.[backfillW] || state.backfillLock?.[backfillW]) && (
           <div style={{ fontSize: 11, color: 'var(--cyan)', margin: '8px 0' }}>
-            Currently: {state.weekProgress[backfillW].count}/3 sessions
-            {state.weekProgress[backfillW].completed ? ' ✓ complete' : ''}
+            Currently: {state.weekProgress?.[backfillW]?.count ?? 0}/3 sessions
+            {state.weekProgress?.[backfillW]?.completed ? ' ✓ complete' : ''}
           </div>
         )}
 
@@ -396,11 +396,13 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         })()}
 
         {(() => {
-          const alreadyDone = (state.weekProgress?.[backfillW]?.count ?? 0) >= backfillCount;
+          const lockedCount = state.backfillLock?.[backfillW] ?? 0;
+          const alreadyDone = backfillCount <= lockedCount;
           return (
             <button
               disabled={alreadyDone}
               onClick={() => {
+                if (alreadyDone) return;
                 const done = Object.values(backfillSets).filter(s => s > 0).length;
                 const autoPct = Math.round(done / EXERCISES.length * 100);
                 const custom = {};
@@ -421,7 +423,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 color: alreadyDone ? 'var(--text3)' : '#fff',
                 letterSpacing: 0.5, cursor: alreadyDone ? 'not-allowed' : 'pointer'
               }}
-            >{alreadyDone ? `WEEK ${backfillW} ALREADY AT ${backfillCount}/3` : `APPLY WEEK ${backfillW}`}</button>
+            >{alreadyDone ? `WEEK ${backfillW} ALREADY AT ${lockedCount}/3` : `APPLY WEEK ${backfillW}`}</button>
           );
         })()}
       </div>
