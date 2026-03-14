@@ -216,9 +216,8 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
   const [backfillWeights, setBackfillWeights] = useState(() =>
     Object.fromEntries(EXERCISES.filter(e => !e.isPlank).map(e => [e.id, '']))
   );
-  // Default all sets to 0 — user opts in to exercise detail, sessions apply without data by default
   const [backfillSets, setBackfillSets] = useState(() =>
-    Object.fromEntries(EXERCISES.map(e => [e.id, 0]))
+    Object.fromEntries(EXERCISES.map(e => [e.id, e.isPlank ? 2 : 3]))
   );
   return (
     <div>
