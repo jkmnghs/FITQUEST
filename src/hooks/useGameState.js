@@ -4,6 +4,13 @@ import { storageGet, storageSet, storageClear } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 
+// Module-level guard — lives completely outside React, reset only on page reload.
+// Initialized from localStorage so page reloads are also covered.
+const _initSaved = storageGet();
+const _backfillGuard = Object.fromEntries(
+  Object.entries(_initSaved?.weekProgress ?? {}).map(([w, d]) => [w, d.count ?? 0])
+);
+
 function mergeState(saved) {
   return { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...saved };
 }
@@ -30,6 +37,15 @@ export function useGameState() {
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
+
+  // Ref-based synchronous lock for backfill — tracks the highest session count
+  // already applied per week. Updated synchronously before setState so rapid
+  // re-clicks are blocked even before React commits the state update.
+  const backfillApplied = useRef((() => {
+    const saved = storageGet();
+    const wp = saved?.weekProgress ?? {};
+    return Object.fromEntries(Object.entries(wp).map(([w, d]) => [w, d.count ?? 0]));
+  })());
 
   // Auto-save on state change
   useEffect(() => {
@@ -103,6 +119,8 @@ export function useGameState() {
 
   const resetAll = useCallback(() => {
     storageClear();
+    backfillApplied.current = {};
+    Object.keys(_backfillGuard).forEach(k => delete _backfillGuard[k]);
     setStateRaw({ ...DEFAULT_STATE });
     showToast('Progress reset!');
   }, [showToast]);
@@ -331,53 +349,71 @@ export function useGameState() {
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
-    setState(prev => {
-      const weekProgress = { ...prev.weekProgress };
+    // --- Module-level guard (outermost, synchronous, outside React entirely) ---
+    const key = String(week);
+    const guardCount = _backfillGuard[key] ?? 0;
+    if (sessionCount <= guardCount) {
+      showToast(`Week ${week}: already recorded ${guardCount}/3 sessions`);
+      return;
+    }
+    _backfillGuard[key] = sessionCount; // lock immediately
+
+    setStateRaw(prev => {
+      // --- State-level guard (atomic, persisted in localStorage via state) ---
+      const lockedCount = prev.backfillLock?.[week] ?? 0;
+      if (sessionCount <= lockedCount) return prev;
+
+      const prevSessionCount = prev.weekProgress?.[week]?.count ?? 0;
+      const prevCompleted = prev.weekProgress?.[week]?.completed ?? false;
+      const newSessions = Math.max(0, sessionCount - prevSessionCount);
+      if (newSessions === 0) return prev;
+
       const completed = sessionCount >= 3;
       const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
+
+      // Populate exercisesDone with exercises that had sets > 0 in the form
+      const doneExIds = Object.entries(customSets)
+        .filter(([, sets]) => sets > 0)
+        .map(([exId]) => exId);
+
       const sessions = fakeDates.map(d => ({
         date: `Week ${week} ${d} (backfilled)`,
-        exercisesDone: [],
+        exercisesDone: doneExIds,
         completion: completionPct
       }));
 
-      weekProgress[week] = { count: sessionCount, dates: fakeDates, completed, sessions };
+      const weekProgress = {
+        ...prev.weekProgress,
+        [week]: { count: sessionCount, dates: fakeDates, completed, sessions }
+      };
 
-      const nextWeek = completed && week >= prev.currentWeek
-        ? Math.min(12, week + 1)
-        : prev.currentWeek;
-
-      // Merge custom weights
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
-      // Compute volume from sets * weight * reps for each exercise
       let addedVolume = 0;
       Object.entries(customSets).forEach(([exId, sets]) => {
         if (!sets || sets <= 0) return;
-        const ex = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
+        const reps = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
         const wt = customWeights[exId] ?? prev.liftWeights?.[exId] ?? 0;
-        addedVolume += sets * ex * wt * sessionCount;
+        addedVolume += sets * reps * wt * newSessions;
       });
 
-      // XP scaled by completion
-      const xpGain = sessionCount * Math.round(300 * (completionPct / 100));
+      const xpGain = newSessions * Math.round(300 * (completionPct / 100));
       const { xp, totalXp, level } = applyXP(prev, xpGain);
-
-      showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`);
+      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
 
       return {
         ...prev,
         xp, totalXp, level,
         weekProgress,
         liftWeights,
-        currentWeek: nextWeek,
-        totalSessions: prev.totalSessions + sessionCount,
-        totalMinutes: prev.totalMinutes + sessionCount * durationMins,
+        backfillLock: { ...prev.backfillLock, [week]: sessionCount },
+        totalSessions: prev.totalSessions + newSessions,
+        totalMinutes: prev.totalMinutes + newSessions * durationMins,
         totalVolume: prev.totalVolume + addedVolume,
-        perfectWeeks: completed ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
+        perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
     });
-  }, [setState, showToast]);
+  }, [setStateRaw, showToast]);
 
   return {
     state, setState,
