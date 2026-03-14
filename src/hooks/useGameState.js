@@ -333,6 +333,18 @@ export function useGameState() {
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
     setState(prev => {
       const weekProgress = { ...prev.weekProgress };
+      const existing = weekProgress[week];
+      const prevSessionCount = existing?.count ?? 0;
+      const prevCompleted = existing?.completed ?? false;
+
+      // Only award XP/stats for net-new sessions to prevent XP farming
+      const newSessions = Math.max(0, sessionCount - prevSessionCount);
+
+      if (newSessions === 0 && sessionCount <= prevSessionCount) {
+        showToast(`Week ${week}: already recorded ${prevSessionCount}/3 sessions`);
+        return prev;
+      }
+
       const completed = sessionCount >= 3;
       const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
       const sessions = fakeDates.map(d => ({
@@ -350,17 +362,17 @@ export function useGameState() {
       // Merge custom weights
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
-      // Compute volume from sets * weight * reps for each exercise
+      // Compute volume from sets * weight * reps only for net-new sessions
       let addedVolume = 0;
       Object.entries(customSets).forEach(([exId, sets]) => {
         if (!sets || sets <= 0) return;
         const ex = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
         const wt = customWeights[exId] ?? prev.liftWeights?.[exId] ?? 0;
-        addedVolume += sets * ex * wt * sessionCount;
+        addedVolume += sets * ex * wt * newSessions;
       });
 
-      // XP scaled by completion
-      const xpGain = sessionCount * Math.round(300 * (completionPct / 100));
+      // XP only for net-new sessions
+      const xpGain = newSessions * Math.round(300 * (completionPct / 100));
       const { xp, totalXp, level } = applyXP(prev, xpGain);
 
       showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`);
@@ -371,10 +383,10 @@ export function useGameState() {
         weekProgress,
         liftWeights,
         currentWeek: nextWeek,
-        totalSessions: prev.totalSessions + sessionCount,
-        totalMinutes: prev.totalMinutes + sessionCount * durationMins,
+        totalSessions: prev.totalSessions + newSessions,
+        totalMinutes: prev.totalMinutes + newSessions * durationMins,
         totalVolume: prev.totalVolume + addedVolume,
-        perfectWeeks: completed ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
+        perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
       };
     });
   }, [setState, showToast]);
