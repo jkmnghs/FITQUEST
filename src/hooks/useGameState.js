@@ -22,8 +22,8 @@ function checkDayReset(state) {
     next.todayExDone = [];
     next.todayExDetails = {};
     next.todaySessionFinished = false;
+    next.sessionStartTime = null;
     next.todayExDate = t;
-    // Don't reset sessionStartTime here — we reset it after finishing
   }
   return next;
 }
@@ -285,15 +285,18 @@ export function useGameState() {
     setTimeout(() => addXP(pendingXP), 100);
     if (pendingAdvance !== null) {
       setTimeout(() => {
-        setState(s => ({
-          ...s,
-          currentWeek: pendingAdvance,
-          todayExDone: [],
-          todayExDetails: {},
-          todaySessionFinished: false,
-          sessionStartTime: null,
-          todayExDate: today()
-        }));
+        setState(s => {
+          // Only clear daily fields if user hasn't manually navigated to a different week
+          if (s.currentWeek !== pendingAdvance) return s;
+          return {
+            ...s,
+            todayExDone: [],
+            todayExDetails: {},
+            todaySessionFinished: false,
+            sessionStartTime: null,
+            todayExDate: today()
+          };
+        });
       }, 2500);
     }
   }, [setState, addXP, showToast]);
