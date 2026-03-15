@@ -400,8 +400,21 @@ export function useGameState() {
         addedVolume += sets * reps * wt * newSessions;
       });
 
-      const xpGain = newSessions * Math.round(60 * (completionPct / 100));
+      const sessionXp = Math.round(60 * (completionPct / 100));
+      const xpGain = newSessions * sessionXp;
       const { xp, totalXp, level } = applyXP(prev, xpGain);
+
+      // Build log entries for each newly backfilled session so Summary/Log tabs reflect them
+      const totalExCount = Object.keys(customSets).length || 7;
+      const dayLabels = ['Mon', 'Wed', 'Fri'];
+      const newLogEntries = [];
+      for (let i = prevSessionCount; i < sessionCount; i++) {
+        newLogEntries.push({
+          name: `Session ${i + 1}/3 • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
+          xp: sessionXp, date: `Week ${week} (backfill)`, type: 'session', week,
+          dateStr: `Week ${week} ${dayLabels[i] || `S${i + 1}`} (backfill)`
+        });
+      }
 
       const updatedState = {
         ...prev,
@@ -413,6 +426,7 @@ export function useGameState() {
         totalMinutes: prev.totalMinutes + newSessions * durationMins,
         totalVolume: prev.totalVolume + addedVolume,
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
+        log: [...prev.log, ...newLogEntries],
       };
 
       const newlyUnlocked = checkAchievements(updatedState);
