@@ -262,37 +262,74 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
 }
 
 function PlankSets({ sets, onToggle, onUpdate }) {
+  const [activeTimer, setActiveTimer] = React.useState(null); // { setIdx, elapsed, interval }
+  const intervalRef = React.useRef(null);
+  const startTimeRef = React.useRef(null);
+
+  function startTimer(i) {
+    if (activeTimer?.setIdx === i) {
+      // Stop timer, fill in elapsed seconds
+      clearInterval(intervalRef.current);
+      const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
+      onUpdate(i, 'time', elapsed);
+      setActiveTimer(null);
+      return;
+    }
+    clearInterval(intervalRef.current);
+    startTimeRef.current = Date.now();
+    setActiveTimer({ setIdx: i, elapsed: 0 });
+    intervalRef.current = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
+      setActiveTimer(prev => prev ? { ...prev, elapsed } : null);
+    }, 100);
+  }
+
+  React.useEffect(() => () => clearInterval(intervalRef.current), []);
+
   return (
     <>
       <div style={{
-        display: 'grid', gridTemplateColumns: '20px 1fr 36px',
+        display: 'grid', gridTemplateColumns: '20px 1fr 56px 36px',
         gap: 6, marginBottom: 6, paddingBottom: 6,
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
-        {['#', 'SECONDS', ''].map((h, i) => (
+        {['#', 'SECONDS', 'TIMER', ''].map((h, i) => (
           <span key={i} style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>{h}</span>
         ))}
       </div>
-      {sets.map((s, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 36px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-          <span style={{ fontFamily: 'Orbitron', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center' }}>
-            {i + 1}{s.isExtra ? '+' : ''}
-          </span>
-          <input
-            type="number" inputMode="numeric"
-            value={s.time} onChange={e => onUpdate(i, 'time', e.target.value)}
-            placeholder="45-60"
-            style={inputStyle}
-          />
-          <button onClick={() => onToggle(i)} style={{
-            width: 36, height: 38, borderRadius: 9,
-            border: `2px solid ${s.done ? 'var(--green)' : 'rgba(255,255,255,0.1)'}`,
-            background: s.done ? 'var(--green)' : 'transparent',
-            color: s.done ? 'var(--bg)' : 'var(--text3)',
-            fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>✓</button>
-        </div>
-      ))}
+      {sets.map((s, i) => {
+        const isRunning = activeTimer?.setIdx === i;
+        const elapsed = isRunning ? activeTimer.elapsed : null;
+        return (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 56px 36px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+            <span style={{ fontFamily: 'Orbitron', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center' }}>
+              {i + 1}{s.isExtra ? '+' : ''}
+            </span>
+            <input
+              type="number" inputMode="numeric"
+              value={s.time} onChange={e => onUpdate(i, 'time', e.target.value)}
+              placeholder="45-60"
+              style={inputStyle}
+            />
+            <button onClick={() => startTimer(i)} style={{
+              height: 38, borderRadius: 9, fontSize: isRunning ? 13 : 11,
+              border: `1px solid ${isRunning ? 'rgba(255,109,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              background: isRunning ? 'rgba(255,109,0,0.12)' : 'rgba(255,255,255,0.04)',
+              color: isRunning ? 'var(--fire2)' : 'var(--text3)',
+              fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer'
+            }}>
+              {isRunning ? `${elapsed}s` : '▶'}
+            </button>
+            <button onClick={() => onToggle(i)} style={{
+              width: 36, height: 38, borderRadius: 9,
+              border: `2px solid ${s.done ? 'var(--green)' : 'rgba(255,255,255,0.1)'}`,
+              background: s.done ? 'var(--green)' : 'transparent',
+              color: s.done ? 'var(--bg)' : 'var(--text3)',
+              fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>✓</button>
+          </div>
+        );
+      })}
     </>
   );
 }
