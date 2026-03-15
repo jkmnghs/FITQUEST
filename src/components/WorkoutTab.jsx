@@ -160,7 +160,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
                 fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--fire2)',
                 background: 'var(--fire-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8
               }}>
-                +{isDeload ? 10 : ex.sets * 5 + 10} XP
+                +{isDeload ? 10 : ex.sets * 5 + 10} XP max
               </div>
             </div>
 
