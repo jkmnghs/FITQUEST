@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { DEFAULT_STATE } from '../data/gameData';
+import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
@@ -111,7 +111,10 @@ export function useGameState() {
       const nextAchDone = [...prev.achDone, ...newlyUnlocked];
       showToast(leveledUp ? `+${amount} XP — LEVEL UP! 🎉` : (message || `+${amount} XP`));
       if (newlyUnlocked.length > 0) {
-        setTimeout(() => showToast(`🏆 Achievement unlocked!`), 1500);
+        newlyUnlocked.forEach((id, idx) => {
+          const ach = ACHIEVEMENTS.find(a => a.id === id);
+          setTimeout(() => showToast(`🏆 ${ach?.name || 'Achievement'} unlocked!`), 1500 + idx * 2000);
+        });
       }
       return { ...prev, xp, totalXp, level, achDone: nextAchDone };
     });
@@ -342,10 +345,10 @@ export function useGameState() {
     });
   }, [setState]);
 
-  const addAIHistory = useCallback((entry) => {
+  const addAIHistory = useCallback((messages) => {
     setState(prev => ({
       ...prev,
-      aiCoachHistory: [...(prev.aiCoachHistory || []).slice(-19), entry]
+      aiCoachHistory: messages
     }));
   }, [setState]);
 
@@ -432,13 +435,24 @@ export function useGameState() {
       const newlyUnlocked = checkAchievements(updatedState);
       if (newlyUnlocked.length > 0) {
         updatedState.achDone = [...(prev.achDone || []), ...newlyUnlocked];
-        setTimeout(() => showToast(`🏆 Achievement unlocked!`), 1500);
+        newlyUnlocked.forEach((id, idx) => {
+          const ach = ACHIEVEMENTS.find(a => a.id === id);
+          setTimeout(() => showToast(`🏆 ${ach?.name || 'Achievement'} unlocked!`), 1500 + idx * 2000);
+        });
       }
 
       setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
       return updatedState;
     });
   }, [setStateRaw, showToast]);
+
+  const importData = useCallback((data) => {
+    const merged = mergeState(data);
+    storageSet(merged);
+    backfillApplied.current = {};
+    setStateRaw(merged);
+    showToast('Progress restored from backup! ✓');
+  }, [showToast]);
 
   return {
     state, setState,
@@ -452,6 +466,7 @@ export function useGameState() {
     finishSession,
     submitCheckin,
     updateSetting,
-    addAIHistory
+    addAIHistory,
+    importData
   };
 }
