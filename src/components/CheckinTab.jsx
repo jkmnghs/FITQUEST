@@ -24,8 +24,10 @@ export default function CheckinTab({ state, onSubmit }) {
 
   function handleSubmit() {
     const wt = parseFloat(weight);
-    if (!wt) return;
-    onSubmit(wt, parseFloat(waist) || 0);
+    if (!wt || wt <= 0 || wt > 500) return;
+    const ws = parseFloat(waist) || 0;
+    if (ws < 0 || ws > 300) return;
+    onSubmit(wt, ws);
     setSubmitted(true);
   }
 
@@ -60,9 +62,9 @@ export default function CheckinTab({ state, onSubmit }) {
           ) : (
             <>
               <InputRow label="Weight" value={weight} onChange={setWeight}
-                placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" />
+                placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
               <InputRow label="Waist" value={waist} onChange={setWaist}
-                placeholder="0" unit="cm" inputMode="decimal" step="0.1" />
+                placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
               <button onClick={handleSubmit} style={{
                 width: '100%', padding: 12, border: 'none', borderRadius: 12,
                 background: 'linear-gradient(135deg, var(--purple2), var(--purple))',
@@ -166,12 +168,12 @@ export default function CheckinTab({ state, onSubmit }) {
   );
 }
 
-function InputRow({ label, value, onChange, placeholder, unit, inputMode, step }) {
+function InputRow({ label, value, onChange, placeholder, unit, inputMode, step, min, max }) {
   return (
     <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
       <label style={{ fontSize: 13, color: 'var(--text2)', width: 70, flexShrink: 0 }}>{label}</label>
       <input
-        type="number" inputMode={inputMode} step={step}
+        type="number" inputMode={inputMode} step={step} min={min} max={max}
         value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         style={{

@@ -10,69 +10,59 @@ const COACH_MODES = [
   { id: 'checkin',  icon: '📋', label: 'Check-in Review',color: 'var(--gold)',    bg: 'var(--gold-glow)',       border: 'rgba(255,214,0,0.2)' },
 ];
 
-function buildSystemPrompt(state) {
+// One-shot modes don't benefit from conversation history — each call is independent
+const ONE_SHOT_MODES = ['pep', 'analysis', 'overload', 'form'];
+
+// Mode-specific system prompts — only send data relevant to each mode
+function buildSystemPrompt(state, mode) {
   const phase = getPhase(state.currentWeek);
-  const sug = state.overloadSuggestions || {};
-  const prs = state.personalRecords || {};
   const unit = state.unit;
-
-  const liftSummary = EXERCISES.filter(e => !e.isPlank).map(ex => {
-    const wt = convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg, unit);
-    const pr = prs[ex.id] ? convertWeight(prs[ex.id].weight, unit) : null;
-    const s = sug[ex.id];
-    return `  - ${ex.name}: ${wt}${unit}${pr ? ` (PR: ${pr}${unit})` : ''}${s ? ` [${s === 'increase' ? '↑ ready to progress' : s === 'repeat' ? '= repeat weight' : '↓ deload recommended'}]` : ''}`;
-  }).join('\n');
-
-  const recentCheckin = state.weeklyCheckins?.length > 0
-    ? state.weeklyCheckins[state.weeklyCheckins.length - 1]
-    : null;
-  const prevCheckin = state.weeklyCheckins?.length > 1
-    ? state.weeklyCheckins[state.weeklyCheckins.length - 2]
-    : null;
-
-  const weightTrend = recentCheckin
-    ? `Current: ${recentCheckin.weight}${unit}${prevCheckin ? `, previous: ${prevCheckin.weight}${unit}, change: ${(recentCheckin.weight - prevCheckin.weight).toFixed(1)}${unit}` : ''}`
-    : 'No check-ins yet';
-
+  const name = state.name;
   const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
 
-  return `You are Coach AI for FitQuest — a hyper-personalized fitness coach for Jake's 12-week body recomposition program.
+  const base = `You are Coach AI for FitQuest — a hyper-personalized fitness coach for ${name}'s 12-week body recomposition program.
+COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.`;
 
-JAKE'S CURRENT STATUS:
-- Name: ${state.name}
-- Level: ${state.level} | Streak: ${state.streak} days | Best streak: ${state.bestStreak}
-- Week: ${state.currentWeek}/12 | Phase: ${phase.name} — ${phase.desc}
-- Sessions this week: ${weekSessions}/3 | Total sessions: ${state.totalSessions}
-- Perfect weeks: ${state.perfectWeeks}
-- Unit preference: ${unit}
+  if (mode === 'form') {
+    // Form mode only needs exercise context, not full lift data
+    return `${base}
+PROGRAM: 3×/week full body — Squat, Bench Press, RDL, Lat Pulldown, OHP, Leg Curl, Plank.
+PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
+  }
 
-CURRENT LIFTS & PROGRESSION:
-${liftSummary}
+  const sug = state.overloadSuggestions || {};
+  const liftSummary = EXERCISES.filter(e => !e.isPlank).map(ex => {
+    const wt = convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg, unit);
+    const s = sug[ex.id];
+    return `  ${ex.name}: ${wt}${unit}${s ? ` [${s === 'increase' ? '↑ ready' : s === 'repeat' ? '= repeat' : '↓ deload'}]` : ''}`;
+  }).join('\n');
 
-BODY WEIGHT TREND:
-${weightTrend}
+  const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/3`;
 
-PROGRAM STRUCTURE:
-- 3x/week full body (Mon/Wed/Fri): Squat, Bench, RDL, Lat Pulldown, OHP, Leg Curl, Plank
-- Phase 1 (Wk 1-2): RPE 8 baseline finding
-- Phase 2 (Wk 3-8): Linear +2.5kg/week when RPE ≤8
-- Phase 3 (Wk 9): Deload at 80% weight, 2 sets
-- Phase 4 (Wk 10-12): Continued progression
+  if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
+    return `${base}
+STATUS: ${statusLine}
+LIFTS:\n${liftSummary}`;
+  }
 
-COACHING STYLE:
-- Be direct, energetic, and motivating — like a knowledgeable gym coach who knows Jake personally
-- Use Jake's actual numbers and data; never be generic
-- Keep responses concise (150-250 words max) — Jake is reading this at the gym or before/after training
-- Use formatting (bullet points, bold) sparingly but effectively
-- Occasionally use intensity language, but don't be over-the-top cheesy
-- Always ground advice in the program structure above`;
+  // checkin — needs weight trend + training stats
+  const checkins = state.weeklyCheckins || [];
+  const last = checkins[checkins.length - 1];
+  const prev = checkins.length > 1 ? checkins[checkins.length - 2] : null;
+  const weightTrend = last
+    ? `${last.weight}${unit}${prev ? `, prev: ${prev.weight}${unit}, Δ${(last.weight - prev.weight).toFixed(1)}${unit}` : ''}`
+    : 'No check-ins yet';
+
+  return `${base}
+STATUS: ${statusLine}
+BODY WEIGHT: ${weightTrend}
+TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect weeks`;
 }
 
 function buildUserPrompt(mode, state, userMessage) {
   const phase = getPhase(state.currentWeek);
   const sug = state.overloadSuggestions || {};
   const unit = state.unit;
-
   const todayDone = state.todayExDone || [];
   const details = state.todayExDetails || {};
 
@@ -84,116 +74,78 @@ function buildUserPrompt(mode, state, userMessage) {
         const wt = convertWeight((state.liftWeights?.[k] ?? 0) + 2.5, unit);
         return ex ? `${ex.name} → ${wt}${unit}` : k;
       });
-      return `Give me a focused pre-workout pep talk for today's session.
-Context:
-- It's Week ${state.currentWeek}, ${phase.name}
-- Session ${weekSessions + 1}/3 this week
-- Streak: ${state.streak} days
-${increases.length > 0 ? `- Ready to increase weight on: ${increases.join(', ')}` : '- Maintaining current weights today'}
-${userMessage ? `\nJake's note: "${userMessage}"` : ''}
-
-Give me energy and tell me exactly what to focus on today. Be specific to my numbers.`;
+      return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/3. Streak: ${state.streak} days.
+${increases.length > 0 ? `Weight increases today: ${increases.join(', ')}` : 'Maintaining current weights.'}
+${userMessage ? `Jake's note: "${userMessage}"` : ''}
+Be specific and energetic.`;
     }
 
     case 'analysis': {
       if (todayDone.length === 0) {
-        return `Jake hasn't completed any exercises yet today. Give a brief motivating message to get started, referencing Week ${state.currentWeek} and what's on the program today.`;
+        return `Jake hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
       }
       const summary = todayDone.map(id => {
         const ex = EXERCISES.find(e => e.id === id);
         const det = details[id];
-        if (!det || !ex) return `  - ${id}: completed`;
-        return `  - ${ex.name}: ${det.setsCompleted}/${det.setsPrescribed} sets${det.maxRPE > 0 ? `, max RPE ${det.maxRPE}` : ''}${det.volume > 0 ? `, ${Math.round(det.volume)}${unit} volume` : ''}`;
+        if (!det || !ex) return `  ${id}: done`;
+        return `  ${ex.name}: ${det.setsCompleted}/${det.setsPrescribed} sets${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}${det.volume > 0 ? `, ${Math.round(det.volume)}${unit} vol` : ''}`;
       }).join('\n');
       const missed = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);
-      return `Analyze my session for Week ${state.currentWeek}:
-
-Exercises completed:
+      return `Post-session analysis Week ${state.currentWeek}:
 ${summary}
-${missed.length > 0 ? `\nSkipped: ${missed.join(', ')}` : '\nAll exercises completed!'}
-${userMessage ? `\nMy note: "${userMessage}"` : ''}
-
-Give me a concise post-session analysis: what went well, what to watch, and what this means for next session.`;
+${missed.length > 0 ? `Skipped: ${missed.join(', ')}` : 'All exercises done!'}
+${userMessage ? `Note: "${userMessage}"` : ''}
+What went well, what to watch, what it means for next session.`;
     }
 
     case 'overload': {
-      const increases = Object.entries(sug).filter(([,v]) => v === 'increase');
-      const repeats = Object.entries(sug).filter(([,v]) => v === 'repeat');
-      const deloads = Object.entries(sug).filter(([,v]) => v === 'deload');
-
       if (Object.keys(sug).length === 0) {
-        return `I'm in Week ${state.currentWeek} of my program but haven't logged enough sessions yet to have overload data. Explain the progressive overload approach for this phase (${phase.name}: ${phase.desc}) and what RPE targets I should be aiming for.`;
+        return `Week ${state.currentWeek}, ${phase.name}: ${phase.desc}. Explain progressive overload approach and RPE targets for this phase.`;
       }
-
-      const formatList = (arr) => arr.map(([k]) => {
+      const fmt = (arr) => arr.map(([k]) => {
         const ex = EXERCISES.find(e => e.id === k);
         const cur = convertWeight(state.liftWeights?.[k] ?? 0, unit);
         const next = convertWeight((state.liftWeights?.[k] ?? 0) + 2.5, unit);
-        return ex ? `  - ${ex.name}: ${cur}${unit} → ${next}${unit}` : k;
+        return ex ? `  ${ex.name}: ${cur} → ${next}${unit}` : k;
       }).join('\n');
-
-      return `Give me my progressive overload plan for next session (Week ${state.currentWeek}, ${phase.name}):
-
-Ready to increase (RPE ≤8):
-${increases.length > 0 ? formatList(increases) : '  - None yet'}
-
-Repeat weight (RPE 9):
-${repeats.length > 0 ? repeats.map(([k]) => `  - ${EXERCISES.find(e=>e.id===k)?.name || k}`).join('\n') : '  - None'}
-
-Consider deload (RPE 10):
-${deloads.length > 0 ? deloads.map(([k]) => `  - ${EXERCISES.find(e=>e.id===k)?.name || k}`).join('\n') : '  - None'}
-${userMessage ? `\nQuestion: "${userMessage}"` : ''}
-
-Explain the strategy and any key things to watch for.`;
+      const increases = Object.entries(sug).filter(([,v]) => v === 'increase');
+      const repeats = Object.entries(sug).filter(([,v]) => v === 'repeat');
+      const deloads = Object.entries(sug).filter(([,v]) => v === 'deload');
+      return `Overload plan Week ${state.currentWeek}, ${phase.name}:
+Increase: ${increases.length ? '\n' + fmt(increases) : 'none'}
+Repeat: ${repeats.length ? repeats.map(([k]) => EXERCISES.find(e=>e.id===k)?.name||k).join(', ') : 'none'}
+Deload: ${deloads.length ? deloads.map(([k]) => EXERCISES.find(e=>e.id===k)?.name||k).join(', ') : 'none'}
+${userMessage ? `Question: "${userMessage}"` : ''}
+Explain the strategy concisely.`;
     }
 
     case 'form': {
       const exId = userMessage?.toLowerCase();
-      const matchedEx = EXERCISES.find(e =>
-        e.name.toLowerCase().includes(exId || '') ||
-        e.id === exId
+      const matched = EXERCISES.find(e =>
+        e.name.toLowerCase().includes(exId || '') || e.id === exId
       );
-      if (matchedEx) {
-        return `Give me detailed form coaching for ${matchedEx.name}. 
-My current weight: ${convertWeight(state.liftWeights?.[matchedEx.id] ?? matchedEx.startKg, unit)}${unit}
-Target: RPE ${matchedEx.rpe}, ${matchedEx.reps} reps × ${matchedEx.sets} sets
-
-Cover: setup, key cues, most common mistakes at my weight level, and one thing that will immediately improve the lift.`;
+      if (matched) {
+        return `Form coaching for ${matched.name}. My weight: ${convertWeight(state.liftWeights?.[matched.id] ?? matched.startKg, unit)}${unit}. Target: RPE ${matched.rpe}, ${matched.reps} reps × ${matched.sets} sets.
+Cover: setup, key cues, most common mistakes, one immediate improvement.`;
       }
-      const exerciseList = EXERCISES.map(e => e.name).join(', ');
-      return `Jake wants form tips. Available exercises: ${exerciseList}.
-${userMessage ? `Jake asked about: "${userMessage}"` : 'Jake didn\'t specify an exercise.'}
-
-${!matchedEx ? 'Ask which exercise they want tips on, then provide coaching.' : ''}`;
+      return `Jake wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
     }
 
     case 'checkin': {
       const checkins = state.weeklyCheckins || [];
       if (checkins.length === 0) {
-        return `Jake hasn't done any Sunday check-ins yet (Week ${state.currentWeek}). Explain what the weekly check-in is for and what metrics matter for a recomp program. Motivate them to do their first one this Sunday.`;
+        return `No Sunday check-ins yet (Week ${state.currentWeek}). Explain check-in purpose and what metrics matter for recomp. Motivate first check-in.`;
       }
-      const recent = checkins.slice(-4);
-      const trend = recent.map((c, i) => `  Week ${c.week}: ${c.weight}${unit}${c.waist > 0 ? `, waist ${c.waist}cm` : ''}`).join('\n');
-      const totalSessions = state.totalSessions;
-      const perfectWeeks = state.perfectWeeks;
-
-      return `Review my check-in data and overall recomp progress:
-
-Recent check-ins:
+      const trend = checkins.slice(-4).map(c => `  Wk ${c.week}: ${c.weight}${unit}${c.waist > 0 ? `, waist ${c.waist}cm` : ''}`).join('\n');
+      return `Analyze recomp progress:
 ${trend}
-
-Training stats:
-  - Total sessions: ${totalSessions}
-  - Perfect weeks: ${perfectWeeks}
-  - Current week: ${state.currentWeek}/12
-  - Streak: ${state.streak} days
-${userMessage ? `\nJake's question: "${userMessage}"` : ''}
-
-Analyze my progress toward recomposition (simultaneous fat loss + muscle gain). Are the weight trends appropriate? What should I be thinking about for the remaining weeks?`;
+Sessions: ${state.totalSessions} | Perfect weeks: ${state.perfectWeeks} | Week ${state.currentWeek}/12 | Streak: ${state.streak}d
+${userMessage ? `Question: "${userMessage}"` : ''}
+Analyze weight trend for recomposition. Are trends appropriate? What to focus on?`;
     }
 
     default:
-      return userMessage || 'Give me general coaching advice for my program.';
+      return userMessage || 'General coaching advice for my program.';
   }
 }
 
@@ -205,6 +157,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const lastSendRef = useRef({ prompt: '', ts: 0 });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -222,8 +175,29 @@ export default function AICoachTab({ state, onSaveHistory }) {
     }
 
     const text = (overrideMessage ?? userMessage).trim();
-    const systemPrompt = buildSystemPrompt(state);
+    const systemPrompt = buildSystemPrompt(state, activeMode);
     const userPrompt = buildUserPrompt(activeMode, state, text);
+
+    // Dedup: block same prompt within 5 seconds
+    if (userPrompt === lastSendRef.current.prompt && Date.now() - lastSendRef.current.ts < 5000) {
+      return;
+    }
+    lastSendRef.current = { prompt: userPrompt, ts: Date.now() };
+
+    // Cache check for quick prompts (session-scoped)
+    const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${userPrompt.slice(0, 80)}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      const newMessages = [
+        ...messages,
+        { role: 'user', content: userPrompt, mode: activeMode, displayText: text || mode.label, ts: Date.now() },
+        { role: 'assistant', content: cached, mode: activeMode, ts: Date.now() }
+      ];
+      setMessages(newMessages);
+      setUserMessage('');
+      onSaveHistory(newMessages.slice(-20));
+      return;
+    }
 
     const newMessages = [
       ...messages,
@@ -234,11 +208,14 @@ export default function AICoachTab({ state, onSaveHistory }) {
     setLoading(true);
     setError(null);
 
-    // Only send the last 6 messages from the current mode to minimize token usage
-    const modeHistory = newMessages
-      .filter(m => m.mode === activeMode && (m.role === 'user' || m.role === 'assistant'))
-      .slice(-6)
-      .map(m => ({ role: m.role, content: m.content }));
+    // One-shot modes: send only the current message (no history = big token savings)
+    // Checkin: send last 6 messages for conversational context
+    const modeHistory = ONE_SHOT_MODES.includes(activeMode)
+      ? [{ role: 'user', content: userPrompt }]
+      : newMessages
+          .filter(m => m.mode === activeMode && (m.role === 'user' || m.role === 'assistant'))
+          .slice(-6)
+          .map(m => ({ role: m.role, content: m.content }));
 
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -261,12 +238,15 @@ export default function AICoachTab({ state, onSaveHistory }) {
       const data = await response.json();
       const assistantText = data.content?.find(b => b.type === 'text')?.text || 'No response';
 
+      // Cache response for reuse within this session
+      try { sessionStorage.setItem(cacheKey, assistantText); } catch (e) {}
+
       const finalMessages = [
         ...newMessages,
         { role: 'assistant', content: assistantText, mode: activeMode, ts: Date.now() }
       ];
       setMessages(finalMessages);
-      onSaveHistory(finalMessages.slice(-20)); // save last 20
+      onSaveHistory(finalMessages.slice(-20));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -375,7 +355,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
             }}
           />
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={loading}
             style={{
               width: 42, height: 42, borderRadius: 10, border: 'none',
@@ -444,7 +424,6 @@ function MessageBubble({ msg }) {
     );
   }
 
-  // Format assistant markdown-lite: bold and bullets
   const formatted = msg.content
     .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>');

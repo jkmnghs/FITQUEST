@@ -18,6 +18,9 @@ export default function StatsTab({ state }) {
       <SectionTitle>Weight Trend</SectionTitle>
       <WeightChart checkins={weeklyCheckins || []} unit={unit} />
 
+      <SectionTitle>Waist Trend</SectionTitle>
+      <WaistChart checkins={weeklyCheckins || []} />
+
       <SectionTitle>Personal Records</SectionTitle>
       <PRSection prs={personalRecords || {}} unit={unit} />
 
@@ -139,6 +142,75 @@ function WeightChart({ checkins, unit }) {
           { val: `${last} ${unit}`, lbl: 'Current', color: 'var(--cyan)' },
           { val: `${change >= 0 ? '+' : ''}${change.toFixed(1)}`, lbl: 'Change', color: rateColor },
           { val: `${rate >= 0 ? '+' : ''}${rate.toFixed(2)}/wk`, lbl: 'Rate', color: rateColor }
+        ].map((s, i) => (
+          <div key={i} style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WaistChart({ checkins }) {
+  const withWaist = checkins.filter(c => c.waist > 0);
+  if (withWaist.length < 2) {
+    return (
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--card-border)',
+        borderRadius: 14, padding: 16, marginBottom: 16, textAlign: 'center',
+        color: 'var(--text3)', fontSize: 13
+      }}>
+        Need 2+ check-ins with waist measurement to show chart
+      </div>
+    );
+  }
+  const waists = withWaist.map(c => c.waist);
+  const minW = Math.min(...waists) - 1;
+  const maxW = Math.max(...waists) + 1;
+  const range = maxW - minW || 1;
+  const W = 280, H = 90;
+  const step = W / (waists.length - 1);
+
+  let path = 'M';
+  const dots = waists.map((wt, i) => {
+    const x = i * step;
+    const y = H - ((wt - minW) / range) * H;
+    path += `${i ? 'L' : ''}${x.toFixed(1)},${y.toFixed(1)} `;
+    return { x: x.toFixed(1), y: y.toFixed(1) };
+  });
+  const areaPath = path + `L${W},${H} L0,${H} Z`;
+  const first = waists[0], last = waists[waists.length - 1];
+  const change = last - first;
+  const changeColor = change < 0 ? 'var(--green)' : change === 0 ? 'var(--cyan)' : 'var(--fire2)';
+
+  return (
+    <div style={{
+      background: 'var(--card)', border: '1px solid var(--card-border)',
+      borderRadius: 14, padding: 16, marginBottom: 16, backdropFilter: 'blur(20px)'
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Waist Trend (cm)</div>
+      <div style={{ position: 'relative', height: H, overflow: 'hidden' }}>
+        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--purple)" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="var(--purple)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={areaPath} fill="url(#wg)" />
+          <path d={path} fill="none" stroke="var(--purple)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {dots.map((d, i) => (
+            <circle key={i} cx={d.x} cy={d.y} r="4" fill="var(--purple)" stroke="var(--bg)" strokeWidth="2" />
+          ))}
+        </svg>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        {[
+          { val: `${first}cm`, lbl: 'Start', color: 'var(--text)' },
+          { val: `${last}cm`, lbl: 'Current', color: 'var(--purple)' },
+          { val: `${change >= 0 ? '+' : ''}${change.toFixed(1)}cm`, lbl: 'Change', color: changeColor }
         ].map((s, i) => (
           <div key={i} style={{ textAlign: 'center' }}>
             <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>

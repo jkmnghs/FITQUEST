@@ -1,11 +1,24 @@
 import React from 'react';
 import { getRank, getPhase, xpForLevel } from '../utils/gameLogic';
 
+function getNextWorkoutLabel() {
+  const day = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const workoutDays = [1, 3, 5];
+  if (workoutDays.includes(day)) return 'Today!';
+  let d = 1;
+  while (d <= 7) {
+    if (workoutDays.includes((day + d) % 7)) break;
+    d++;
+  }
+  return d === 1 ? 'Tomorrow' : `In ${d} days`;
+}
+
 export default function Header({ state }) {
   const rank = getRank(state.level);
   const phase = getPhase(state.currentWeek);
   const n = xpForLevel(state.level);
   const pct = Math.min(100, (state.xp / n) * 100);
+  const nextWorkout = getNextWorkoutLabel();
 
   return (
     <div style={{ padding: '16px 20px 8px', background: 'rgba(10,14,26,0.7)', backdropFilter: 'blur(12px)' }}>
@@ -58,7 +71,7 @@ export default function Header({ state }) {
         </div>
       </div>
 
-      {/* Phase banner */}
+      {/* Phase banner + next workout */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 14px', borderRadius: 12, marginBottom: 10,
@@ -66,11 +79,17 @@ export default function Header({ state }) {
         border: '1px solid rgba(179,136,255,0.18)'
       }}>
         <span style={{ fontSize: 20 }}>{phase.icon}</span>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--purple)', letterSpacing: 1 }}>
             {phase.name}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 1 }}>{phase.desc}</div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 0.8, marginBottom: 1 }}>NEXT SESSION</div>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, color: nextWorkout === 'Today!' ? 'var(--green)' : 'var(--cyan)' }}>
+            {nextWorkout}
+          </div>
         </div>
       </div>
 

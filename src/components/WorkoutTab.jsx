@@ -7,6 +7,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showProgramComplete, setShowProgramComplete] = useState(false);
   // Stores per-exercise set arrays so checked sets survive modal close/reopen
   const [inProgressSets, setInProgressSets] = useState({});
 
@@ -132,6 +133,22 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
         );
       })()}
 
+      {/* Deload week banner */}
+      {isDeload && isCurrentWeek && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
+          border: '1px solid rgba(0,229,255,0.2)',
+          borderRadius: 12, padding: '12px 16px', marginBottom: 14
+        }}>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', marginBottom: 5, letterSpacing: 0.8 }}>
+            🧘 DELOAD WEEK — RECOVERY MODE
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+            80% weight, 2 sets per exercise. This week <strong style={{ color: 'var(--text)' }}>rebuilds your tendons and CNS</strong> — lighter loads now unlock stronger lifts in Weeks 10-12. Don't skip it.
+          </div>
+        </div>
+      )}
+
       {/* Exercise cards */}
       {EXERCISES.map(ex => {
         const isDone = todayDone.includes(ex.id);
@@ -245,8 +262,18 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
         <FinishConfirmModal
           state={state}
           onCancel={() => setShowFinishConfirm(false)}
-          onConfirm={() => { setShowFinishConfirm(false); onFinishSession(); }}
+          onConfirm={() => {
+            setShowFinishConfirm(false);
+            const isLastSession = state.currentWeek === 12 && (state.weekProgress?.[12]?.count || 0) >= 2;
+            onFinishSession();
+            if (isLastSession) setTimeout(() => setShowProgramComplete(true), 2000);
+          }}
         />
+      )}
+
+      {/* Program complete celebration */}
+      {showProgramComplete && (
+        <ProgramCompleteModal onClose={() => setShowProgramComplete(false)} state={state} />
       )}
     </div>
   );
@@ -374,6 +401,55 @@ function FinishArea({ state, onFinish }) {
       }}>
         {allDone && completionPct >= 95 ? 'FINISH SESSION ⚔️ (PERFECT!)' : 'FINISH SESSION ⚔️'}
       </button>
+    </div>
+  );
+}
+
+function ProgramCompleteModal({ state, onClose }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9998,
+      background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{
+        background: 'var(--bg2)', border: '1px solid rgba(0,229,255,0.3)',
+        borderRadius: 22, padding: '32px 24px',
+        width: 'calc(100% - 40px)', maxWidth: 360, textAlign: 'center',
+        boxShadow: '0 0 60px rgba(0,229,255,0.15)'
+      }}>
+        <div style={{ fontSize: 52, marginBottom: 12 }}>🏆</div>
+        <div style={{ fontFamily: 'Orbitron', fontSize: 18, fontWeight: 900, color: 'var(--cyan)', marginBottom: 8, letterSpacing: 1 }}>
+          PROGRAM COMPLETE
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.7 }}>
+          You finished the full 12-week body recomposition program. That's{' '}
+          <strong style={{ color: 'var(--text)' }}>{state.totalSessions} sessions</strong>,{' '}
+          <strong style={{ color: 'var(--text)' }}>{state.perfectWeeks} perfect weeks</strong>, and{' '}
+          <strong style={{ color: 'var(--text)' }}>{state.totalXp} XP</strong> earned.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 24 }}>
+          {[
+            { val: `Lv ${state.level}`, lbl: 'Level' },
+            { val: state.streak, lbl: 'Streak' },
+            { val: `${(state.totalVolume / 1000).toFixed(1)}k`, lbl: `Vol (${state.unit})` }
+          ].map(s => (
+            <div key={s.lbl} style={{ background: 'rgba(0,229,255,0.06)', borderRadius: 10, padding: '10px 4px' }}>
+              <div style={{ fontFamily: 'Orbitron', fontSize: 16, fontWeight: 800, color: 'var(--cyan)' }}>{s.val}</div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
+            </div>
+          ))}
+        </div>
+        <button onClick={onClose} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 13,
+          background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+          fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
+          color: 'var(--bg)', letterSpacing: 0.8, cursor: 'pointer',
+          boxShadow: '0 4px 20px var(--cyan-glow)'
+        }}>
+          KEEP LIFTING ⚔️
+        </button>
+      </div>
     </div>
   );
 }
