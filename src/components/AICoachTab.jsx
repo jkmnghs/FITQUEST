@@ -76,13 +76,13 @@ function buildUserPrompt(mode, state, userMessage) {
       });
       return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/3. Streak: ${state.streak} days.
 ${increases.length > 0 ? `Weight increases today: ${increases.join(', ')}` : 'Maintaining current weights.'}
-${userMessage ? `Jake Mangahas's note: "${userMessage}"` : ''}
+${userMessage ? `Jake's note: "${userMessage}"` : ''}
 Be specific and energetic.`;
     }
 
     case 'analysis': {
       if (todayDone.length === 0) {
-        return `Jake Mangahas hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
+        return `Jake hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
       }
       const summary = todayDone.map(id => {
         const ex = EXERCISES.find(e => e.id === id);
@@ -128,7 +128,7 @@ Explain the strategy concisely.`;
         return `Form coaching for ${matched.name}. My weight: ${convertWeight(state.liftWeights?.[matched.id] ?? matched.startKg, unit)}${unit}. Target: RPE ${matched.rpe}, ${matched.reps} reps × ${matched.sets} sets.
 Cover: setup, key cues, most common mistakes, one immediate improvement.`;
       }
-      return `Jake Mangahas wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
+      return `Jake wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
     }
 
     case 'checkin': {
