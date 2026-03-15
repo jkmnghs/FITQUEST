@@ -25,6 +25,11 @@ function checkDayReset(state) {
     next.sessionStartTime = null;
     next.todayExDate = t;
   }
+  // Decay streak if more than one day has passed since last session
+  const yesterday = new Date(Date.now() - 864e5).toDateString();
+  if (next.lastDate && next.lastDate !== t && next.lastDate !== yesterday && next.streak > 0) {
+    next.streak = 0;
+  }
   return next;
 }
 
