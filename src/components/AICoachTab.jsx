@@ -212,7 +212,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
 
   const mode = COACH_MODES.find(m => m.id === activeMode);
 
-  async function sendMessage() {
+  async function sendMessage(overrideMessage) {
     if (loading) return;
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
@@ -221,17 +221,24 @@ export default function AICoachTab({ state, onSaveHistory }) {
       return;
     }
 
+    const text = (overrideMessage ?? userMessage).trim();
     const systemPrompt = buildSystemPrompt(state);
-    const userPrompt = buildUserPrompt(activeMode, state, userMessage.trim());
+    const userPrompt = buildUserPrompt(activeMode, state, text);
 
     const newMessages = [
       ...messages,
-      { role: 'user', content: userPrompt, mode: activeMode, displayText: userMessage.trim() || mode.label, ts: Date.now() }
+      { role: 'user', content: userPrompt, mode: activeMode, displayText: text || mode.label, ts: Date.now() }
     ];
     setMessages(newMessages);
     setUserMessage('');
     setLoading(true);
     setError(null);
+
+    // Only send the last 6 messages from the current mode to minimize token usage
+    const modeHistory = newMessages
+      .filter(m => m.mode === activeMode && (m.role === 'user' || m.role === 'assistant'))
+      .slice(-6)
+      .map(m => ({ role: m.role, content: m.content }));
 
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -244,11 +251,9 @@ export default function AICoachTab({ state, onSaveHistory }) {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
+          max_tokens: 500,
           system: systemPrompt,
-          messages: newMessages
-            .filter(m => m.role === 'user' || m.role === 'assistant')
-            .map(m => ({ role: m.role, content: m.content }))
+          messages: modeHistory
         })
       });
 
@@ -388,7 +393,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
         {/* Quick fire buttons */}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           {getQuickPrompts(activeMode).map((q, i) => (
-            <button key={i} onClick={() => { setUserMessage(q); setTimeout(sendMessage, 50); }} style={{
+            <button key={i} onClick={() => sendMessage(q)} style={{
               padding: '4px 10px', borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.08)',
               background: 'rgba(255,255,255,0.03)',
