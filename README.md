@@ -1,4 +1,4 @@
-# FitQuest — Jake's Recomp (React Edition)
+# FitQuest — Jake Mangahas's Recomp (React Edition)
 
 A fully featured 12-week body recomposition tracking app, converted from vanilla HTML/JS to a clean Vite + React architecture.
 
