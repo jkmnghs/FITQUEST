@@ -42,7 +42,9 @@ export function AchievementsTab({ state }) {
 
 // ─── LOG TAB ───
 export function LogTab({ state }) {
-  const logs = [...(state.log || [])].reverse().slice(0, 30);
+  const [showCount, setShowCount] = useState(30);
+  const allLogs = [...(state.log || [])].reverse();
+  const logs = allLogs.slice(0, showCount);
   const dotColor = { exercise: 'var(--green)', session: 'var(--purple)', checkin: 'var(--gold)' };
 
   return (
@@ -50,37 +52,49 @@ export function LogTab({ state }) {
       <div style={{
         fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
         color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
-      }}>RECENT ACTIVITY</div>
+      }}>RECENT ACTIVITY • {allLogs.length} entries</div>
 
       {logs.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '28px 0', fontSize: 13 }}>
           No activity yet. Complete your first session!
         </div>
       ) : (
-        logs.map((l, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '14px 12px', marginBottom: 8,
-            background: 'var(--card)', border: '1px solid var(--card-border)',
-            borderRadius: 12, backdropFilter: 'blur(20px)'
-          }}>
-            <div style={{
-              width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-              background: dotColor[l.type] || 'var(--cyan)',
-              boxShadow: `0 0 10px ${dotColor[l.type] || 'var(--cyan)'}60`
-            }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 }}>{l.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
-                {l.dateStr || l.date}{l.week ? ` • Week ${l.week}` : ''}
+        <>
+          {logs.map((l, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 12px', marginBottom: 8,
+              background: 'var(--card)', border: '1px solid var(--card-border)',
+              borderRadius: 12, backdropFilter: 'blur(20px)'
+            }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                background: dotColor[l.type] || 'var(--cyan)',
+                boxShadow: `0 0 10px ${dotColor[l.type] || 'var(--cyan)'}60`
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 }}>{l.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+                  {l.dateStr || l.date}{l.week ? ` • Week ${l.week}` : ''}
+                </div>
               </div>
+              <div style={{
+                fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700, color: 'var(--green2)',
+                background: 'var(--green-glow)', padding: '4px 8px', borderRadius: 6
+              }}>+{l.xp}</div>
             </div>
-            <div style={{
-              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700, color: 'var(--green2)',
-              background: 'var(--green-glow)', padding: '4px 8px', borderRadius: 6
-            }}>+{l.xp}</div>
-          </div>
-        ))
+          ))}
+          {allLogs.length > showCount && (
+            <button onClick={() => setShowCount(c => c + 30)} style={{
+              width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 12, background: 'rgba(255,255,255,0.03)',
+              color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 11,
+              fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5
+            }}>
+              LOAD MORE ({allLogs.length - showCount} remaining)
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -209,7 +223,7 @@ export function SummaryTab({ state }) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport }) {
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(1);
   const [backfillDuration, setBackfillDuration] = useState(50);
@@ -426,6 +440,71 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             >{alreadyDone ? `WEEK ${backfillW} ALREADY AT ${lockedCount}/3` : `APPLY WEEK ${backfillW}`}</button>
           );
         })()}
+      </div>
+
+      {/* Export / Import */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--card-border)',
+        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Backup & Restore</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
+          Export your progress as a JSON file, or restore from a previous backup.
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => {
+              const json = JSON.stringify(state, null, 2);
+              const blob = new Blob([json], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `fitquest-backup-${new Date().toISOString().slice(0, 10)}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+            style={{
+              flex: 1, padding: 10, border: 'none', borderRadius: 10,
+              background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+              color: 'var(--bg)', cursor: 'pointer', letterSpacing: 0.5
+            }}
+          >EXPORT</button>
+          <label style={{
+            flex: 1, padding: 10, borderRadius: 10, textAlign: 'center',
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(255,255,255,0.04)',
+            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+            color: 'var(--text2)', cursor: 'pointer', letterSpacing: 0.5
+          }}>
+            IMPORT
+            <input type="file" accept=".json" style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                  try {
+                    const data = JSON.parse(ev.target.result);
+                    if (data && typeof data === 'object' && data.level !== undefined) {
+                      if (window.confirm('Replace all current progress with this backup?')) {
+                        onImport(data);
+                      }
+                    } else {
+                      alert('Invalid backup file.');
+                    }
+                  } catch {
+                    alert('Could not read file. Make sure it\'s a valid FitQuest backup.');
+                  }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       {/* Reset Today */}

@@ -5,17 +5,21 @@ const CIRCUMFERENCE = 2 * Math.PI * 108; // ~678.58
 export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, onDone }) {
   const [remaining, setRemaining] = useState(seconds);
   const [total, setTotal] = useState(seconds);
+  const endTimeRef = useRef(null);
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const firedRef = useRef(false);
 
-  // Reset when new timer starts
+  // Reset when new timer starts — anchor to wall-clock end time
   useEffect(() => {
     if (!visible) return;
+    endTimeRef.current = Date.now() + seconds * 1000;
+    firedRef.current = false;
     setRemaining(seconds);
     setTotal(seconds);
   }, [visible, seconds]);
 
-  // Tick
+  // Tick using Date.now() so backgrounding the app doesn't freeze the countdown
   useEffect(() => {
     if (!visible) {
       clearInterval(intervalRef.current);
@@ -23,18 +27,17 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
     }
     clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) {
-          clearInterval(intervalRef.current);
-          playDoneSound();
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-          return 0;
-        }
-        return r - 1;
-      });
-    }, 1000);
+      const r = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+      setRemaining(r);
+      if (r <= 0 && !firedRef.current) {
+        firedRef.current = true;
+        clearInterval(intervalRef.current);
+        playDoneSound();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      }
+    }, 500);
     return () => clearInterval(intervalRef.current);
-  }, [visible]); // only re-run when visibility changes
+  }, [visible]);
 
   function playDoneSound() {
     try {
@@ -54,6 +57,7 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
   }
 
   const add30 = useCallback(() => {
+    endTimeRef.current = (endTimeRef.current || Date.now()) + 30000;
     setRemaining(r => r + 30);
     setTotal(t => t + 30);
   }, []);
@@ -68,7 +72,6 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
   const timeStr = `${m}:${s.toString().padStart(2, '0')}`;
 
   const ringColor = isDone ? 'var(--green)' : isWarning ? 'var(--fire2)' : 'var(--cyan)';
-  const timeColor = ringColor;
 
   if (!visible) return null;
 
@@ -79,7 +82,6 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexDirection: 'column', gap: 0
     }}>
-      {/* Exercise name */}
       <div style={{
         fontFamily: 'Exo 2, sans-serif', fontSize: 18, fontWeight: 700,
         color: 'var(--text)', marginBottom: 6, textAlign: 'center', padding: '0 20px'
@@ -88,10 +90,9 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
       </div>
       <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 28 }}>{setInfo}</div>
 
-      {/* Ring */}
       <div style={{ width: 220, height: 220, position: 'relative', marginBottom: 28 }}>
         <svg width="220" height="220" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
-          <circle className="track" cx="120" cy="120" r="108"
+          <circle cx="120" cy="120" r="108"
             fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
           <circle cx="120" cy="120" r="108"
             fill="none" stroke={ringColor} strokeWidth="6"
@@ -108,8 +109,7 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
         }}>
           <div style={{
             fontFamily: 'Orbitron, sans-serif', fontSize: 48, fontWeight: 900,
-            color: timeColor, transition: 'color 0.3s',
-            lineHeight: 1
+            color: ringColor, transition: 'color 0.3s', lineHeight: 1
           }}>
             {isDone ? '✓' : timeStr}
           </div>
@@ -122,7 +122,6 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
         </div>
       </div>
 
-      {/* Buttons */}
       <div style={{ display: 'flex', gap: 12 }}>
         <button onClick={onSkip} style={{
           padding: '12px 28px', borderRadius: 12,

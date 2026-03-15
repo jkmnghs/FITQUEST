@@ -34,8 +34,17 @@ export default function App() {
     state, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
-    resetAll, resetToday, startSession, backfillWeek, addAIHistory
+    resetAll, resetToday, startSession, backfillWeek, addAIHistory, importData
   } = useGameState();
+
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installDismissed, setInstallDismissed] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   // Register service worker on mount
   useEffect(() => {
@@ -55,6 +64,43 @@ export default function App() {
     <>
       <BgFx />
       <Toast message={toast} />
+
+      {/* PWA install banner */}
+      {installPrompt && !installDismissed && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9000, width: 'calc(100% - 40px)', maxWidth: 390,
+          background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(179,136,255,0.12))',
+          border: '1px solid rgba(0,229,255,0.25)',
+          borderRadius: 14, padding: '12px 14px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+        }}>
+          <span style={{ fontSize: 24, flexShrink: 0 }}>⚡</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', marginBottom: 2 }}>
+              ADD TO HOME SCREEN
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Install FitQuest for faster access</div>
+          </div>
+          <button onClick={async () => {
+            installPrompt.prompt();
+            const { outcome } = await installPrompt.userChoice;
+            if (outcome === 'accepted') setInstallPrompt(null);
+            else setInstallDismissed(true);
+          }} style={{
+            padding: '6px 12px', borderRadius: 8, border: 'none',
+            background: 'var(--cyan)', color: 'var(--bg)',
+            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, cursor: 'pointer'
+          }}>INSTALL</button>
+          <button onClick={() => setInstallDismissed(true)} style={{
+            width: 26, height: 26, borderRadius: 6, border: 'none',
+            background: 'rgba(255,255,255,0.08)', color: 'var(--text3)',
+            fontSize: 13, cursor: 'pointer', flexShrink: 0
+          }}>✕</button>
+        </div>
+      )}
 
       <div style={{
         position: 'relative', zIndex: 1,
@@ -135,6 +181,7 @@ export default function App() {
               onBackfillWeek={backfillWeek}
               notifStatus={notifStatus}
               onRequestNotif={handleRequestNotif}
+              onImport={importData}
             />
           )}
         </div>
