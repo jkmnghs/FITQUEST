@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EXERCISES } from '../data/gameData';
-import { getSetsForWeek, getWeightForExercise, convertWeight } from '../utils/gameLogic';
+import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 
 export default function WorkoutTab({ state, onCompleteExercise, onFinishSession, onStartSession, onModalChange }) {
@@ -107,13 +107,30 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
         <SessionTimerBar startTime={state.sessionStartTime} />
       )}
 
-      {/* Exercise label */}
-      <div style={{
-        fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600, color: 'var(--text2)',
-        letterSpacing: 1.5, marginBottom: 12, textTransform: 'uppercase'
-      }}>
-        Full Body Session
-      </div>
+      {/* Phase + session label */}
+      {(() => {
+        const phase = getPhase(w);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{
+              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600, color: 'var(--text2)',
+              letterSpacing: 1.5, textTransform: 'uppercase'
+            }}>
+              Full Body Session
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: 'rgba(179,136,255,0.08)', border: '1px solid rgba(179,136,255,0.15)',
+              borderRadius: 8, padding: '3px 9px'
+            }}>
+              <span style={{ fontSize: 12 }}>{phase.icon}</span>
+              <span style={{ fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, color: 'var(--purple)', letterSpacing: 0.8 }}>
+                {phase.name}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Exercise cards */}
       {EXERCISES.map(ex => {
