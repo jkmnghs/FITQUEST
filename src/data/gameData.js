@@ -94,7 +94,7 @@ export const FORM_TIPS = {
 };
 
 export const DEFAULT_STATE = {
-  name: 'Jake',
+  name: 'Jake Mangahas',
   level: 1,
   xp: 0,
   totalXp: 0,

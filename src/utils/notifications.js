@@ -62,7 +62,7 @@ export function maybeFireOpenNotification(state) {
       .filter(([,v]) => v === 'increase').length;
     const title = increases > 0
       ? `💪 Time to train — ${increases} lift${increases > 1 ? 's' : ''} ready to increase!`
-      : '⚔️ Workout day — let\'s go, Jake!';
+      : '⚔️ Workout day — let\'s go, Jake Mangahas!';
     const body = increases > 0
       ? 'Your RPE was ≤8 last session. Progressive overload time!'
       : 'Mon/Wed/Fri full-body session is waiting. Get after it.';
