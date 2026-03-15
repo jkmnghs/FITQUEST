@@ -108,6 +108,20 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
         <SessionTimerBar startTime={state.sessionStartTime} />
       )}
 
+      {/* Manual start session button */}
+      {isCurrentWeek && !state.sessionStartTime && !state.todaySessionFinished && (
+        <button onClick={onStartSession} style={{
+          width: '100%', padding: '11px 0', marginBottom: 14, border: 'none',
+          borderRadius: 12, cursor: 'pointer',
+          background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(179,136,255,0.12))',
+          border: '1px solid rgba(0,229,255,0.2)',
+          fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+          color: 'var(--cyan)', letterSpacing: 0.8
+        }}>
+          ▶ START SESSION TIMER
+        </button>
+      )}
+
       {/* Phase + session label */}
       {(() => {
         const phase = getPhase(w);
@@ -161,7 +175,6 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
           <div key={ex.id}
             onClick={() => {
               if (!isCurrentWeek || todaySessionFinished) return;
-              onStartSession();
               setActiveExId(ex.id);
             }}
             style={{
