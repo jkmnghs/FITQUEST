@@ -1,39 +1,173 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#38bdf8"/>
-      <stop offset="100%" stop-color="#818cf8"/>
+    <radialGradient id="bg" cx="50%" cy="38%" r="65%">
+      <stop offset="0%"   stop-color="#22d8e5"/>
+      <stop offset="55%"  stop-color="#1460bb"/>
+      <stop offset="100%" stop-color="#09296a"/>
+    </radialGradient>
+    <linearGradient id="gV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffe84c"/>
+      <stop offset="45%"  stop-color="#ff9200"/>
+      <stop offset="100%" stop-color="#c85400"/>
     </linearGradient>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#0a0e1a"/>
+    <linearGradient id="gArc" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#b86a00"/>
+      <stop offset="45%"  stop-color="#ffdf48"/>
+      <stop offset="100%" stop-color="#ff9200"/>
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="10" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <linearGradient id="shG" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%"   stop-color="#ffaa30"/>
+      <stop offset="100%" stop-color="#c84400"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="sglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="11" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="sh">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
     </filter>
   </defs>
 
-  <!-- Background rounded square -->
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- ── BACKGROUND ── -->
+  <rect width="512" height="512" rx="88" fill="url(#bg)"/>
+  <ellipse cx="256" cy="205" rx="178" ry="158" fill="#3aecf5" opacity="0.13"/>
+  <!-- bg sparkles -->
+  <circle cx="128" cy="158" r="3"   fill="white" opacity="0.5"/>
+  <circle cx="86"  cy="298" r="2"   fill="white" opacity="0.4"/>
+  <circle cx="466" cy="228" r="2.5" fill="white" opacity="0.4"/>
+  <circle cx="72"  cy="208" r="2.5" fill="#4de8e8" opacity="0.55"/>
+  <circle cx="445" cy="318" r="3"   fill="#4de8e8" opacity="0.5"/>
 
-  <!-- Subtle border -->
-  <rect width="512" height="512" rx="96" fill="none" stroke="#1e3a5f" stroke-width="3"/>
-
-  <!-- Dumbbell -->
-  <g fill="url(#g)" filter="url(#glow)">
-    <!-- Left outer plate -->
-    <rect x="58"  y="156" width="52" height="200" rx="12"/>
-    <!-- Left inner collar -->
-    <rect x="110" y="208" width="30" height="96"  rx="7"/>
-    <!-- Center bar -->
-    <rect x="140" y="240" width="232" height="32" rx="8"/>
-    <!-- Right inner collar -->
-    <rect x="372" y="208" width="30" height="96"  rx="7"/>
-    <!-- Right outer plate -->
-    <rect x="402" y="156" width="52" height="200" rx="12"/>
+  <!-- ── SPEED LINES ── -->
+  <g opacity="0.22" stroke="white" stroke-linecap="round">
+    <line x1="40"  y1="192" x2="188" y2="232" stroke-width="3.5"/>
+    <line x1="36"  y1="228" x2="160" y2="258" stroke-width="2.5"/>
+    <line x1="42"  y1="264" x2="163" y2="280" stroke-width="2"/>
+    <line x1="430" y1="130" x2="482" y2="116" stroke-width="2.5"/>
+    <line x1="436" y1="160" x2="490" y2="148" stroke-width="2"/>
   </g>
+
+  <!-- ── GOLDEN SWEEP ARC ── -->
+  <path d="M 65,414 A 232,202 0 0 1 455,295"
+        fill="none" stroke="#ffdf48" stroke-width="42" stroke-linecap="round" opacity="0.11"/>
+  <path d="M 65,414 A 232,202 0 0 1 455,295"
+        fill="none" stroke="url(#gArc)" stroke-width="26" stroke-linecap="round" filter="url(#sh)"/>
+  <!-- arrowhead -->
+  <polygon points="455,295 428,272 422,300" fill="#ffdf48" filter="url(#sh)"/>
+
+  <!-- ── RIGHT UPWARD ARROW ── -->
+  <g fill="url(#gV)" filter="url(#sh)" transform="translate(458,162)">
+    <polygon points="0,-42 21,0 9,0 9,80 -9,80 -9,0 -21,0"/>
+  </g>
+
+  <!-- ── STARS ── -->
+  <!-- large teal – top left -->
+  <g transform="translate(94,91)" filter="url(#sglow)">
+    <polygon fill="#3de8e8"
+      points="0,-24 5.9,-8.1 22.8,-7.4 9.5,3.1 14.1,19.4 0,10 -14.1,19.4 -9.5,3.1 -22.8,-7.4 -5.9,-8.1"/>
+  </g>
+  <!-- small teal – beside large -->
+  <g transform="translate(150,60) scale(0.6)" filter="url(#glow)">
+    <polygon fill="#3de8e8"
+      points="0,-24 5.9,-8.1 22.8,-7.4 9.5,3.1 14.1,19.4 0,10 -14.1,19.4 -9.5,3.1 -22.8,-7.4 -5.9,-8.1"/>
+  </g>
+  <!-- gold – top centre -->
+  <g transform="translate(188,52) scale(0.72)" filter="url(#glow)">
+    <polygon fill="#ffe84c"
+      points="0,-24 5.9,-8.1 22.8,-7.4 9.5,3.1 14.1,19.4 0,10 -14.1,19.4 -9.5,3.1 -22.8,-7.4 -5.9,-8.1"/>
+  </g>
+  <!-- teal – top right -->
+  <g transform="translate(402,72) scale(0.78)" filter="url(#sglow)">
+    <polygon fill="#3de8e8"
+      points="0,-24 5.9,-8.1 22.8,-7.4 9.5,3.1 14.1,19.4 0,10 -14.1,19.4 -9.5,3.1 -22.8,-7.4 -5.9,-8.1"/>
+  </g>
+
+  <!-- ── TOP-RIGHT CHEVRONS ── -->
+  <g fill="none" stroke="#3de8e8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
+    <polyline points="438,126 457,145 476,126"/>
+    <polyline points="438,149 457,168 476,149"/>
+  </g>
+
+  <!-- ── WARRIOR ──  (stroke outlines the cartoon style) -->
+  <!-- back leg -->
+  <ellipse cx="255" cy="366" rx="23" ry="53" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(-22,255,366)"/>
+  <ellipse cx="224" cy="418" rx="34" ry="16" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(-6,224,418)"/>
+  <!-- left arm (toward shield) -->
+  <ellipse cx="230" cy="256" rx="18" ry="46" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(-40,230,256)"/>
+  <!-- torso -->
+  <ellipse cx="287" cy="263" rx="57" ry="72" fill="url(#gV)" stroke="#5a2000" stroke-width="5"/>
+  <path d="M 267,230 L 287,298 M 307,230 L 287,298 M 262,256 Q 287,265 312,256 M 261,278 Q 287,287 313,278"
+        fill="none" stroke="#c85000" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- front leg -->
+  <ellipse cx="325" cy="376" rx="24" ry="53" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(20,325,376)"/>
+  <ellipse cx="357" cy="432" rx="35" ry="16" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(6,357,432)"/>
+  <!-- right arm + fist -->
+  <ellipse cx="350" cy="226" rx="19" ry="49" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(30,350,226)"/>
+  <rect x="364" y="172" width="42" height="36" rx="10" fill="url(#gV)" stroke="#5a2000" stroke-width="5"/>
+  <!-- shoulder pads -->
+  <ellipse cx="234" cy="218" rx="28" ry="20" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(-10,234,218)"/>
+  <ellipse cx="345" cy="212" rx="28" ry="20" fill="url(#gV)" stroke="#5a2000" stroke-width="5"
+           transform="rotate(10,345,212)"/>
+
+  <!-- ── SHIELD ── -->
+  <g filter="url(#sh)" transform="translate(184,256)">
+    <path d="M 0,-64 L 61,-41 L 61,18 Q 61,65 0,89 Q -61,65 -61,18 L -61,-41 Z"
+          fill="url(#shG)" stroke="#5a2000" stroke-width="5"/>
+    <path d="M 0,-39 L 37,-23 L 37,10 Q 37,39 0,57 Q -37,39 -37,10 L -37,-23 Z"
+          fill="white" opacity="0.9"/>
+    <!-- circular arrow on shield -->
+    <path d="M -18,-14 A 22,22 0 0 1 18,-14" fill="none" stroke="#c84000" stroke-width="7" stroke-linecap="round"/>
+    <polygon points="18,-14 28,-27 7,-25" fill="#c84000"/>
+    <path d="M 18,16 A 22,22 0 0 1 -18,16" fill="none" stroke="#c84000" stroke-width="7" stroke-linecap="round"/>
+    <polygon points="-18,16 -28,29 -7,27" fill="#c84000"/>
+    <!-- shield sparkle -->
+    <circle cx="-39" cy="-28" r="7" fill="white" opacity="0.95"/>
+  </g>
+
+  <!-- ── HEAD & HELMET ── -->
+  <circle cx="307" cy="170" r="52" fill="url(#gV)" stroke="#5a2000" stroke-width="5"/>
+  <!-- visor -->
+  <path d="M 266,162 Q 307,186 348,162 L 342,208 Q 307,222 272,208 Z"
+        fill="#6a2000" opacity="0.88"/>
+  <!-- eye glow -->
+  <ellipse cx="292" cy="178" rx="9" ry="5.5" fill="#ff4400" filter="url(#glow)"/>
+  <ellipse cx="322" cy="178" rx="9" ry="5.5" fill="#ff4400" filter="url(#glow)"/>
+  <!-- helmet ridge -->
+  <rect x="297" y="122" width="22" height="50" rx="7" fill="url(#gV)" stroke="#5a2000" stroke-width="4"/>
+
+  <!-- ── CROWN ── -->
+  <g filter="url(#sglow)" fill="url(#gV)" stroke="#7a4000" stroke-width="3" stroke-linejoin="round">
+    <rect x="258" y="88" width="106" height="34" rx="7"/>
+    <polygon points="268,88 279,49 293,88"/>
+    <polygon points="300,88 321,33 342,88"/>
+    <polygon points="329,88 343,49 354,88"/>
+    <circle cx="281"  cy="72" r="6.5" fill="#ee1100" stroke="#900" stroke-width="2"/>
+    <circle cx="321"  cy="57" r="7.5" fill="#ee1100" stroke="#900" stroke-width="2"/>
+    <circle cx="342"  cy="72" r="6.5" fill="#ee1100" stroke="#900" stroke-width="2"/>
+  </g>
+
+  <!-- ── BOTTOM-RIGHT CHEVRONS ── -->
+  <g fill="none" stroke="#3de8e8" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+    <polyline points="415,382 440,402 465,382"/>
+    <polyline points="415,406 440,426 465,406"/>
+  </g>
+
+  <!-- ── HIGHLIGHT SPARKLES ── -->
+  <circle cx="241" cy="145" r="4.5" fill="white" opacity="0.85" filter="url(#glow)"/>
+  <circle cx="380" cy="152" r="3.5" fill="white" opacity="0.8"  filter="url(#glow)"/>
+
+  <!-- ── GOLD BORDER ── -->
+  <rect x="5" y="5" width="502" height="502" rx="84" fill="none"
+        stroke="#c88200" stroke-width="7" opacity="0.45"/>
 </svg>
