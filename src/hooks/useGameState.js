@@ -342,10 +342,10 @@ export function useGameState() {
     });
   }, [setState]);
 
-  const addAIHistory = useCallback((entry) => {
+  const addAIHistory = useCallback((messages) => {
     setState(prev => ({
       ...prev,
-      aiCoachHistory: [...(prev.aiCoachHistory || []).slice(-19), entry]
+      aiCoachHistory: messages
     }));
   }, [setState]);
 

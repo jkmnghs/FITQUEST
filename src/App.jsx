@@ -112,12 +112,12 @@ export default function App() {
               onModalChange={setModalOpen}
             />
           </div>
-          {activeTab === 'coach' && (
+          <div style={{ display: activeTab === 'coach' ? 'block' : 'none' }}>
             <AICoachTab
               state={state}
               onSaveHistory={addAIHistory}
             />
-          )}
+          </div>
           {activeTab === 'stats' && <StatsTab state={state} />}
           {activeTab === 'rank' && <RankTab state={state} />}
           {activeTab === 'checkin' && (
