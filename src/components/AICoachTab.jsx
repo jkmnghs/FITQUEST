@@ -178,7 +178,6 @@ export default function AICoachTab({ state, onSaveHistory }) {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastSendRef = useRef({ prompt: '', ts: 0 });
-  const lastCallTsRef = useRef(0);
 
   // Tick down the cooldown counter
   useEffect(() => {
@@ -276,7 +275,6 @@ export default function AICoachTab({ state, onSaveHistory }) {
       ];
       setMessages(finalMessages);
       onSaveHistory(finalMessages.slice(-20));
-      lastCallTsRef.current = Date.now();
       setCooldownLeft(Math.ceil(COOLDOWN_MS / 1000));
     } catch (e) {
       setError(e.message);
