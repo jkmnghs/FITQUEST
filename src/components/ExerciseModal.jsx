@@ -316,7 +316,8 @@ function PlankSets({ sets, onToggle, onUpdate }) {
               border: `1px solid ${isRunning ? 'rgba(255,109,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
               background: isRunning ? 'rgba(255,109,0,0.12)' : 'rgba(255,255,255,0.04)',
               color: isRunning ? 'var(--fire2)' : 'var(--text3)',
-              fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer'
+              fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+              animation: isRunning ? 'timerPulse 1.2s ease-in-out infinite' : 'none'
             }}>
               {isRunning ? `${elapsed}s` : '▶'}
             </button>
