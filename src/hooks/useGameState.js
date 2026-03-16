@@ -309,10 +309,10 @@ export function useGameState() {
     }
   }, [setState, addXP, showToast]);
 
-  const submitCheckin = useCallback((weight, waist) => {
+  const submitCheckin = useCallback((weight, waist, sleep) => {
     let pendingXP = 25;
     setState(prev => {
-      const entry = { week: prev.currentWeek, weight, waist: waist || 0, date: today() };
+      const entry = { week: prev.currentWeek, weight, waist: waist || 0, sleep: sleep || 0, date: today() };
       const logEntry = {
         name: `Week ${prev.currentWeek} Check-in: ${weight} ${prev.unit}`,
         xp: 25, date: today(), type: 'checkin',
