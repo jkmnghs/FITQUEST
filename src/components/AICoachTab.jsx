@@ -76,26 +76,28 @@ function buildUserPrompt(mode, state, userMessage) {
       });
       return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/3. Streak: ${state.streak} days.
 ${increases.length > 0 ? `Weight increases today: ${increases.join(', ')}` : 'Maintaining current weights.'}
-${userMessage ? `Jake Mangahas's note: "${userMessage}"` : ''}
+${userMessage ? `Jake's note: "${userMessage}"` : ''}
 Be specific and energetic.`;
     }
 
     case 'analysis': {
       if (todayDone.length === 0) {
-        return `Jake Mangahas hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
+        return `Jake hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
       }
       const summary = todayDone.map(id => {
         const ex = EXERCISES.find(e => e.id === id);
         const det = details[id];
         if (!det || !ex) return `  ${id}: done`;
-        return `  ${ex.name}: ${det.setsCompleted}/${det.setsPrescribed} sets${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}${det.volume > 0 ? `, ${Math.round(det.volume)}${unit} vol` : ''}`;
+        const compliance = det.setsCompleted >= det.setsPrescribed ? 'completed as programmed' : `only ${det.setsCompleted} of ${det.setsPrescribed} prescribed sets`;
+        return `  ${ex.name}: ${compliance}${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}`;
       }).join('\n');
       const missed = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);
       return `Post-session analysis Week ${state.currentWeek}:
+Note: set counts vary per exercise by program design (compounds are 3 sets, accessories are 2 sets — this is intentional).
 ${summary}
 ${missed.length > 0 ? `Skipped: ${missed.join(', ')}` : 'All exercises done!'}
 ${userMessage ? `Note: "${userMessage}"` : ''}
-What went well, what to watch, what it means for next session.`;
+What went well, what to watch, what it means for next session. Do not reference raw volume numbers.`;
     }
 
     case 'overload': {
@@ -128,7 +130,7 @@ Explain the strategy concisely.`;
         return `Form coaching for ${matched.name}. My weight: ${convertWeight(state.liftWeights?.[matched.id] ?? matched.startKg, unit)}${unit}. Target: RPE ${matched.rpe}, ${matched.reps} reps × ${matched.sets} sets.
 Cover: setup, key cues, most common mistakes, one immediate improvement.`;
       }
-      return `Jake Mangahas wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
+      return `Jake wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
     }
 
     case 'checkin': {

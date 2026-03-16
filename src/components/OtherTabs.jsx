@@ -244,7 +244,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       <SettingRow label="Name">
         <input
           value={state.name} maxLength={20}
-          onChange={e => onUpdate('name', e.target.value || 'Jake Mangahas')}
+          onChange={e => onUpdate('name', e.target.value || 'Jake')}
           style={inputStyle}
         />
       </SettingRow>
