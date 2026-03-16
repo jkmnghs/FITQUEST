@@ -151,15 +151,40 @@ Analyze weight trend for recomposition. Are trends appropriate? What to focus on
   }
 }
 
+const COOLDOWN_MS = 8000; // 8s between API calls
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min cache
+
+function getCached(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { text, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL_MS) { sessionStorage.removeItem(key); return null; }
+    return text;
+  } catch { return null; }
+}
+
+function setCached(key, text) {
+  try { sessionStorage.setItem(key, JSON.stringify({ text, ts: Date.now() })); } catch {}
+}
+
 export default function AICoachTab({ state, onSaveHistory }) {
   const [activeMode, setActiveMode] = useState('pep');
   const [userMessage, setUserMessage] = useState('');
   const [messages, setMessages] = useState(() => state.aiCoachHistory || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastSendRef = useRef({ prompt: '', ts: 0 });
+
+  // Tick down the cooldown counter
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const t = setTimeout(() => setCooldownLeft(c => Math.max(0, c - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [cooldownLeft]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -169,6 +194,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
 
   async function sendMessage(overrideMessage) {
     if (loading) return;
+    if (cooldownLeft > 0) return;
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -186,11 +212,9 @@ export default function AICoachTab({ state, onSaveHistory }) {
     }
     lastSendRef.current = { prompt: userPrompt, ts: Date.now() };
 
-    // Cache check for quick prompts (session-scoped)
-    // Use user's actual message text as key differentiator so follow-up questions
-    // don't collide with prior responses that share the same prompt preamble
+    // Cache check (session-scoped, 30-min TTL)
     const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${text ? text.slice(0, 80) : userPrompt.slice(0, 80)}`;
-    const cached = sessionStorage.getItem(cacheKey);
+    const cached = getCached(cacheKey);
     if (cached) {
       const newMessages = [
         ...messages,
@@ -242,8 +266,8 @@ export default function AICoachTab({ state, onSaveHistory }) {
       const data = await response.json();
       const assistantText = data.content?.find(b => b.type === 'text')?.text || 'No response';
 
-      // Cache response for reuse within this session
-      try { sessionStorage.setItem(cacheKey, assistantText); } catch (e) {}
+      // Cache response for reuse within this session (30-min TTL)
+      setCached(cacheKey, assistantText);
 
       const finalMessages = [
         ...newMessages,
@@ -251,6 +275,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
       ];
       setMessages(finalMessages);
       onSaveHistory(finalMessages.slice(-20));
+      setCooldownLeft(Math.ceil(COOLDOWN_MS / 1000));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -360,17 +385,19 @@ export default function AICoachTab({ state, onSaveHistory }) {
           />
           <button
             onClick={() => sendMessage()}
-            disabled={loading}
+            disabled={loading || cooldownLeft > 0}
             style={{
               width: 42, height: 42, borderRadius: 10, border: 'none',
-              background: loading ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
-              color: loading ? 'var(--text3)' : 'var(--bg)',
-              fontSize: 18, cursor: loading ? 'default' : 'pointer',
+              background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
+              color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
+              fontSize: cooldownLeft > 0 ? 11 : 18,
+              fontFamily: 'Orbitron', fontWeight: 700,
+              cursor: (loading || cooldownLeft > 0) ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.2s', flexShrink: 0
             }}
           >
-            {loading ? '⏳' : '→'}
+            {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
           </button>
         </div>
 

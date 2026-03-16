@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import BgFx from './components/BgFx';
 import Toast from './components/Toast';
 import Header from './components/Header';
@@ -10,6 +10,36 @@ import AICoachTab from './components/AICoachTab';
 import { AchievementsTab, LogTab, SummaryTab, SettingsTab } from './components/OtherTabs';
 import { useGameState } from './hooks/useGameState';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(e) { return { error: e }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          padding: 24, textAlign: 'center', background: 'var(--bg)'
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>
+            SOMETHING WENT WRONG
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6, maxWidth: 300 }}>
+            {this.state.error.message}
+          </div>
+          <button onClick={() => window.location.reload()} style={{
+            padding: '10px 20px', borderRadius: 10, border: 'none',
+            background: 'var(--cyan)', color: 'var(--bg)',
+            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, cursor: 'pointer'
+          }}>RELOAD APP</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const PRIMARY_TABS = [
   { id: 'workout',  icon: '⚔️',  label: 'Workout'  },
@@ -74,7 +104,7 @@ export default function App() {
   const isMoreTabActive = MORE_TABS.some(t => t.id === activeTab);
 
   return (
-    <>
+    <ErrorBoundary>
       <BgFx />
       <Toast message={toast} />
 
@@ -99,6 +129,7 @@ export default function App() {
               borderRadius: '20px 20px 0 0',
               padding: '6px 0 calc(70px + env(safe-area-inset-bottom, 0px))',
               boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
+              animation: 'slideUp 0.3s cubic-bezier(0.16,1,0.3,1)',
             }}
           >
             {/* Drag handle */}
@@ -336,6 +367,6 @@ export default function App() {
           </nav>
         )}
       </div>
-    </>
+    </ErrorBoundary>
   );
 }

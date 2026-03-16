@@ -12,8 +12,11 @@ const CHECKLIST_ITEMS = [
 export default function CheckinTab({ state, onSubmit }) {
   const [weight, setWeight] = useState('');
   const [waist, setWaist] = useState('');
+  const [sleep, setSleep] = useState('');
   const [checked, setChecked] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(null);
+  const [showOverwrite, setShowOverwrite] = useState(false);
 
   const dayIdx = new Date().getDay();
   const isSunday = dayIdx === 0;
@@ -21,14 +24,42 @@ export default function CheckinTab({ state, onSubmit }) {
   const lastCheckin = state.weeklyCheckins?.length > 0
     ? state.weeklyCheckins[state.weeklyCheckins.length - 1]
     : null;
+  const thisWeekCheckin = state.weeklyCheckins?.find(c => c.week === state.currentWeek);
+
+  function validate() {
+    const wt = parseFloat(weight);
+    if (!wt || wt <= 0 || wt > 500) {
+      setError(`Enter a valid weight between 1–500 ${state.unit}`);
+      return false;
+    }
+    const ws = parseFloat(waist) || 0;
+    if (ws < 0 || ws > 300) {
+      setError('Enter a valid waist measurement (0–300 cm)');
+      return false;
+    }
+    if (sleep !== '') {
+      const sl = parseFloat(sleep);
+      if (isNaN(sl) || sl < 0 || sl > 24) {
+        setError('Enter a valid sleep value (0–24 hours)');
+        return false;
+      }
+    }
+    setError(null);
+    return true;
+  }
 
   function handleSubmit() {
+    if (!validate()) return;
+    if (thisWeekCheckin && !showOverwrite) {
+      setShowOverwrite(true);
+      return;
+    }
     const wt = parseFloat(weight);
-    if (!wt || wt <= 0 || wt > 500) return;
     const ws = parseFloat(waist) || 0;
-    if (ws < 0 || ws > 300) return;
-    onSubmit(wt, ws);
+    const sl = parseFloat(sleep) || 0;
+    onSubmit(wt, ws, sl);
     setSubmitted(true);
+    setShowOverwrite(false);
   }
 
   function toggleCheck(id) {
@@ -61,17 +92,35 @@ export default function CheckinTab({ state, onSubmit }) {
             </div>
           ) : (
             <>
-              <InputRow label="Weight" value={weight} onChange={setWeight}
+              <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
                 placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
-              <InputRow label="Waist" value={waist} onChange={setWaist}
+              <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
                 placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
+              <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
+                placeholder="Optional" unit="hrs/night" inputMode="decimal" step="0.5" min="0" max="24" />
+              {error && (
+                <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
+                  ⚠ {error}
+                </div>
+              )}
+              {showOverwrite && !error && (
+                <div style={{
+                  fontSize: 12, color: 'var(--gold)', marginTop: 4, marginBottom: 4,
+                  padding: '8px 10px', borderRadius: 8,
+                  background: 'rgba(255,214,0,0.07)', border: '1px solid rgba(255,214,0,0.2)'
+                }}>
+                  ⚠ Already checked in Week {thisWeekCheckin.week} ({thisWeekCheckin.weight} {state.unit}). Tap again to overwrite.
+                </div>
+              )}
               <button onClick={handleSubmit} style={{
                 width: '100%', padding: 12, border: 'none', borderRadius: 12,
-                background: 'linear-gradient(135deg, var(--purple2), var(--purple))',
+                background: showOverwrite
+                  ? 'linear-gradient(135deg, var(--fire), var(--fire2))'
+                  : 'linear-gradient(135deg, var(--purple2), var(--purple))',
                 fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
                 color: '#fff', letterSpacing: 0.5, marginTop: 6, cursor: 'pointer'
               }}>
-                SAVE CHECK-IN (+25 XP)
+                {showOverwrite ? 'OVERWRITE CHECK-IN' : 'SAVE CHECK-IN (+25 XP)'}
               </button>
             </>
           )}
@@ -88,7 +137,7 @@ export default function CheckinTab({ state, onSubmit }) {
             color: 'var(--text)', marginBottom: 6
           }}>CHECK-IN DAY: SUNDAY</div>
           <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
-            Today is {dayName}. Come back Sunday morning to log your weight and waist.
+            Today is {dayName}. Come back Sunday morning to log your weight, waist, and sleep.
           </div>
           {lastCheckin && (
             <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text2)' }}>
@@ -158,6 +207,7 @@ export default function CheckinTab({ state, onSubmit }) {
                 <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--cyan)' }}>
                   {ci.weight} {state.unit}
                   {ci.waist > 0 && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{ci.waist}cm</span>}
+                  {ci.sleep > 0 && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>😴 {ci.sleep}h</span>}
                 </div>
               </div>
             ))}
@@ -184,7 +234,7 @@ function InputRow({ label, value, onChange, placeholder, unit, inputMode, step, 
           fontWeight: 600, textAlign: 'center', padding: '0 8px'
         }}
       />
-      <div style={{ fontSize: 11, color: 'var(--text3)', width: 30 }}>{unit}</div>
+      <div style={{ fontSize: 11, color: 'var(--text3)', minWidth: 30 }}>{unit}</div>
     </div>
   );
 }
