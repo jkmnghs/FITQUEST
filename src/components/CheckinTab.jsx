@@ -12,6 +12,7 @@ const CHECKLIST_ITEMS = [
 export default function CheckinTab({ state, onSubmit }) {
   const [weight, setWeight] = useState('');
   const [waist, setWaist] = useState('');
+  const [sleep, setSleep] = useState('');
   const [checked, setChecked] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
@@ -48,7 +49,8 @@ export default function CheckinTab({ state, onSubmit }) {
     }
     const wt = parseFloat(weight);
     const ws = parseFloat(waist) || 0;
-    onSubmit(wt, ws);
+    const sl = parseFloat(sleep) || 0;
+    onSubmit(wt, ws, sl);
     setSubmitted(true);
     setShowOverwrite(false);
   }
@@ -87,6 +89,8 @@ export default function CheckinTab({ state, onSubmit }) {
                 placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
               <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
                 placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
+              <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
+                placeholder="Optional" unit="hrs/night" inputMode="decimal" step="0.5" min="0" max="24" />
               {error && (
                 <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
                   ⚠ {error}
@@ -196,6 +200,7 @@ export default function CheckinTab({ state, onSubmit }) {
                 <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--cyan)' }}>
                   {ci.weight} {state.unit}
                   {ci.waist > 0 && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{ci.waist}cm</span>}
+                  {ci.sleep > 0 && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>😴 {ci.sleep}h</span>}
                 </div>
               </div>
             ))}
@@ -222,7 +227,7 @@ function InputRow({ label, value, onChange, placeholder, unit, inputMode, step, 
           fontWeight: 600, textAlign: 'center', padding: '0 8px'
         }}
       />
-      <div style={{ fontSize: 11, color: 'var(--text3)', width: 30 }}>{unit}</div>
+      <div style={{ fontSize: 11, color: 'var(--text3)', minWidth: 30 }}>{unit}</div>
     </div>
   );
 }

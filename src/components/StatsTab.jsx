@@ -21,6 +21,9 @@ export default function StatsTab({ state }) {
       <SectionTitle>Waist Trend</SectionTitle>
       <WaistChart checkins={weeklyCheckins || []} />
 
+      <SectionTitle>Sleep Trend</SectionTitle>
+      <SleepChart checkins={weeklyCheckins || []} />
+
       <SectionTitle>Personal Records</SectionTitle>
       <PRSection prs={personalRecords || {}} unit={unit} />
 
@@ -267,6 +270,89 @@ function PRSection({ prs, unit }) {
           );
         })
       )}
+    </div>
+  );
+}
+
+function SleepChart({ checkins }) {
+  const withSleep = checkins.filter(c => c.sleep > 0);
+  if (withSleep.length === 0) {
+    return (
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--card-border)',
+        borderRadius: 14, padding: '18px 16px', marginBottom: 16, textAlign: 'center'
+      }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>😴</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>No sleep data yet</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
+          Log your average nightly sleep hours in your Sunday check-in to track recovery trends.
+        </div>
+      </div>
+    );
+  }
+
+  const sleeps = withSleep.map(c => c.sleep);
+  const avg = sleeps.reduce((a, b) => a + b, 0) / sleeps.length;
+  const minS = Math.max(0, Math.min(...sleeps) - 0.5);
+  const maxS = Math.max(...sleeps) + 0.5;
+  const range = maxS - minS || 1;
+  const W = 280, H = 80;
+  const step = sleeps.length > 1 ? W / (sleeps.length - 1) : W;
+
+  let path = 'M';
+  const dots = sleeps.map((s, i) => {
+    const x = sleeps.length > 1 ? i * step : W / 2;
+    const y = H - ((s - minS) / range) * H;
+    path += `${i ? 'L' : ''}${x.toFixed(1)},${y.toFixed(1)} `;
+    return { x: x.toFixed(1), y: y.toFixed(1), val: s };
+  });
+
+  const targetY = H - ((7 - minS) / range) * H;
+  const last = sleeps[sleeps.length - 1];
+  const sleepColor = last >= 7 ? 'var(--green)' : last >= 6 ? 'var(--gold)' : 'var(--red)';
+
+  return (
+    <div style={{
+      background: 'var(--card)', border: '1px solid var(--card-border)',
+      borderRadius: 14, padding: 16, marginBottom: 16, backdropFilter: 'blur(20px)'
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Avg Sleep (hrs/night)</div>
+      <div style={{ position: 'relative', height: H, overflow: 'hidden' }}>
+        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="slg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--purple)" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="var(--purple)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* 7hr target line */}
+          {targetY >= 0 && targetY <= H && (
+            <line x1="0" y1={targetY.toFixed(1)} x2={W} y2={targetY.toFixed(1)}
+              stroke="rgba(0,230,118,0.3)" strokeWidth="1" strokeDasharray="4,4" />
+          )}
+          {sleeps.length > 1 && (
+            <path d={path + `L${W},${H} L0,${H} Z`} fill="url(#slg)" />
+          )}
+          {sleeps.length > 1 && (
+            <path d={path} fill="none" stroke="var(--purple)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          )}
+          {dots.map((d, i) => (
+            <circle key={i} cx={d.x} cy={d.y} r="4" fill="var(--purple)" stroke="var(--bg)" strokeWidth="2" />
+          ))}
+        </svg>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        {[
+          { val: `${last}h`, lbl: 'Last', color: sleepColor },
+          { val: `${avg.toFixed(1)}h`, lbl: 'Avg', color: 'var(--purple)' },
+          { val: '7h', lbl: 'Target', color: 'var(--green)' },
+        ].map((s, i) => (
+          <div key={i} style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
