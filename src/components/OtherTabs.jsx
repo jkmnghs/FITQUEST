@@ -224,6 +224,7 @@ export function SummaryTab({ state }) {
 
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport }) {
+  const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(1);
   const [backfillDuration, setBackfillDuration] = useState(50);
@@ -308,8 +309,19 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         background: 'var(--card)', border: '1px solid rgba(179,136,255,0.2)',
         borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Backfill Past Weeks</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <button
+          onClick={() => setBackfillOpen(o => !o)}
+          style={{
+            width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: backfillOpen ? 4 : 0
+          }}
+        >
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Backfill Past Weeks</span>
+          <span style={{ fontSize: 16, color: 'var(--text3)', transition: 'transform 0.2s', display: 'inline-block', transform: backfillOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+        </button>
+
+        {backfillOpen && <>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, marginTop: 4, lineHeight: 1.5 }}>
           Lost your data? Set sessions done, completion, and weights you were lifting.
         </div>
 
@@ -440,6 +452,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             >{alreadyDone ? `WEEK ${backfillW} ALREADY AT ${lockedCount}/3` : `APPLY WEEK ${backfillW}`}</button>
           );
         })()}
+        </>}
       </div>
 
       {/* Export / Import */}
