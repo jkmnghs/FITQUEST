@@ -37,6 +37,13 @@ export default function CheckinTab({ state, onSubmit }) {
       setError('Enter a valid waist measurement (0–300 cm)');
       return false;
     }
+    if (sleep !== '') {
+      const sl = parseFloat(sleep);
+      if (isNaN(sl) || sl < 0 || sl > 24) {
+        setError('Enter a valid sleep value (0–24 hours)');
+        return false;
+      }
+    }
     setError(null);
     return true;
   }
@@ -130,7 +137,7 @@ export default function CheckinTab({ state, onSubmit }) {
             color: 'var(--text)', marginBottom: 6
           }}>CHECK-IN DAY: SUNDAY</div>
           <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
-            Today is {dayName}. Come back Sunday morning to log your weight and waist.
+            Today is {dayName}. Come back Sunday morning to log your weight, waist, and sleep.
           </div>
           {lastCheckin && (
             <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text2)' }}>
