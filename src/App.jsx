@@ -11,11 +11,14 @@ import { AchievementsTab, LogTab, SummaryTab, SettingsTab } from './components/O
 import { useGameState } from './hooks/useGameState';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 
-const TABS = [
+const PRIMARY_TABS = [
   { id: 'workout',  icon: '⚔️',  label: 'Workout'  },
   { id: 'coach',    icon: '🤖',  label: 'Coach'    },
   { id: 'stats',    icon: '📊',  label: 'Stats'    },
   { id: 'rank',     icon: '⭐',  label: 'Rank'     },
+];
+
+const MORE_TABS = [
   { id: 'checkin',  icon: '📋',  label: 'Check-in' },
   { id: 'summary',  icon: '📝',  label: 'Summary'  },
   { id: 'ach',      icon: '🏆',  label: 'Awards'   },
@@ -23,9 +26,12 @@ const TABS = [
   { id: 'settings', icon: '⚙️',  label: 'Settings' },
 ];
 
+const ALL_TABS = [...PRIMARY_TABS, ...MORE_TABS];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('workout');
   const [modalOpen, setModalOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
@@ -60,15 +66,89 @@ export default function App() {
     }
   }
 
+  function handleTabSelect(id) {
+    setActiveTab(id);
+    setMoreOpen(false);
+  }
+
+  const isMoreTabActive = MORE_TABS.some(t => t.id === activeTab);
+
   return (
     <>
       <BgFx />
       <Toast message={toast} />
 
+      {/* "More" sheet overlay */}
+      {moreOpen && (
+        <div
+          onClick={() => setMoreOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: 0, left: '50%',
+              transform: 'translateX(-50%)',
+              width: '100%', maxWidth: 430,
+              background: 'linear-gradient(180deg, rgba(15,21,40,0.98) 0%, rgba(10,14,26,0.99) 100%)',
+              border: '1px solid rgba(0,229,255,0.1)',
+              borderBottom: 'none',
+              borderRadius: '20px 20px 0 0',
+              padding: '6px 0 calc(70px + env(safe-area-inset-bottom, 0px))',
+              boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
+            }}
+          >
+            {/* Drag handle */}
+            <div style={{
+              width: 36, height: 4, borderRadius: 2,
+              background: 'rgba(255,255,255,0.15)',
+              margin: '8px auto 16px',
+            }} />
+            <div style={{
+              fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+              color: 'var(--text3)', letterSpacing: 1.5,
+              padding: '0 20px 10px',
+            }}>MORE</div>
+            {MORE_TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabSelect(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  width: '100%', padding: '14px 20px',
+                  border: 'none', background: activeTab === tab.id
+                    ? 'rgba(0,229,255,0.08)' : 'transparent',
+                  color: activeTab === tab.id ? 'var(--cyan)' : 'var(--text2)',
+                  fontFamily: 'Rajdhani', fontSize: 16, fontWeight: 600,
+                  cursor: 'pointer', textAlign: 'left',
+                  borderLeft: activeTab === tab.id
+                    ? '3px solid var(--cyan)' : '3px solid transparent',
+                  transition: 'all 0.15s',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{ fontSize: 20, width: 28, textAlign: 'center' }}>{tab.icon}</span>
+                {tab.label}
+                {activeTab === tab.id && (
+                  <span style={{
+                    marginLeft: 'auto', fontSize: 11,
+                    color: 'var(--cyan)', fontFamily: 'Orbitron',
+                  }}>ACTIVE</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* PWA install banner */}
       {installPrompt && !installDismissed && (
         <div style={{
-          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px) + 10px)',
+          left: '50%', transform: 'translateX(-50%)',
           zIndex: 9000, width: 'calc(100% - 40px)', maxWidth: 390,
           background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(179,136,255,0.12))',
           border: '1px solid rgba(0,229,255,0.25)',
@@ -113,41 +193,11 @@ export default function App() {
           <Header state={state} />
         </div>
 
-        {/* Tab bar — hidden when modal is open */}
-        <div style={{
-          display: modalOpen ? 'none' : 'flex', gap: 4, padding: '8px 12px',
-          overflowX: 'auto', WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-          position: 'sticky', top: 0, zIndex: 10,
-          background: 'rgba(10,14,26,0.96)', backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(0,229,255,0.06)'
-        }}>
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                flexShrink: 0, padding: '9px 13px', borderRadius: 11,
-                border: `1px solid ${activeTab === tab.id ? 'rgba(0,229,255,0.22)' : 'transparent'}`,
-                background: activeTab === tab.id ? 'rgba(0,229,255,0.1)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--cyan)' : 'var(--text3)',
-                fontFamily: 'Rajdhani', fontSize: 13, fontWeight: 600,
-                cursor: 'pointer', transition: 'all 0.2s',
-                display: 'flex', alignItems: 'center', gap: 5,
-                letterSpacing: 0.3,
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              <span style={{ fontSize: 14 }}>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content — WorkoutTab stays mounted to preserve in-progress modal state */}
+        {/* Content */}
         <div style={{
           flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          padding: '10px 20px 40px'
+          padding: '10px 20px',
+          paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
         }}>
           <div style={{ display: activeTab === 'workout' ? 'block' : 'none' }}>
             <WorkoutTab
@@ -185,6 +235,106 @@ export default function App() {
             />
           )}
         </div>
+
+        {/* Bottom navigation bar — hidden when modal is open */}
+        {!modalOpen && (
+          <nav style={{
+            position: 'fixed', bottom: 0, left: '50%',
+            transform: 'translateX(-50%)',
+            width: '100%', maxWidth: 430,
+            zIndex: 100,
+            background: 'rgba(10,14,26,0.97)',
+            backdropFilter: 'blur(20px)',
+            borderTop: '1px solid rgba(0,229,255,0.08)',
+            display: 'flex', alignItems: 'stretch',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.4)',
+          }}>
+            {PRIMARY_TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabSelect(tab.id)}
+                  style={{
+                    flex: 1, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: 3, padding: '10px 4px 10px',
+                    border: 'none', background: 'transparent',
+                    cursor: 'pointer', position: 'relative',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {/* Active indicator dot */}
+                  {isActive && (
+                    <span style={{
+                      position: 'absolute', top: 0, left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 28, height: 2, borderRadius: 1,
+                      background: 'var(--cyan)',
+                      boxShadow: '0 0 8px var(--cyan)',
+                    }} />
+                  )}
+                  <span style={{
+                    fontSize: 22,
+                    filter: isActive ? 'drop-shadow(0 0 6px var(--cyan))' : 'none',
+                    transition: 'filter 0.2s',
+                    transform: isActive ? 'translateY(-1px)' : 'none',
+                  }}>{tab.icon}</span>
+                  <span style={{
+                    fontFamily: 'Rajdhani', fontSize: 11, fontWeight: 600,
+                    color: isActive ? 'var(--cyan)' : 'var(--text3)',
+                    letterSpacing: 0.3,
+                    transition: 'color 0.2s',
+                  }}>{tab.label}</span>
+                </button>
+              );
+            })}
+
+            {/* More button */}
+            <button
+              onClick={() => setMoreOpen(prev => !prev)}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                gap: 3, padding: '10px 4px 10px',
+                border: 'none', background: 'transparent',
+                cursor: 'pointer', position: 'relative',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.2s',
+              }}
+            >
+              {/* Active indicator for More tab */}
+              {isMoreTabActive && (
+                <span style={{
+                  position: 'absolute', top: 0, left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 28, height: 2, borderRadius: 1,
+                  background: 'var(--cyan)',
+                  boxShadow: '0 0 8px var(--cyan)',
+                }} />
+              )}
+              <span style={{
+                fontSize: 22,
+                color: (isMoreTabActive || moreOpen) ? 'var(--cyan)' : 'var(--text3)',
+                transition: 'all 0.2s',
+                transform: moreOpen ? 'rotate(45deg)' : 'none',
+                display: 'inline-block',
+              }}>⋯</span>
+              <span style={{
+                fontFamily: 'Rajdhani', fontSize: 11, fontWeight: 600,
+                color: (isMoreTabActive || moreOpen) ? 'var(--cyan)' : 'var(--text3)',
+                letterSpacing: 0.3,
+                transition: 'color 0.2s',
+              }}>
+                {isMoreTabActive
+                  ? MORE_TABS.find(t => t.id === activeTab)?.label
+                  : 'More'}
+              </span>
+            </button>
+          </nav>
+        )}
       </div>
     </>
   );
