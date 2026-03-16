@@ -54,18 +54,19 @@
       <line x1="420" y1="30"  x2="370" y2="512" stroke-width="30"/>
     </g>
 
-    <!-- Orbit ring -->
-    <ellipse cx="268" cy="275" rx="155" ry="150"
-             fill="none" stroke="#4fc3f7" stroke-width="3.5" opacity="0.45"/>
-    <path d="M 155 200 A 155 150 0 0 1 420 195"
-          fill="none" stroke="#b3e5fc" stroke-width="4" opacity="0.55" stroke-linecap="round"/>
+    <!-- Orbit arc (top portion only, behind warrior) -->
+    <path d="M 148 310 A 155 150 0 0 1 390 310"
+          fill="none" stroke="#4fc3f7" stroke-width="3.5" opacity="0.45" stroke-linecap="round"/>
+    <!-- Orbit arc highlight (upper arc) -->
+    <path d="M 170 210 A 135 130 0 0 1 400 220"
+          fill="none" stroke="#b3e5fc" stroke-width="3" opacity="0.45" stroke-linecap="round"/>
 
-    <!-- Speed lines (left side) -->
-    <g opacity="0.45" stroke="#90caf9" stroke-linecap="round">
-      <line x1="50"  y1="230" x2="155" y2="215" stroke-width="5"/>
-      <line x1="42"  y1="258" x2="152" y2="254" stroke-width="6"/>
-      <line x1="48"  y1="286" x2="155" y2="286" stroke-width="5"/>
-      <line x1="55"  y1="312" x2="158" y2="310" stroke-width="4"/>
+    <!-- Speed lines (contained, left-centre only) -->
+    <g opacity="0.40" stroke="#90caf9" stroke-linecap="round">
+      <line x1="110" y1="238" x2="175" y2="225" stroke-width="5"/>
+      <line x1="105" y1="262" x2="172" y2="258" stroke-width="6"/>
+      <line x1="108" y1="286" x2="173" y2="286" stroke-width="5"/>
+      <line x1="112" y1="308" x2="172" y2="306" stroke-width="4"/>
     </g>
 
     <!-- Sweeping golden arc arrow -->
