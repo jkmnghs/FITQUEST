@@ -187,7 +187,9 @@ export default function AICoachTab({ state, onSaveHistory }) {
     lastSendRef.current = { prompt: userPrompt, ts: Date.now() };
 
     // Cache check for quick prompts (session-scoped)
-    const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${userPrompt.slice(0, 80)}`;
+    // Use user's actual message text as key differentiator so follow-up questions
+    // don't collide with prior responses that share the same prompt preamble
+    const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${text ? text.slice(0, 80) : userPrompt.slice(0, 80)}`;
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       const newMessages = [
