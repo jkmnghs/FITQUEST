@@ -88,14 +88,16 @@ Be specific and energetic.`;
         const ex = EXERCISES.find(e => e.id === id);
         const det = details[id];
         if (!det || !ex) return `  ${id}: done`;
-        return `  ${ex.name}: ${det.setsCompleted}/${det.setsPrescribed} sets${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}${det.volume > 0 ? `, ${Math.round(det.volume)}${unit} vol` : ''}`;
+        const compliance = det.setsCompleted >= det.setsPrescribed ? 'completed as programmed' : `only ${det.setsCompleted} of ${det.setsPrescribed} prescribed sets`;
+        return `  ${ex.name}: ${compliance}${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}`;
       }).join('\n');
       const missed = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);
       return `Post-session analysis Week ${state.currentWeek}:
+Note: set counts vary per exercise by program design (compounds are 3 sets, accessories are 2 sets — this is intentional).
 ${summary}
 ${missed.length > 0 ? `Skipped: ${missed.join(', ')}` : 'All exercises done!'}
 ${userMessage ? `Note: "${userMessage}"` : ''}
-What went well, what to watch, what it means for next session.`;
+What went well, what to watch, what it means for next session. Do not reference raw volume numbers.`;
     }
 
     case 'overload': {
