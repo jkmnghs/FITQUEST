@@ -87,10 +87,17 @@ function WeightChart({ checkins, unit }) {
     return (
       <div style={{
         background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 14, padding: 20, marginBottom: 16, textAlign: 'center',
-        color: 'var(--text3)', fontSize: 13
+        borderRadius: 14, padding: '18px 16px', marginBottom: 16, textAlign: 'center'
       }}>
-        Need 2+ Sunday check-ins to show chart
+        <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>
+          {checkins.length === 0 ? 'No check-ins yet' : 'Need one more check-in'}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
+          {checkins.length === 0
+            ? 'Complete your first Sunday check-in to start tracking your weight trend. Tap the More → Check-in tab every Sunday.'
+            : 'Submit one more Sunday check-in to unlock your weight trend chart.'}
+        </div>
       </div>
     );
   }
@@ -159,10 +166,17 @@ function WaistChart({ checkins }) {
     return (
       <div style={{
         background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 14, padding: 16, marginBottom: 16, textAlign: 'center',
-        color: 'var(--text3)', fontSize: 13
+        borderRadius: 14, padding: '18px 16px', marginBottom: 16, textAlign: 'center'
       }}>
-        Need 2+ check-ins with waist measurement to show chart
+        <div style={{ fontSize: 28, marginBottom: 8 }}>📏</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>
+          {withWaist.length === 0 ? 'No waist data yet' : 'Need one more waist entry'}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
+          {withWaist.length === 0
+            ? 'Include your waist measurement in your Sunday check-in to track recomposition progress.'
+            : 'Submit one more Sunday check-in with waist data to unlock this chart.'}
+        </div>
       </div>
     );
   }

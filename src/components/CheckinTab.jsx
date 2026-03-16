@@ -14,6 +14,8 @@ export default function CheckinTab({ state, onSubmit }) {
   const [waist, setWaist] = useState('');
   const [checked, setChecked] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(null);
+  const [showOverwrite, setShowOverwrite] = useState(false);
 
   const dayIdx = new Date().getDay();
   const isSunday = dayIdx === 0;
@@ -21,14 +23,34 @@ export default function CheckinTab({ state, onSubmit }) {
   const lastCheckin = state.weeklyCheckins?.length > 0
     ? state.weeklyCheckins[state.weeklyCheckins.length - 1]
     : null;
+  const thisWeekCheckin = state.weeklyCheckins?.find(c => c.week === state.currentWeek);
+
+  function validate() {
+    const wt = parseFloat(weight);
+    if (!wt || wt <= 0 || wt > 500) {
+      setError(`Enter a valid weight between 1–500 ${state.unit}`);
+      return false;
+    }
+    const ws = parseFloat(waist) || 0;
+    if (ws < 0 || ws > 300) {
+      setError('Enter a valid waist measurement (0–300 cm)');
+      return false;
+    }
+    setError(null);
+    return true;
+  }
 
   function handleSubmit() {
+    if (!validate()) return;
+    if (thisWeekCheckin && !showOverwrite) {
+      setShowOverwrite(true);
+      return;
+    }
     const wt = parseFloat(weight);
-    if (!wt || wt <= 0 || wt > 500) return;
     const ws = parseFloat(waist) || 0;
-    if (ws < 0 || ws > 300) return;
     onSubmit(wt, ws);
     setSubmitted(true);
+    setShowOverwrite(false);
   }
 
   function toggleCheck(id) {
@@ -61,17 +83,33 @@ export default function CheckinTab({ state, onSubmit }) {
             </div>
           ) : (
             <>
-              <InputRow label="Weight" value={weight} onChange={setWeight}
+              <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
                 placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
-              <InputRow label="Waist" value={waist} onChange={setWaist}
+              <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
                 placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
+              {error && (
+                <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
+                  ⚠ {error}
+                </div>
+              )}
+              {showOverwrite && !error && (
+                <div style={{
+                  fontSize: 12, color: 'var(--gold)', marginTop: 4, marginBottom: 4,
+                  padding: '8px 10px', borderRadius: 8,
+                  background: 'rgba(255,214,0,0.07)', border: '1px solid rgba(255,214,0,0.2)'
+                }}>
+                  ⚠ Already checked in Week {thisWeekCheckin.week} ({thisWeekCheckin.weight} {state.unit}). Tap again to overwrite.
+                </div>
+              )}
               <button onClick={handleSubmit} style={{
                 width: '100%', padding: 12, border: 'none', borderRadius: 12,
-                background: 'linear-gradient(135deg, var(--purple2), var(--purple))',
+                background: showOverwrite
+                  ? 'linear-gradient(135deg, var(--fire), var(--fire2))'
+                  : 'linear-gradient(135deg, var(--purple2), var(--purple))',
                 fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
                 color: '#fff', letterSpacing: 0.5, marginTop: 6, cursor: 'pointer'
               }}>
-                SAVE CHECK-IN (+25 XP)
+                {showOverwrite ? 'OVERWRITE CHECK-IN' : 'SAVE CHECK-IN (+25 XP)'}
               </button>
             </>
           )}
