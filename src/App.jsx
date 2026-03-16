@@ -129,7 +129,6 @@ export default function App() {
               borderRadius: '20px 20px 0 0',
               padding: '6px 0 calc(70px + env(safe-area-inset-bottom, 0px))',
               boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
-              animation: 'slideUp 0.3s cubic-bezier(0.16,1,0.3,1)',
             }}
           >
             {/* Drag handle */}
@@ -349,8 +348,6 @@ export default function App() {
               <span style={{
                 fontSize: 22,
                 color: (isMoreTabActive || moreOpen) ? 'var(--cyan)' : 'var(--text3)',
-                transition: 'all 0.2s',
-                transform: moreOpen ? 'rotate(45deg)' : 'none',
                 display: 'inline-block',
               }}>⋯</span>
               <span style={{
