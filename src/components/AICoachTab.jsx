@@ -175,9 +175,17 @@ export default function AICoachTab({ state, onSaveHistory }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastSendRef = useRef({ prompt: '', ts: 0 });
+
+  // Warn on mount if API key is not configured
+  useEffect(() => {
+    if (!import.meta.env.VITE_ANTHROPIC_API_KEY) {
+      setApiKeyMissing(true);
+    }
+  }, []);
 
   // Tick down the cooldown counter
   useEffect(() => {
@@ -336,6 +344,19 @@ export default function AICoachTab({ state, onSaveHistory }) {
           ))}
         </div>
       </div>
+
+      {/* API key missing warning */}
+      {apiKeyMissing && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
+          fontSize: 12, color: 'var(--gold)', lineHeight: 1.6
+        }}>
+          <strong>API key not configured.</strong> Create a <code>.env.local</code> file in the project root with:<br />
+          <code>VITE_ANTHROPIC_API_KEY=sk-ant-...</code><br />
+          Then restart the dev server.
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{ flex: 1, marginBottom: 14 }}>

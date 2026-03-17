@@ -43,6 +43,8 @@ export function useGameState() {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
+  const isFinishingSession = useRef(false);
+
   // Ref-based synchronous lock for backfill — tracks the highest session count
   // already applied per week. Updated synchronously before setState so rapid
   // re-clicks are blocked even before React commits the state update.
@@ -229,6 +231,8 @@ export function useGameState() {
   }, [setState, addXP, showToast]);
 
   const finishSession = useCallback(() => {
+    if (isFinishingSession.current) return;
+    isFinishingSession.current = true;
     let pendingXP = 0;
     let pendingAdvance = null;
     setState(prev => {
@@ -305,7 +309,10 @@ export function useGameState() {
             todayExDate: today()
           };
         });
+        isFinishingSession.current = false;
       }, 2500);
+    } else {
+      isFinishingSession.current = false;
     }
   }, [setState, addXP, showToast]);
 
@@ -452,6 +459,13 @@ export function useGameState() {
   }, [setStateRaw, showToast]);
 
   const importData = useCallback((data) => {
+    if (!data || typeof data !== 'object' ||
+        typeof data.currentWeek !== 'number' ||
+        typeof data.level !== 'number' ||
+        !Array.isArray(data.log)) {
+      showToast('Invalid backup: missing required fields.');
+      return;
+    }
     const merged = mergeState(data);
     storageSet(merged);
     backfillApplied.current = {};

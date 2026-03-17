@@ -20,7 +20,6 @@ export default function ExerciseModal({ exId, week, unit, liftWeights, todayExDo
   const det = todayExDetails[exId];
   const isDeload = week === 9;
   const formTips = FORM_TIPS[exId] || [];
-  const randomTip = formTips[Math.floor(Math.random() * formTips.length)];
 
   const [sets, setSets] = useState(() => savedSets || makeDefaultSets(ex, baseSets, displayWt));
   const [timer, setTimer] = useState(null);
@@ -64,10 +63,10 @@ export default function ExerciseModal({ exId, week, unit, liftWeights, todayExDo
     // Convert display weights to kg
     const processedSets = sets.map(s => ({
       ...s,
-      weightKg: unit === 'lbs' ? kgFromDisplay(parseFloat(s.weightKg) || 0, unit) : (parseFloat(s.weightKg) || 0),
-      reps: parseFloat(s.reps) || 0,
+      weightKg: Math.max(0, Math.min(1000, unit === 'lbs' ? kgFromDisplay(parseFloat(s.weightKg) || 0, unit) : (parseFloat(s.weightKg) || 0))),
+      reps: Math.max(0, Math.min(100, parseFloat(s.reps) || 0)),
       rpe: parseInt(s.rpe) || 0,
-      time: parseFloat(s.time) || 0
+      time: Math.max(0, parseFloat(s.time) || 0)
     }));
     onComplete(exId, processedSets);
     onClose();

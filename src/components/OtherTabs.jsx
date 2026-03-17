@@ -382,6 +382,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             ) : (
               <input
                 type="number" inputMode="decimal"
+                min={0} max={1000}
                 placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
                 value={backfillWeights[ex.id]}
                 onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
@@ -435,7 +436,8 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 EXERCISES.filter(e => !e.isPlank).forEach(ex => {
                   const v = parseFloat(backfillWeights[ex.id]);
                   if (!isNaN(v) && v > 0) {
-                    custom[ex.id] = state.unit === 'lbs' ? v / 2.205 : v;
+                    const clamped = Math.min(1000, v);
+                    custom[ex.id] = state.unit === 'lbs' ? clamped / 2.205 : clamped;
                   }
                 });
                 onBackfillWeek(backfillW, backfillCount, autoPct, custom, backfillSets, backfillDuration);
