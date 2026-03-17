@@ -1,13 +1,25 @@
-import React, { useState, useEffect, Component } from 'react';
+import React, { useState, useEffect, Component, lazy, Suspense } from 'react';
 import BgFx from './components/BgFx';
 import Toast from './components/Toast';
 import Header from './components/Header';
 import WorkoutTab from './components/WorkoutTab';
-import StatsTab from './components/StatsTab';
-import RankTab from './components/RankTab';
-import CheckinTab from './components/CheckinTab';
 import AICoachTab from './components/AICoachTab';
-import { AchievementsTab, LogTab, SummaryTab, SettingsTab } from './components/OtherTabs';
+
+const StatsTab = lazy(() => import('./components/StatsTab'));
+const RankTab = lazy(() => import('./components/RankTab'));
+const CheckinTab = lazy(() => import('./components/CheckinTab'));
+const AchievementsTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.AchievementsTab })));
+const LogTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.LogTab })));
+const SummaryTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.SummaryTab })));
+const SettingsTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.SettingsTab })));
+
+function LazyTab({ children }) {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 11 }}>LOADING...</div>}>
+      {children}
+    </Suspense>
+  );
+}
 import { useGameState } from './hooks/useGameState';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 
@@ -244,25 +256,27 @@ export default function App() {
               onSaveHistory={addAIHistory}
             />
           </div>
-          {activeTab === 'stats' && <StatsTab state={state} />}
-          {activeTab === 'rank' && <RankTab state={state} />}
+          {activeTab === 'stats' && <LazyTab><StatsTab state={state} /></LazyTab>}
+          {activeTab === 'rank' && <LazyTab><RankTab state={state} /></LazyTab>}
           {activeTab === 'checkin' && (
-            <CheckinTab state={state} onSubmit={submitCheckin} />
+            <LazyTab><CheckinTab state={state} onSubmit={submitCheckin} /></LazyTab>
           )}
-          {activeTab === 'summary' && <SummaryTab state={state} />}
-          {activeTab === 'ach' && <AchievementsTab state={state} />}
-          {activeTab === 'log' && <LogTab state={state} />}
+          {activeTab === 'summary' && <LazyTab><SummaryTab state={state} /></LazyTab>}
+          {activeTab === 'ach' && <LazyTab><AchievementsTab state={state} /></LazyTab>}
+          {activeTab === 'log' && <LazyTab><LogTab state={state} /></LazyTab>}
           {activeTab === 'settings' && (
-            <SettingsTab
-              state={state}
-              onUpdate={updateSetting}
-              onReset={resetAll}
-              onResetToday={resetToday}
-              onBackfillWeek={backfillWeek}
-              notifStatus={notifStatus}
-              onRequestNotif={handleRequestNotif}
-              onImport={importData}
-            />
+            <LazyTab>
+              <SettingsTab
+                state={state}
+                onUpdate={updateSetting}
+                onReset={resetAll}
+                onResetToday={resetToday}
+                onBackfillWeek={backfillWeek}
+                notifStatus={notifStatus}
+                onRequestNotif={handleRequestNotif}
+                onImport={importData}
+              />
+            </LazyTab>
           )}
         </div>
 
