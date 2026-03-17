@@ -4,6 +4,8 @@ import Toast from './components/Toast';
 import Header from './components/Header';
 import WorkoutTab from './components/WorkoutTab';
 import AICoachTab from './components/AICoachTab';
+import { useGameState } from './hooks/useGameState';
+import { registerSW, requestNotificationPermission } from './utils/notifications';
 
 const StatsTab = lazy(() => import('./components/StatsTab'));
 const RankTab = lazy(() => import('./components/RankTab'));
@@ -20,8 +22,6 @@ function LazyTab({ children }) {
     </Suspense>
   );
 }
-import { useGameState } from './hooks/useGameState';
-import { registerSW, requestNotificationPermission } from './utils/notifications';
 
 class ErrorBoundary extends Component {
   state = { error: null };
