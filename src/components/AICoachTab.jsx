@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
+import { formatForCoach } from '../utils/coachExport';
 
 const COACH_MODES = [
   { id: 'pep',      icon: '⚡', label: 'Pre-Workout',    color: 'var(--fire2)',   bg: 'rgba(255,109,0,0.08)',   border: 'rgba(255,109,0,0.2)' },
@@ -176,6 +177,26 @@ export default function AICoachTab({ state, onSaveHistory }) {
   const [error, setError] = useState(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
+  const [copyLabel, setCopyLabel] = useState('COPY FOR AI');
+
+  function handleCopyReport() {
+    const text = formatForCoach(state);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyLabel('COPIED!');
+      setTimeout(() => setCopyLabel('COPY FOR AI'), 2000);
+    }).catch(() => {
+      // fallback for browsers that block clipboard
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopyLabel('COPIED!');
+      setTimeout(() => setCopyLabel('COPY FOR AI'), 2000);
+    });
+  }
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastSendRef = useRef({ prompt: '', ts: 0 });
@@ -316,15 +337,25 @@ export default function AICoachTab({ state, onSaveHistory }) {
               Powered by Claude · Knows your data
             </div>
           </div>
-          {messages.length > 0 && (
-            <button onClick={clearHistory} style={{
-              marginLeft: 'auto', padding: '4px 10px', borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
-              fontWeight: 700, cursor: 'pointer'
-            }}>CLEAR</button>
-          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
+              padding: '4px 10px', borderRadius: 8,
+              border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
+              background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
+              color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
+              fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}>{copyLabel}</button>
+            {messages.length > 0 && (
+              <button onClick={clearHistory} style={{
+                padding: '4px 10px', borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)',
+                color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
+                fontWeight: 700, cursor: 'pointer'
+              }}>CLEAR</button>
+            )}
+          </div>
         </div>
 
         {/* Mode selector */}
