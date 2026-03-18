@@ -70,8 +70,17 @@ export function applyXP(state, amount) {
 export function updateStreak(state) {
   const t = today();
   if (state.lastDate === t) return state; // already updated today
-  const yesterday = new Date(Date.now() - 864e5).toDateString();
-  const streak = state.lastDate === yesterday ? state.streak + 1 : 1;
+
+  // Calculate calendar-day gap between last session and today.
+  // Allow up to 3 days so normal rest days (e.g. Mon→Wed, Fri→Mon) don't
+  // break the streak. Gap > 3 means a session was genuinely skipped.
+  let daysSinceLast = Infinity;
+  if (state.lastDate) {
+    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+    const lastMidnight = new Date(state.lastDate); lastMidnight.setHours(0, 0, 0, 0);
+    daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
+  }
+  const streak = daysSinceLast <= 3 ? state.streak + 1 : 1;
   const bestStreak = Math.max(streak, state.bestStreak);
   return { ...state, streak, bestStreak, lastDate: t };
 }
