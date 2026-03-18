@@ -1,4 +1,4 @@
-import { EXERCISES } from '../data/gameData';
+import { EXERCISES, ACHIEVEMENTS } from '../data/gameData';
 import { getPhase, convertWeight } from './gameLogic';
 
 /**
@@ -110,17 +110,32 @@ export function formatForCoach(state) {
     lines.push('');
   }
 
-  // ── Personal records ────────────────────────────────────────────────────────
+  // ── Personal records (always shown — current weight as baseline if no PR yet) ──
   const prs = state.personalRecords || {};
-  if (Object.keys(prs).length > 0) {
-    lines.push('PERSONAL RECORDS');
-    lines.push('─'.repeat(48));
-    for (const ex of EXERCISES.filter(e => !e.isPlank)) {
-      const pr = prs[ex.id];
-      if (pr) lines.push(`  ${ex.name}: ${convertWeight(pr.weight, unit)}${unit} (Week ${pr.week}, ${pr.date})`);
+  lines.push('PERSONAL RECORDS');
+  lines.push('─'.repeat(48));
+  for (const ex of EXERCISES.filter(e => !e.isPlank)) {
+    const pr = prs[ex.id];
+    const curWt = convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg, unit);
+    if (pr) {
+      const prWt = convertWeight(pr.weight, unit);
+      const isCurrent = pr.weight === (state.liftWeights?.[ex.id] ?? ex.startKg);
+      lines.push(`  ${ex.name}: ${prWt}${unit}  (set Week ${pr.week}, ${pr.date}${isCurrent ? ' — still current' : ` → now at ${curWt}${unit}`})`);
+    } else {
+      lines.push(`  ${ex.name}: no PR yet — current working weight ${curWt}${unit}`);
     }
-    lines.push('');
   }
+  lines.push('');
+
+  // ── Achievements ─────────────────────────────────────────────────────────────
+  const unlocked = (state.achDone || []);
+  lines.push(`ACHIEVEMENTS  (${unlocked.length}/${ACHIEVEMENTS.length} unlocked)`);
+  lines.push('─'.repeat(48));
+  for (const ach of ACHIEVEMENTS) {
+    const done = unlocked.includes(ach.id);
+    lines.push(`  ${done ? '[X]' : '[ ]'} ${ach.name} — ${ach.desc}`);
+  }
+  lines.push('');
 
   lines.push('END OF REPORT');
   return lines.join('\n');
