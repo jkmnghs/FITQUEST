@@ -25,10 +25,12 @@ function checkDayReset(state) {
     next.sessionStartTime = null;
     next.todayExDate = t;
   }
-  // Decay streak if more than one day has passed since last session
-  const yesterday = new Date(Date.now() - 864e5).toDateString();
-  if (next.lastDate && next.lastDate !== t && next.lastDate !== yesterday && next.streak > 0) {
-    next.streak = 0;
+  // Decay streak if gap since last session exceeds the 3-day rest-day window
+  if (next.lastDate && next.lastDate !== t && next.streak > 0) {
+    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+    const lastMidnight = new Date(next.lastDate); lastMidnight.setHours(0, 0, 0, 0);
+    const daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
+    if (daysSinceLast > 3) next.streak = 0;
   }
   return next;
 }
@@ -466,7 +468,7 @@ export function useGameState() {
       showToast('Invalid backup: missing required fields.');
       return;
     }
-    const merged = mergeState(data);
+    const merged = checkDayReset(mergeState(data));
     storageSet(merged);
     backfillApplied.current = {};
     setStateRaw(merged);
