@@ -22,7 +22,7 @@ export function formatForCoach(state) {
 
   // ── Current weights + overload status ───────────────────────────────────────
   lines.push('CURRENT WORKING WEIGHTS & OVERLOAD STATUS');
-  lines.push('─'.repeat(48));
+  lines.push('---');
   const sug = state.overloadSuggestions || {};
   for (const ex of EXERCISES) {
     if (ex.isPlank) {
@@ -46,7 +46,7 @@ export function formatForCoach(state) {
   if (todayDone.length > 0) {
     const sessionLabel = state.todaySessionFinished ? 'TODAY\'S COMPLETED SESSION' : 'TODAY\'S SESSION (in progress)';
     lines.push(sessionLabel);
-    lines.push('─'.repeat(48));
+    lines.push('---');
     for (const ex of EXERCISES) {
       if (!todayDone.includes(ex.id)) continue;
       const d = details[ex.id];
@@ -66,7 +66,7 @@ export function formatForCoach(state) {
 
   // ── Session history by week ──────────────────────────────────────────────────
   lines.push('SESSION HISTORY');
-  lines.push('─'.repeat(48));
+  lines.push('---');
   const wp = state.weekProgress || {};
   const weeks = Object.keys(wp).map(Number).sort((a, b) => b - a).slice(0, 8); // last 8 weeks
   if (weeks.length === 0) {
@@ -98,7 +98,7 @@ export function formatForCoach(state) {
   const checkins = state.weeklyCheckins || [];
   if (checkins.length > 0) {
     lines.push('BODY WEIGHT TREND');
-    lines.push('─'.repeat(48));
+    lines.push('---');
     const recent = checkins.slice(-8);
     for (let i = 0; i < recent.length; i++) {
       const c = recent[i];
@@ -113,7 +113,7 @@ export function formatForCoach(state) {
   // ── Personal records (always shown — current weight as baseline if no PR yet) ──
   const prs = state.personalRecords || {};
   lines.push('PERSONAL RECORDS');
-  lines.push('─'.repeat(48));
+  lines.push('---');
   for (const ex of EXERCISES.filter(e => !e.isPlank)) {
     const pr = prs[ex.id];
     const curWt = convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg, unit);
@@ -130,7 +130,7 @@ export function formatForCoach(state) {
   // ── Achievements ─────────────────────────────────────────────────────────────
   const unlocked = (state.achDone || []);
   lines.push(`ACHIEVEMENTS  (${unlocked.length}/${ACHIEVEMENTS.length} unlocked)`);
-  lines.push('─'.repeat(48));
+  lines.push('---');
   for (const ach of ACHIEVEMENTS) {
     const done = unlocked.includes(ach.id);
     lines.push(`  ${done ? '[X]' : '[ ]'} ${ach.name} — ${ach.desc}`);
