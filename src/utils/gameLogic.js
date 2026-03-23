@@ -21,6 +21,12 @@ export function xpForLevel(level) {
   return 80 + (level - 1) * 35;
 }
 
+export function xpToLevel(targetLevel) {
+  let total = 0;
+  for (let l = 1; l < targetLevel; l++) total += xpForLevel(l);
+  return total;
+}
+
 export function getWeightForExercise(ex, week, liftWeights) {
   const base = liftWeights[ex.id] ?? ex.startKg;
   if (week === 9) return Math.round(base * 0.8 * 2) / 2; // deload

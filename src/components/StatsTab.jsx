@@ -108,12 +108,12 @@ function WeightChart({ checkins, unit }) {
   const minW = Math.min(...weights) - 1;
   const maxW = Math.max(...weights) + 1;
   const range = maxW - minW || 1;
-  const W = 280, H = 120;
-  const step = W / (weights.length - 1);
+  const W = 280, H = 120, PAD = 8;
+  const step = (W - PAD * 2) / (weights.length - 1);
 
   let path = 'M';
   const dots = weights.map((wt, i) => {
-    const x = i * step;
+    const x = PAD + i * step;
     const y = H - ((wt - minW) / range) * H;
     path += `${i ? 'L' : ''}${x.toFixed(1)},${y.toFixed(1)} `;
     return { x: x.toFixed(1), y: y.toFixed(1) };
@@ -187,12 +187,12 @@ function WaistChart({ checkins }) {
   const minW = Math.min(...waists) - 1;
   const maxW = Math.max(...waists) + 1;
   const range = maxW - minW || 1;
-  const W = 280, H = 90;
-  const step = W / (waists.length - 1);
+  const W = 280, H = 90, PAD = 8;
+  const step = (W - PAD * 2) / (waists.length - 1);
 
   let path = 'M';
   const dots = waists.map((wt, i) => {
-    const x = i * step;
+    const x = PAD + i * step;
     const y = H - ((wt - minW) / range) * H;
     path += `${i ? 'L' : ''}${x.toFixed(1)},${y.toFixed(1)} `;
     return { x: x.toFixed(1), y: y.toFixed(1) };
@@ -296,12 +296,12 @@ function SleepChart({ checkins }) {
   const minS = Math.max(0, Math.min(...sleeps) - 0.5);
   const maxS = Math.max(...sleeps) + 0.5;
   const range = maxS - minS || 1;
-  const W = 280, H = 80;
-  const step = sleeps.length > 1 ? W / (sleeps.length - 1) : W;
+  const W = 280, H = 80, PAD = 8;
+  const step = sleeps.length > 1 ? (W - PAD * 2) / (sleeps.length - 1) : W;
 
   let path = 'M';
   const dots = sleeps.map((s, i) => {
-    const x = sleeps.length > 1 ? i * step : W / 2;
+    const x = sleeps.length > 1 ? PAD + i * step : W / 2;
     const y = H - ((s - minS) / range) * H;
     path += `${i ? 'L' : ''}${x.toFixed(1)},${y.toFixed(1)} `;
     return { x: x.toFixed(1), y: y.toFixed(1), val: s };
