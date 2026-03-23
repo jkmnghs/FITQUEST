@@ -1,11 +1,12 @@
 import React from 'react';
 import { RANKS } from '../data/gameData';
-import { getRank } from '../utils/gameLogic';
+import { getRank, xpToLevel } from '../utils/gameLogic';
 
 export default function RankTab({ state }) {
   const rank = getRank(state.level);
   const rankIdx = RANKS.findIndex(r => r.l === rank.l);
   const nextRank = rankIdx < RANKS.length - 1 ? RANKS[rankIdx + 1] : null;
+  const xpTarget = nextRank ? xpToLevel(nextRank.minLevel) : xpToLevel(RANKS[RANKS.length - 1].minLevel + 10);
 
   return (
     <div>
@@ -76,7 +77,7 @@ export default function RankTab({ state }) {
           { label: 'Sessions Completed', value: state.totalSessions, target: 36, color: 'var(--cyan)' },
           { label: 'Perfect Weeks', value: state.perfectWeeks, target: 12, color: 'var(--purple)' },
           { label: 'Best Streak', value: state.bestStreak, target: 12, color: 'var(--fire2)' },
-          { label: 'Total XP', value: state.totalXp, target: 1000, color: 'var(--gold)' }
+          { label: 'Total XP', value: state.totalXp, target: xpTarget, color: 'var(--gold)' }
         ].map(row => (
           <div key={row.label} style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
