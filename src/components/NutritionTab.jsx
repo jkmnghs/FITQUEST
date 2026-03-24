@@ -531,19 +531,24 @@ Guidelines:
           {foods.map((food, idx) => {
             const adj = getAdjusted(food);
             const isOpen = swipedIdx === idx;
-            const TRASH_W = 64;
+            const TRASH_W = 68;
             return (
               <div
                 key={idx}
-                style={{ position: 'relative', marginBottom: 10, borderRadius: 14, overflow: 'hidden' }}
+                style={{
+                  position: 'relative',
+                  marginBottom: 10,
+                  // clip-path is more reliable than overflow:hidden for clipping
+                  // CSS-transformed children on mobile Safari
+                  clipPath: 'inset(0 round 14px)',
+                }}
               >
-                {/* Trash revealed behind */}
+                {/* Trash — always behind the card */}
                 <div style={{
                   position: 'absolute', right: 0, top: 0, bottom: 0,
                   width: TRASH_W,
-                  background: 'rgba(255,23,68,0.85)',
+                  background: 'rgba(255,23,68,0.9)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: 14,
                 }}>
                   <button
                     onClick={() => {
@@ -558,7 +563,7 @@ Guidelines:
                   >🗑️</button>
                 </div>
 
-                {/* Swipeable card */}
+                {/* Swipeable card — slides left to reveal trash */}
                 <div
                   style={{
                     background: 'rgba(255,255,255,0.03)',
@@ -567,7 +572,6 @@ Guidelines:
                     transform: isOpen ? `translateX(-${TRASH_W}px)` : 'translateX(0)',
                     transition: 'transform 0.22s ease',
                     position: 'relative', zIndex: 1,
-                    willChange: 'transform',
                   }}
                   onTouchStart={e => {
                     swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, moved: false };
@@ -673,6 +677,7 @@ Guidelines:
                     ))}
                   </div>
                 </div>
+
               </div>
             );
           })}
