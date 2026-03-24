@@ -58,6 +58,8 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [editingGram, setEditingGram] = useState(null); // { idx, value }
+  const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open
+  const swipeRef = useRef({}); // { startX, startY, moved }
   const fileRef = useRef();
   const galleryRef = useRef();
 
@@ -376,39 +378,73 @@ Guidelines:
 
       {/* Upload area or preview */}
       {!image ? (
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => fileRef.current.click()}
-            style={{
-              flex: 1, padding: '28px 12px',
-              border: '2px dashed rgba(0,229,255,0.25)',
-              borderRadius: 16, background: 'rgba(0,229,255,0.03)',
-              cursor: 'pointer', display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: 10,
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <span style={{ fontSize: 40 }}>📸</span>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
-              CAMERA
+        <div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => fileRef.current.click()}
+              style={{
+                flex: 1, padding: '28px 12px',
+                border: '2px dashed rgba(0,229,255,0.25)',
+                borderRadius: 16, background: 'rgba(0,229,255,0.03)',
+                cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: 10,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{ fontSize: 40 }}>📸</span>
+              <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
+                CAMERA
+              </div>
+            </button>
+            <button
+              onClick={() => galleryRef.current.click()}
+              style={{
+                flex: 1, padding: '28px 12px',
+                border: '2px dashed rgba(179,136,255,0.25)',
+                borderRadius: 16, background: 'rgba(179,136,255,0.03)',
+                cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: 10,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{ fontSize: 40 }}>🖼️</span>
+              <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--purple)', fontWeight: 700, letterSpacing: 1 }}>
+                UPLOAD
+              </div>
+            </button>
+          </div>
+          {/* Framing tip */}
+          <div style={{
+            marginTop: 10, padding: '10px 14px',
+            border: '1px dashed rgba(0,229,255,0.18)',
+            borderRadius: 12, background: 'rgba(0,229,255,0.03)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 38, height: 38, flexShrink: 0,
+              border: '2px dashed rgba(0,229,255,0.5)',
+              borderRadius: 6, position: 'relative',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {/* corner marks */}
+              {[['0','0'],['0','auto'],['auto','0'],['auto','auto']].map(([t,b],i) => (
+                <div key={i} style={{
+                  position: 'absolute',
+                  top: t === '0' ? -2 : 'auto', bottom: b === 'auto' ? -2 : 'auto',
+                  left: i % 2 === 0 ? -2 : 'auto', right: i % 2 === 1 ? -2 : 'auto',
+                  width: 8, height: 8,
+                  borderTop: t === '0' ? '2px solid var(--cyan)' : 'none',
+                  borderBottom: b === 'auto' ? '2px solid var(--cyan)' : 'none',
+                  borderLeft: i % 2 === 0 ? '2px solid var(--cyan)' : 'none',
+                  borderRight: i % 2 === 1 ? '2px solid var(--cyan)' : 'none',
+                }} />
+              ))}
+              <span style={{ fontSize: 14 }}>🍽️</span>
             </div>
-          </button>
-          <button
-            onClick={() => galleryRef.current.click()}
-            style={{
-              flex: 1, padding: '28px 12px',
-              border: '2px dashed rgba(179,136,255,0.25)',
-              borderRadius: 16, background: 'rgba(179,136,255,0.03)',
-              cursor: 'pointer', display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: 10,
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <span style={{ fontSize: 40 }}>🖼️</span>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--purple)', fontWeight: 700, letterSpacing: 1 }}>
-              UPLOAD
+            <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
+              Fit <span style={{ color: 'var(--cyan)' }}>all food items</span> within the frame for accurate analysis. Good lighting helps too.
             </div>
-          </button>
+          </div>
         </div>
       ) : (
         <div style={{ position: 'relative', marginBottom: 14 }}>
@@ -417,7 +453,8 @@ Guidelines:
             alt="Meal"
             style={{
               width: '100%', borderRadius: 16,
-              maxHeight: 280, objectFit: 'cover',
+              maxHeight: 320, objectFit: 'contain',
+              background: 'rgba(0,0,0,0.4)',
               border: '1px solid rgba(0,229,255,0.15)',
               display: 'block',
             }}
@@ -483,97 +520,148 @@ Guidelines:
 
           {foods.map((food, idx) => {
             const adj = getAdjusted(food);
+            const isOpen = swipedIdx === idx;
+            const TRASH_W = 64;
             return (
-              <div key={idx} style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: 14, padding: '14px',
-                marginBottom: 10,
-              }}>
-                {/* Name row + S/M/L */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <div style={{ flex: 1, paddingRight: 10 }}>
-                    <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
-                      {food.name}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {editingGram?.idx === idx ? (
-                        <input
-                          type="number"
-                          value={editingGram.value}
-                          onChange={e => setEditingGram({ idx, value: e.target.value })}
-                          onBlur={() => {
-                            const g = parseInt(editingGram.value, 10);
-                            if (g > 0) setGrams(idx, g);
-                            setEditingGram(null);
-                          }}
-                          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-                          autoFocus
-                          style={{
-                            width: 52, background: 'rgba(0,229,255,0.1)',
-                            border: '1px solid var(--cyan)', borderRadius: 5,
-                            color: 'var(--cyan)', fontSize: 11, padding: '1px 4px',
-                            fontFamily: 'Rajdhani', textAlign: 'center',
-                          }}
-                        />
-                      ) : (
-                        <span
-                          onClick={() => setEditingGram({ idx, value: adj.grams })}
-                          title="Tap to edit"
-                          style={{
-                            cursor: 'pointer', borderBottom: '1px dashed rgba(255,255,255,0.2)',
-                            color: food.customGrams != null ? 'var(--cyan)' : 'var(--text3)',
-                          }}
-                        >{adj.grams}g</span>
-                      )}
-                      <span>&middot; {adj.calories} kcal</span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                    {['S', 'M', 'L'].map(p => {
-                      const previewG = Math.round(food.grams * PORTION_MULT[p]);
-                      const isActive = food.customGrams == null && food.portion === p;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setPortion(idx, p)}
-                          style={{
-                            width: 40, height: 44, borderRadius: 9,
-                            border: `1px solid ${isActive ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
-                            background: isActive ? 'rgba(0,229,255,0.15)' : 'transparent',
-                            color: isActive ? 'var(--cyan)' : 'var(--text3)',
-                            cursor: 'pointer',
-                            WebkitTapHighlightColor: 'transparent',
-                            display: 'flex', flexDirection: 'column',
-                            alignItems: 'center', justifyContent: 'center', gap: 2,
-                            padding: 0,
-                          }}
-                        >
-                          <span style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700 }}>{p}</span>
-                          <span style={{ fontFamily: 'Rajdhani', fontSize: 9, opacity: 0.8 }}>{previewG}g</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+              <div
+                key={idx}
+                style={{ position: 'relative', marginBottom: 10, borderRadius: 14, overflow: 'hidden' }}
+              >
+                {/* Trash revealed behind */}
+                <div style={{
+                  position: 'absolute', right: 0, top: 0, bottom: 0,
+                  width: TRASH_W,
+                  background: 'rgba(255,23,68,0.85)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 14,
+                }}>
+                  <button
+                    onClick={() => {
+                      setFoods(prev => prev.filter((_, i) => i !== idx));
+                      setSwipedIdx(null);
+                    }}
+                    style={{
+                      background: 'none', border: 'none',
+                      color: 'white', fontSize: 22, cursor: 'pointer',
+                      padding: 0, lineHeight: 1,
+                    }}
+                  >🗑️</button>
                 </div>
 
-                {/* Macros */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {[
-                    { label: 'Protein', value: adj.protein, color: 'var(--cyan)' },
-                    { label: 'Carbs', value: adj.carbs, color: 'var(--gold)' },
-                    { label: 'Fat', value: adj.fat, color: 'var(--fire2)' },
-                  ].map(m => (
-                    <div key={m.label} style={{
-                      flex: 1, textAlign: 'center', padding: '7px 4px',
-                      background: 'rgba(255,255,255,0.03)', borderRadius: 9,
-                    }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
-                        {m.value}g
+                {/* Swipeable card */}
+                <div
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${isOpen ? 'rgba(255,23,68,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                    borderRadius: 14, padding: '14px',
+                    transform: isOpen ? `translateX(-${TRASH_W}px)` : 'translateX(0)',
+                    transition: 'transform 0.22s ease',
+                    position: 'relative', zIndex: 1,
+                    willChange: 'transform',
+                  }}
+                  onTouchStart={e => {
+                    swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, moved: false };
+                  }}
+                  onTouchMove={e => {
+                    const dx = e.touches[0].clientX - swipeRef.current.startX;
+                    const dy = e.touches[0].clientY - swipeRef.current.startY;
+                    if (!swipeRef.current.moved && Math.abs(dy) > Math.abs(dx)) return; // scrolling
+                    swipeRef.current.moved = true;
+                    if (dx < -10) e.preventDefault(); // prevent scroll when swiping
+                  }}
+                  onTouchEnd={e => {
+                    if (!swipeRef.current.moved) return;
+                    const dx = e.changedTouches[0].clientX - swipeRef.current.startX;
+                    if (dx < -40) setSwipedIdx(idx);
+                    else if (dx > 20) setSwipedIdx(null);
+                  }}
+                  onClick={() => { if (isOpen) setSwipedIdx(null); }}
+                >
+                  {/* Name row + S/M/L */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <div style={{ flex: 1, paddingRight: 10 }}>
+                      <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
+                        {food.name}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>{m.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {editingGram?.idx === idx ? (
+                          <input
+                            type="number"
+                            value={editingGram.value}
+                            onChange={e => setEditingGram({ idx, value: e.target.value })}
+                            onBlur={() => {
+                              const g = parseInt(editingGram.value, 10);
+                              if (g > 0) setGrams(idx, g);
+                              setEditingGram(null);
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                            autoFocus
+                            style={{
+                              width: 52, background: 'rgba(0,229,255,0.1)',
+                              border: '1px solid var(--cyan)', borderRadius: 5,
+                              color: 'var(--cyan)', fontSize: 11, padding: '1px 4px',
+                              fontFamily: 'Rajdhani', textAlign: 'center',
+                            }}
+                          />
+                        ) : (
+                          <span
+                            onClick={() => !isOpen && setEditingGram({ idx, value: adj.grams })}
+                            title="Tap to edit"
+                            style={{
+                              cursor: 'pointer', borderBottom: '1px dashed rgba(255,255,255,0.2)',
+                              color: food.customGrams != null ? 'var(--cyan)' : 'var(--text3)',
+                            }}
+                          >{adj.grams}g</span>
+                        )}
+                        <span>&middot; {adj.calories} kcal</span>
+                      </div>
                     </div>
-                  ))}
+                    <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                      {['S', 'M', 'L'].map(p => {
+                        const previewG = Math.round(food.grams * PORTION_MULT[p]);
+                        const isActive = food.customGrams == null && food.portion === p;
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => setPortion(idx, p)}
+                            style={{
+                              width: 40, height: 44, borderRadius: 9,
+                              border: `1px solid ${isActive ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
+                              background: isActive ? 'rgba(0,229,255,0.15)' : 'transparent',
+                              color: isActive ? 'var(--cyan)' : 'var(--text3)',
+                              cursor: 'pointer',
+                              WebkitTapHighlightColor: 'transparent',
+                              display: 'flex', flexDirection: 'column',
+                              alignItems: 'center', justifyContent: 'center', gap: 2,
+                              padding: 0,
+                            }}
+                          >
+                            <span style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700 }}>{p}</span>
+                            <span style={{ fontFamily: 'Rajdhani', fontSize: 9, opacity: 0.8 }}>{previewG}g</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Macros */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                      { label: 'Protein', value: adj.protein, color: 'var(--cyan)' },
+                      { label: 'Carbs', value: adj.carbs, color: 'var(--gold)' },
+                      { label: 'Fat', value: adj.fat, color: 'var(--fire2)' },
+                    ].map(m => (
+                      <div key={m.label} style={{
+                        flex: 1, textAlign: 'center', padding: '7px 4px',
+                        background: 'rgba(255,255,255,0.03)', borderRadius: 9,
+                      }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
+                          {m.value}g
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text3)' }}>{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
