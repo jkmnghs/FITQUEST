@@ -82,10 +82,20 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
     setLogged(false);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      // Fallback media_type to jpeg if browser returns empty string
-      const mediaType = file.type || 'image/jpeg';
-      setImage({ base64: dataUrl.split(',')[1], preview: dataUrl, type: mediaType });
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1024;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const resized = canvas.toDataURL('image/jpeg', 0.85);
+        setImage({ base64: resized.split(',')[1], preview: resized, type: 'image/jpeg' });
+      };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   }
