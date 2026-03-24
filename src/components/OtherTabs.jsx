@@ -457,6 +457,36 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         </>}
       </div>
 
+      {/* Nutrition Goals */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--card-border)',
+        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Nutrition Goals</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
+          Set your daily targets (recommended by your AI coach).
+        </div>
+        {[
+          { key: 'calories', label: 'Calories (kcal)', placeholder: '2000' },
+          { key: 'protein',  label: 'Protein (g)',     placeholder: '155'  },
+          { key: 'carbs',    label: 'Carbs (g)',       placeholder: '190'  },
+          { key: 'fat',      label: 'Fat (g)',         placeholder: '60'   },
+        ].map(({ key, label, placeholder }) => (
+          <SettingRow key={key} label={label}>
+            <input
+              type="number" min={0}
+              value={(state.nutritionGoals || {})[key] ?? ''}
+              placeholder={placeholder}
+              onChange={e => onUpdate('nutritionGoals', {
+                ...(state.nutritionGoals || { calories: 2000, protein: 155, carbs: 190, fat: 60 }),
+                [key]: Number(e.target.value) || 0,
+              })}
+              style={{ ...inputStyle, width: 80 }}
+            />
+          </SettingRow>
+        ))}
+      </div>
+
       {/* Export / Import */}
       <div style={{
         background: 'var(--card)', border: '1px solid var(--card-border)',
