@@ -36,6 +36,7 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const fileRef = useRef();
+  const galleryRef = useRef();
 
   function handleImageSelect(e) {
     const file = e.target.files[0];
@@ -241,6 +242,7 @@ Return ONLY a valid JSON array — no markdown, no explanation:
     setError(null);
     setLogged(false);
     if (fileRef.current) fileRef.current.value = '';
+    if (galleryRef.current) galleryRef.current.value = '';
   }
 
   const totals = sumTotals(foods);
@@ -301,7 +303,7 @@ Return ONLY a valid JSON array — no markdown, no explanation:
         </div>
       )}
 
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
         ref={fileRef}
         type="file"
@@ -310,28 +312,50 @@ Return ONLY a valid JSON array — no markdown, no explanation:
         onChange={handleImageSelect}
         style={{ display: 'none' }}
       />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageSelect}
+        style={{ display: 'none' }}
+      />
 
       {/* Upload area or preview */}
       {!image ? (
-        <button
-          onClick={() => fileRef.current.click()}
-          style={{
-            width: '100%', padding: '36px 20px',
-            border: '2px dashed rgba(0,229,255,0.25)',
-            borderRadius: 16, background: 'rgba(0,229,255,0.03)',
-            cursor: 'pointer', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', gap: 12,
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <span style={{ fontSize: 52 }}>📸</span>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 12, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
-            SCAN MEAL
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-            Take a photo or choose from gallery
-          </div>
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => fileRef.current.click()}
+            style={{
+              flex: 1, padding: '28px 12px',
+              border: '2px dashed rgba(0,229,255,0.25)',
+              borderRadius: 16, background: 'rgba(0,229,255,0.03)',
+              cursor: 'pointer', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 10,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{ fontSize: 40 }}>📸</span>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
+              CAMERA
+            </div>
+          </button>
+          <button
+            onClick={() => galleryRef.current.click()}
+            style={{
+              flex: 1, padding: '28px 12px',
+              border: '2px dashed rgba(179,136,255,0.25)',
+              borderRadius: 16, background: 'rgba(179,136,255,0.03)',
+              cursor: 'pointer', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 10,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{ fontSize: 40 }}>🖼️</span>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--purple)', fontWeight: 700, letterSpacing: 1 }}>
+              UPLOAD
+            </div>
+          </button>
+        </div>
       ) : (
         <div style={{ position: 'relative', marginBottom: 14 }}>
           <img
