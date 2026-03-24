@@ -277,7 +277,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
           onCancel={() => setShowFinishConfirm(false)}
           onConfirm={() => {
             setShowFinishConfirm(false);
-            const isLastSession = state.currentWeek === 12 && (state.weekProgress?.[12]?.count || 0) >= 2;
+            const isLastSession = state.currentWeek === 12 && (state.weekProgress?.[12]?.count || 0) === 2;
             onFinishSession();
             if (isLastSession) setTimeout(() => setShowProgramComplete(true), 2000);
           }}

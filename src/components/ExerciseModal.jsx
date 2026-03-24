@@ -12,6 +12,7 @@ function makeDefaultSets(ex, count, weightKg) {
 
 export default function ExerciseModal({ exId, week, unit, liftWeights, todayExDone, todayExDetails, savedSets, onSetsChange, onClose, onComplete }) {
   const ex = EXERCISES.find(e => e.id === exId);
+  if (!ex) { onClose?.(); return null; }
   const baseSets = getSetsForWeek(ex, week);
   const baseWeightKg = getWeightForExercise(ex, week, liftWeights);
   const displayWt = convertWeight(baseWeightKg, unit);

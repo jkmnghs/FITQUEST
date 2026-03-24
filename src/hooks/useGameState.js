@@ -186,7 +186,7 @@ export function useGameState() {
             week: prev.currentWeek,
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
           };
-          newPR = !!cur;
+          newPR = true;
         }
       }
       pendingPR = newPR;
