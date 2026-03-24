@@ -59,7 +59,8 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   const [addError, setAddError] = useState(null);
   const [editingGram, setEditingGram] = useState(null); // { idx, value }
   const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open
-  const swipeRef = useRef({}); // { startX, startY, moved }
+  const swipeRef = useRef({}); // { startX, startY, moved, idx, baseX }
+  const cardRefs = useRef({});  // idx -> card DOM element
   const fileRef = useRef();
   const galleryRef = useRef();
 
@@ -565,29 +566,59 @@ Guidelines:
 
                 {/* Swipeable card — slides left to reveal trash */}
                 <div
+                  ref={el => { cardRefs.current[idx] = el; }}
                   style={{
                     background: 'rgba(255,255,255,0.03)',
                     border: `1px solid ${isOpen ? 'rgba(255,23,68,0.35)' : 'rgba(255,255,255,0.07)'}`,
                     borderRadius: 14, padding: '14px',
                     transform: isOpen ? `translateX(-${TRASH_W}px)` : 'translateX(0)',
-                    transition: 'transform 0.22s ease',
+                    transition: 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                     position: 'relative', zIndex: 1,
                   }}
                   onTouchStart={e => {
-                    swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, moved: false };
+                    const el = cardRefs.current[idx];
+                    // Start from whatever position the card currently is at
+                    const baseX = swipedIdx === idx ? -TRASH_W : 0;
+                    swipeRef.current = {
+                      startX: e.touches[0].clientX,
+                      startY: e.touches[0].clientY,
+                      moved: false,
+                      idx,
+                      baseX,
+                    };
+                    // Disable transition so the card follows the finger exactly
+                    if (el) el.style.transition = 'none';
                   }}
                   onTouchMove={e => {
-                    const dx = e.touches[0].clientX - swipeRef.current.startX;
-                    const dy = e.touches[0].clientY - swipeRef.current.startY;
-                    if (!swipeRef.current.moved && Math.abs(dy) > Math.abs(dx)) return; // scrolling
+                    const { startX, startY, baseX } = swipeRef.current;
+                    const dx = e.touches[0].clientX - startX;
+                    const dy = e.touches[0].clientY - startY;
+                    // First movement: ignore if scrolling vertically
+                    if (!swipeRef.current.moved && Math.abs(dy) > Math.abs(dx)) return;
                     swipeRef.current.moved = true;
-                    if (dx < -10) e.preventDefault(); // prevent scroll when swiping
+                    e.preventDefault(); // lock scroll once we're swiping horizontally
+                    const el = cardRefs.current[idx];
+                    if (!el) return;
+                    // Clamp: can't go past fully open (-TRASH_W) or past closed (0)
+                    // Add slight resistance past the limits for a rubber-band feel
+                    let newX = baseX + dx;
+                    if (newX > 0) newX = newX * 0.2;           // resist overdrag right
+                    if (newX < -TRASH_W) newX = -TRASH_W + (newX + TRASH_W) * 0.2; // resist overdrag left
+                    el.style.transform = `translateX(${newX}px)`;
                   }}
                   onTouchEnd={e => {
-                    if (!swipeRef.current.moved) return;
-                    const dx = e.changedTouches[0].clientX - swipeRef.current.startX;
-                    if (dx < -40) setSwipedIdx(idx);
-                    else if (dx > 20) setSwipedIdx(null);
+                    const { moved, idx: sIdx, baseX, startX } = swipeRef.current;
+                    const el = cardRefs.current[sIdx];
+                    // Re-enable the smooth snap transition
+                    if (el) el.style.transition = 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                    if (!moved) return;
+                    const dx = e.changedTouches[0].clientX - startX;
+                    // Snap open if dragged left >30px from closed, or snap closed if dragged right >20px from open
+                    if (baseX === 0 ? dx < -30 : dx < 20) {
+                      setSwipedIdx(sIdx); // snap open → React will apply translateX(-TRASH_W)
+                    } else {
+                      setSwipedIdx(null); // snap closed → React will apply translateX(0)
+                    }
                   }}
                   onClick={() => { if (isOpen) setSwipedIdx(null); }}
                 >
