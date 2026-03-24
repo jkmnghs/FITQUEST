@@ -4,9 +4,12 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const PORTION_MULT = { S: 0.75, M: 1.0, L: 1.5 };
 
 function getAdjusted(food) {
-  const m = PORTION_MULT[food.portion];
+  const m = food.customGrams != null && food.grams > 0
+    ? food.customGrams / food.grams
+    : PORTION_MULT[food.portion];
+  const grams = food.customGrams != null ? food.customGrams : Math.round(food.grams * m);
   return {
-    grams: Math.round(food.grams * m),
+    grams,
     calories: Math.round(food.calories * m),
     protein: Math.round(food.protein * m * 10) / 10,
     carbs: Math.round(food.carbs * m * 10) / 10,
@@ -35,6 +38,7 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   const [addText, setAddText] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
+  const [editingGram, setEditingGram] = useState(null); // { idx, value }
   const fileRef = useRef();
   const galleryRef = useRef();
 
@@ -143,6 +147,7 @@ Guidelines:
         carbs: Number(f.carbs) || 0,
         fat: Number(f.fat) || 0,
         portion: 'M',
+        customGrams: null,
       })));
     } catch (err) {
       setError(err.message || 'Analysis failed. Try again.');
@@ -206,6 +211,7 @@ Return ONLY a valid JSON array — no markdown, no explanation:
           carbs: Number(f.carbs) || 0,
           fat: Number(f.fat) || 0,
           portion: 'M',
+          customGrams: null,
         })),
       ]);
       setAddText('');
@@ -217,7 +223,11 @@ Return ONLY a valid JSON array — no markdown, no explanation:
   }
 
   function setPortion(idx, portion) {
-    setFoods(prev => prev.map((f, i) => i === idx ? { ...f, portion } : f));
+    setFoods(prev => prev.map((f, i) => i === idx ? { ...f, portion, customGrams: null } : f));
+  }
+
+  function setGrams(idx, grams) {
+    setFoods(prev => prev.map((f, i) => i === idx ? { ...f, customGrams: grams } : f));
   }
 
   function handleLogMeal() {
@@ -442,28 +452,64 @@ Return ONLY a valid JSON array — no markdown, no explanation:
                     <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
                       {food.name}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
-                      {adj.grams}g &middot; {adj.calories} kcal
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {editingGram?.idx === idx ? (
+                        <input
+                          type="number"
+                          value={editingGram.value}
+                          onChange={e => setEditingGram({ idx, value: e.target.value })}
+                          onBlur={() => {
+                            const g = parseInt(editingGram.value, 10);
+                            if (g > 0) setGrams(idx, g);
+                            setEditingGram(null);
+                          }}
+                          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                          autoFocus
+                          style={{
+                            width: 52, background: 'rgba(0,229,255,0.1)',
+                            border: '1px solid var(--cyan)', borderRadius: 5,
+                            color: 'var(--cyan)', fontSize: 11, padding: '1px 4px',
+                            fontFamily: 'Rajdhani', textAlign: 'center',
+                          }}
+                        />
+                      ) : (
+                        <span
+                          onClick={() => setEditingGram({ idx, value: adj.grams })}
+                          title="Tap to edit"
+                          style={{
+                            cursor: 'pointer', borderBottom: '1px dashed rgba(255,255,255,0.2)',
+                            color: food.customGrams != null ? 'var(--cyan)' : 'var(--text3)',
+                          }}
+                        >{adj.grams}g</span>
+                      )}
+                      <span>&middot; {adj.calories} kcal</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                    {['S', 'M', 'L'].map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setPortion(idx, p)}
-                        style={{
-                          width: 34, height: 34, borderRadius: 9,
-                          border: `1px solid ${food.portion === p ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
-                          background: food.portion === p ? 'rgba(0,229,255,0.15)' : 'transparent',
-                          color: food.portion === p ? 'var(--cyan)' : 'var(--text3)',
-                          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-                          cursor: 'pointer',
-                          WebkitTapHighlightColor: 'transparent',
-                        }}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                    {['S', 'M', 'L'].map(p => {
+                      const previewG = Math.round(food.grams * PORTION_MULT[p]);
+                      const isActive = food.customGrams == null && food.portion === p;
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPortion(idx, p)}
+                          style={{
+                            width: 40, height: 44, borderRadius: 9,
+                            border: `1px solid ${isActive ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
+                            background: isActive ? 'rgba(0,229,255,0.15)' : 'transparent',
+                            color: isActive ? 'var(--cyan)' : 'var(--text3)',
+                            cursor: 'pointer',
+                            WebkitTapHighlightColor: 'transparent',
+                            display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', justifyContent: 'center', gap: 2,
+                            padding: 0,
+                          }}
+                        >
+                          <span style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700 }}>{p}</span>
+                          <span style={{ fontFamily: 'Rajdhani', fontSize: 9, opacity: 0.8 }}>{previewG}g</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
