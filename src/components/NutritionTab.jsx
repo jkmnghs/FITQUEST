@@ -361,27 +361,30 @@ Guidelines:
         </div>
         {/* Macro rows */}
         {[
-          { label: 'PROTEIN', value: dayTotals.protein, goal: goals.protein, color: 'var(--cyan)' },
-          { label: 'CARBS',   value: dayTotals.carbs,   goal: goals.carbs,   color: 'var(--gold)' },
-          { label: 'FAT',     value: dayTotals.fat,     goal: goals.fat,     color: 'var(--fire2)' },
-        ].map(m => (
-          <div key={m.label} style={{ marginBottom: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 1 }}>{m.label}</span>
-              <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: m.value > m.goal ? 'var(--fire2)' : m.color, fontWeight: 700 }}>
-                {Math.round(m.value)}g <span style={{ color: 'var(--text3)', fontWeight: 400 }}>/ {m.goal}g</span>
-              </span>
+          { label: 'PROTEIN', value: dayTotals.protein, goal: goals.protein, color: '#a78bfa' },
+          { label: 'CARBS',   value: dayTotals.carbs,   goal: goals.carbs,   color: '#34d399' },
+          { label: 'FAT',     value: dayTotals.fat,     goal: goals.fat,     color: '#fbbf24' },
+        ].map(m => {
+          const over = m.value > m.goal;
+          return (
+            <div key={m.label} style={{ marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 1 }}>{m.label}</span>
+                <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: over ? '#ff4444' : m.color, fontWeight: 700 }}>
+                  {Math.round(m.value)}g / {m.goal}g
+                </span>
+              </div>
+              <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 2,
+                  width: `${Math.min(100, (m.value / m.goal) * 100)}%`,
+                  background: over ? '#ff4444' : m.color,
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
             </div>
-            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', borderRadius: 2,
-                width: `${Math.min(100, (m.value / m.goal) * 100)}%`,
-                background: m.value > m.goal ? 'var(--fire2)' : m.color,
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {todayMeals.length > 0 && (
           <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, textAlign: 'right' }}>
             {todayMeals.length} meal{todayMeals.length !== 1 ? 's' : ''} logged
