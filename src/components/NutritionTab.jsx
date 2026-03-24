@@ -191,29 +191,27 @@ Guidelines:
     setAdding(true);
     setAddError(null);
     try {
-      // Run USDA lookup and Claude in parallel
-      const [usdaPer100g, claudeRes] = await Promise.all([
-        searchUSDA(query),
-        fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 256,
-            messages: [{
-              role: 'user',
-              content: usdaPer100g
-                ? `Estimate the gram weight for: "${query}". Return ONLY JSON: {"name":"<food name>","grams":<number>}`
-                : `Give nutritional info for: "${query}". Return ONLY a JSON array — no markdown:\n[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]\n- Realistic gram weight for the quantity described\n- Accurate macros for that gram amount`,
-            }],
-          }),
+      // First get USDA data, then use it to build the Claude request
+      const usdaPer100g = await searchUSDA(query);
+      const claudeRes = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 256,
+          messages: [{
+            role: 'user',
+            content: usdaPer100g
+              ? `Estimate the gram weight for: "${query}". Return ONLY JSON: {"name":"<food name>","grams":<number>}`
+              : `Give nutritional info for: "${query}". Return ONLY a JSON array — no markdown:\n[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]\n- Realistic gram weight for the quantity described\n- Accurate macros for that gram amount`,
+          }],
         }),
-      ]);
+      });
 
       if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
       const claudeData = await claudeRes.json();
