@@ -102,8 +102,10 @@ Return ONLY a valid JSON array — no markdown, no explanation, nothing else:
 ]
 
 Guidelines:
-- Estimate grams from visual portion (standard dinner plate ~26cm as reference)
-- Calories/macros must match the gram estimate
+- SCALE PRIORITY: If a kitchen scale is visible, read its exact digital display value and use that as the grams for the food on the scale. This overrides any visual estimate.
+- If no scale is visible, estimate grams from visual portion size (standard dinner plate ~26cm as reference)
+- Calories/macros must accurately match the gram amount (e.g. raw rolled oats: ~389 kcal/100g, ~13g protein, ~66g carbs, ~7g fat)
+- Look carefully at texture, color, and context to distinguish similar foods (e.g. oats vs flour vs rice)
 - Separate mixed dishes into visible components
 - Use "Unknown food" if unidentifiable`,
               },
