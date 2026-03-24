@@ -111,7 +111,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
       {/* Manual start session button */}
       {isCurrentWeek && !state.sessionStartTime && !state.todaySessionFinished && (
         <button onClick={onStartSession} style={{
-          width: '100%', padding: '11px 0', marginBottom: 14, border: 'none',
+          width: '100%', padding: '11px 0', marginBottom: 14,
           borderRadius: 12, cursor: 'pointer',
           background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(179,136,255,0.12))',
           border: '1px solid rgba(0,229,255,0.2)',
