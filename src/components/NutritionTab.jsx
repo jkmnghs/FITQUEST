@@ -32,7 +32,11 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   const [foods, setFoods] = useState([]);
   const [error, setError] = useState(null);
   const [logged, setLogged] = useState(false);
+  const [addText, setAddText] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState(null);
   const fileRef = useRef();
+  const galleryRef = useRef();
 
   function handleImageSelect(e) {
     const file = e.target.files[0];
@@ -147,6 +151,71 @@ Guidelines:
     }
   }
 
+  async function addFoodByText() {
+    const query = addText.trim();
+    if (!query) return;
+    setAdding(true);
+    setAddError(null);
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
+          messages: [{
+            role: 'user',
+            content: `Give me the nutritional info for: "${query}"
+
+Return ONLY a valid JSON array — no markdown, no explanation:
+[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]
+
+- Use realistic gram weight for the quantity described
+- Accurate macros for that gram amount`,
+          }],
+        }),
+      });
+
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const data = await res.json();
+      const text = data.content[0].text.trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        const match = text.match(/\[[\s\S]*\]/);
+        if (match) parsed = JSON.parse(match[0]);
+        else throw new Error('Could not parse response.');
+      }
+
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No items returned.');
+
+      setFoods(prev => [
+        ...prev,
+        ...parsed.map(f => ({
+          name: f.name || query,
+          grams: Number(f.grams) || 0,
+          calories: Number(f.calories) || 0,
+          protein: Number(f.protein) || 0,
+          carbs: Number(f.carbs) || 0,
+          fat: Number(f.fat) || 0,
+          portion: 'M',
+        })),
+      ]);
+      setAddText('');
+    } catch (err) {
+      setAddError(err.message || 'Failed to add item.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
   function setPortion(idx, portion) {
     setFoods(prev => prev.map((f, i) => i === idx ? { ...f, portion } : f));
   }
@@ -173,6 +242,7 @@ Guidelines:
     setError(null);
     setLogged(false);
     if (fileRef.current) fileRef.current.value = '';
+    if (galleryRef.current) galleryRef.current.value = '';
   }
 
   const totals = sumTotals(foods);
@@ -233,7 +303,7 @@ Guidelines:
         </div>
       )}
 
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
         ref={fileRef}
         type="file"
@@ -242,28 +312,50 @@ Guidelines:
         onChange={handleImageSelect}
         style={{ display: 'none' }}
       />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageSelect}
+        style={{ display: 'none' }}
+      />
 
       {/* Upload area or preview */}
       {!image ? (
-        <button
-          onClick={() => fileRef.current.click()}
-          style={{
-            width: '100%', padding: '36px 20px',
-            border: '2px dashed rgba(0,229,255,0.25)',
-            borderRadius: 16, background: 'rgba(0,229,255,0.03)',
-            cursor: 'pointer', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', gap: 12,
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <span style={{ fontSize: 52 }}>📸</span>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 12, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
-            SCAN MEAL
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-            Take a photo or choose from gallery
-          </div>
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => fileRef.current.click()}
+            style={{
+              flex: 1, padding: '28px 12px',
+              border: '2px dashed rgba(0,229,255,0.25)',
+              borderRadius: 16, background: 'rgba(0,229,255,0.03)',
+              cursor: 'pointer', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 10,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{ fontSize: 40 }}>📸</span>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
+              CAMERA
+            </div>
+          </button>
+          <button
+            onClick={() => galleryRef.current.click()}
+            style={{
+              flex: 1, padding: '28px 12px',
+              border: '2px dashed rgba(179,136,255,0.25)',
+              borderRadius: 16, background: 'rgba(179,136,255,0.03)',
+              cursor: 'pointer', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 10,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <span style={{ fontSize: 40 }}>🖼️</span>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--purple)', fontWeight: 700, letterSpacing: 1 }}>
+              UPLOAD
+            </div>
+          </button>
+        </div>
       ) : (
         <div style={{ position: 'relative', marginBottom: 14 }}>
           <img
@@ -396,6 +488,52 @@ Guidelines:
               </div>
             );
           })}
+
+          {/* Add missing item */}
+          {!logged && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 8 }}>
+                MISSING SOMETHING?
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={addText}
+                  onChange={e => { setAddText(e.target.value); setAddError(null); }}
+                  onKeyDown={e => e.key === 'Enter' && !adding && addFoodByText()}
+                  placeholder="e.g. 2 scrambled eggs"
+                  style={{
+                    flex: 1, padding: '11px 14px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 10, color: 'var(--text1)',
+                    fontFamily: 'Rajdhani', fontSize: 14,
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={addFoodByText}
+                  disabled={adding || !addText.trim()}
+                  style={{
+                    padding: '11px 16px', borderRadius: 10, border: 'none',
+                    background: adding || !addText.trim()
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'rgba(0,229,255,0.15)',
+                    color: adding || !addText.trim() ? 'var(--text3)' : 'var(--cyan)',
+                    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                    cursor: adding || !addText.trim() ? 'default' : 'pointer',
+                    flexShrink: 0,
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {adding ? '...' : 'ADD'}
+                </button>
+              </div>
+              {addError && (
+                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>{addError}</div>
+              )}
+            </div>
+          )}
 
           {/* Meal totals */}
           <div style={{
