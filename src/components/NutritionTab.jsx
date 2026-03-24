@@ -368,7 +368,7 @@ Guidelines:
           <div key={m.label} style={{ marginBottom: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
               <span style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 1 }}>{m.label}</span>
-              <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: m.color, fontWeight: 700 }}>
+              <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: m.value > m.goal ? 'var(--fire2)' : m.color, fontWeight: 700 }}>
                 {Math.round(m.value)}g <span style={{ color: 'var(--text3)', fontWeight: 400 }}>/ {m.goal}g</span>
               </span>
             </div>
@@ -376,7 +376,8 @@ Guidelines:
               <div style={{
                 height: '100%', borderRadius: 2,
                 width: `${Math.min(100, (m.value / m.goal) * 100)}%`,
-                background: m.color, transition: 'width 0.4s ease',
+                background: m.value > m.goal ? 'var(--fire2)' : m.color,
+                transition: 'width 0.4s ease',
               }} />
             </div>
           </div>
