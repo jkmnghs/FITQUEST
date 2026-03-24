@@ -173,11 +173,24 @@ Guidelines:
       }
 
       // Enrich Claude's macro estimates with USDA verified data in parallel
+      // Only accept USDA data if it doesn't zero-out a macro Claude already estimated
       const enriched = await Promise.all(parsed.map(async (f) => {
         const usda = await searchUSDA(f.name);
         if (usda && f.grams > 0) {
           const m = f.grams / 100;
-          return { ...f, calories: Math.round(usda.calories * m), protein: Math.round(usda.protein * m * 10) / 10, carbs: Math.round(usda.carbs * m * 10) / 10, fat: Math.round(usda.fat * m * 10) / 10 };
+          const usdaResult = {
+            calories: Math.round(usda.calories * m),
+            protein: Math.round(usda.protein * m * 10) / 10,
+            carbs: Math.round(usda.carbs * m * 10) / 10,
+            fat: Math.round(usda.fat * m * 10) / 10,
+          };
+          // Reject USDA if it zeroes out a macro that Claude said was present
+          const suspicious =
+            (f.protein > 2 && usdaResult.protein === 0) ||
+            (f.carbs   > 2 && usdaResult.carbs   === 0) ||
+            (f.fat     > 2 && usdaResult.fat      === 0);
+          if (suspicious) return f;
+          return { ...f, ...usdaResult };
         }
         return f;
       }));
