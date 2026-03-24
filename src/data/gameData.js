@@ -126,5 +126,6 @@ export const DEFAULT_STATE = {
   weeklyCheckins: [],
   notificationsEnabled: false,
   aiCoachHistory: [],
-  mealLogs: []
+  mealLogs: [],
+  nutritionGoals: { calories: 2000, protein: 155, carbs: 190, fat: 60 }
 };
