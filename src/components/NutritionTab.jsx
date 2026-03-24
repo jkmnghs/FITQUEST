@@ -37,13 +37,26 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   function handleImageSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Reject HEIC/HEIF — Anthropic vision API doesn't support them
+    const lowerName = file.name.toLowerCase();
+    if (
+      file.type === 'image/heic' || file.type === 'image/heif' ||
+      lowerName.endsWith('.heic') || lowerName.endsWith('.heif')
+    ) {
+      setError('HEIC photos are not supported. In iPhone Settings → Camera → Formats, choose "Most Compatible" to shoot in JPEG, or pick an existing JPEG from your gallery.');
+      return;
+    }
+
     setFoods([]);
     setError(null);
     setLogged(false);
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
-      setImage({ base64: dataUrl.split(',')[1], preview: dataUrl, type: file.type });
+      // Fallback media_type to jpeg if browser returns empty string
+      const mediaType = file.type || 'image/jpeg';
+      setImage({ base64: dataUrl.split(',')[1], preview: dataUrl, type: mediaType });
     };
     reader.readAsDataURL(file);
   }
