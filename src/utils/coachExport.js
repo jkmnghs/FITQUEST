@@ -137,6 +137,39 @@ export function formatForCoach(state) {
   }
   lines.push('');
 
+  // ── Nutrition goals & today's intake ────────────────────────────────────────
+  const nGoals = state.nutritionGoals || {};
+  if (nGoals.calories) {
+    lines.push('NUTRITION GOALS (set by AI coach)');
+    lines.push('---');
+    lines.push(`  Calories: ${nGoals.calories} kcal/day`);
+    lines.push(`  Protein:  ${nGoals.protein}g`);
+    lines.push(`  Carbs:    ${nGoals.carbs}g`);
+    lines.push(`  Fat:      ${nGoals.fat}g`);
+    lines.push('');
+  }
+
+  // Today's nutrition intake
+  const todayStr = new Date().toDateString();
+  const todayMeals = (state.mealLogs || []).filter(m => new Date(m.date).toDateString() === todayStr);
+  if (todayMeals.length > 0) {
+    const totals = todayMeals.reduce((acc, meal) => {
+      acc.calories += meal.totals?.calories || 0;
+      acc.protein  += meal.totals?.protein  || 0;
+      acc.carbs    += meal.totals?.carbs    || 0;
+      acc.fat      += meal.totals?.fat      || 0;
+      return acc;
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    lines.push("TODAY'S NUTRITION INTAKE");
+    lines.push('---');
+    lines.push(`  Calories: ${Math.round(totals.calories)} kcal${nGoals.calories ? ` / ${nGoals.calories} goal` : ''}`);
+    lines.push(`  Protein:  ${Math.round(totals.protein)}g${nGoals.protein ? ` / ${nGoals.protein}g goal` : ''}`);
+    lines.push(`  Carbs:    ${Math.round(totals.carbs)}g${nGoals.carbs ? ` / ${nGoals.carbs}g goal` : ''}`);
+    lines.push(`  Fat:      ${Math.round(totals.fat)}g${nGoals.fat ? ` / ${nGoals.fat}g goal` : ''}`);
+    lines.push(`  Meals logged: ${todayMeals.length}`);
+    lines.push('');
+  }
+
   lines.push('END OF REPORT');
   return lines.join('\n');
 }

@@ -321,6 +321,7 @@ Guidelines:
   const dayTotals = sumTotals(
     todayMeals.flatMap(m => m.foods.map(f => ({ ...f, portion: 'M' })))
   );
+  const goals = state.nutritionGoals || { calories: 2000, protein: 155, carbs: 190, fat: 60 };
 
   return (
     <div style={{ paddingBottom: 20 }}>
@@ -335,41 +336,57 @@ Guidelines:
       </div>
 
       {/* Daily summary bar */}
-      {todayMeals.length > 0 && (
-        <div style={{
-          background: 'rgba(0,229,255,0.05)',
-          border: '1px solid rgba(0,229,255,0.12)',
-          borderRadius: 12, padding: '12px 14px',
-          marginBottom: 20, display: 'flex',
-          justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)', letterSpacing: 1, marginBottom: 4 }}>
-              TODAY
-            </div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 18, fontWeight: 700, color: 'var(--cyan)' }}>
-              {dayTotals.calories} <span style={{ fontSize: 10, color: 'var(--text3)' }}>kcal</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 14 }}>
-            {[
-              { label: 'P', value: dayTotals.protein, color: 'var(--cyan)' },
-              { label: 'C', value: dayTotals.carbs, color: 'var(--gold)' },
-              { label: 'F', value: dayTotals.fat, color: 'var(--fire2)' },
-            ].map(m => (
-              <div key={m.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
-                  {Math.round(m.value)}g
-                </div>
-                <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'Orbitron' }}>{m.label}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-            {todayMeals.length} meal{todayMeals.length !== 1 ? 's' : ''}
+      <div style={{
+        background: 'rgba(0,229,255,0.05)',
+        border: '1px solid rgba(0,229,255,0.12)',
+        borderRadius: 12, padding: '12px 14px',
+        marginBottom: 20,
+      }}>
+        {/* Calorie row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)', letterSpacing: 1 }}>TODAY</div>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 16, fontWeight: 700, color: 'var(--cyan)' }}>
+            {dayTotals.calories}
+            <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 3 }}>/ {goals.calories} kcal</span>
           </div>
         </div>
-      )}
+        {/* Calorie progress bar */}
+        <div style={{ height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 3, marginBottom: 10, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 3,
+            width: `${Math.min(100, (dayTotals.calories / goals.calories) * 100)}%`,
+            background: dayTotals.calories > goals.calories ? 'var(--fire2)' : 'var(--cyan)',
+            transition: 'width 0.4s ease',
+          }} />
+        </div>
+        {/* Macro rows */}
+        {[
+          { label: 'PROTEIN', value: dayTotals.protein, goal: goals.protein, color: 'var(--cyan)' },
+          { label: 'CARBS',   value: dayTotals.carbs,   goal: goals.carbs,   color: 'var(--gold)' },
+          { label: 'FAT',     value: dayTotals.fat,     goal: goals.fat,     color: 'var(--fire2)' },
+        ].map(m => (
+          <div key={m.label} style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 1 }}>{m.label}</span>
+              <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: m.color, fontWeight: 700 }}>
+                {Math.round(m.value)}g <span style={{ color: 'var(--text3)', fontWeight: 400 }}>/ {m.goal}g</span>
+              </span>
+            </div>
+            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 2,
+                width: `${Math.min(100, (m.value / m.goal) * 100)}%`,
+                background: m.color, transition: 'width 0.4s ease',
+              }} />
+            </div>
+          </div>
+        ))}
+        {todayMeals.length > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, textAlign: 'right' }}>
+            {todayMeals.length} meal{todayMeals.length !== 1 ? 's' : ''} logged
+          </div>
+        )}
+      </div>
 
       {/* Hidden file inputs */}
       <input
