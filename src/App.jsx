@@ -10,6 +10,7 @@ import { registerSW, requestNotificationPermission } from './utils/notifications
 const StatsTab = lazy(() => import('./components/StatsTab'));
 const RankTab = lazy(() => import('./components/RankTab'));
 const CheckinTab = lazy(() => import('./components/CheckinTab'));
+const NutritionTab = lazy(() => import('./components/NutritionTab'));
 const AchievementsTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.AchievementsTab })));
 const LogTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.LogTab })));
 const SummaryTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.SummaryTab })));
@@ -54,13 +55,14 @@ class ErrorBoundary extends Component {
 }
 
 const PRIMARY_TABS = [
-  { id: 'workout',  icon: '⚔️',  label: 'Workout'  },
-  { id: 'coach',    icon: '🤖',  label: 'Coach'    },
-  { id: 'stats',    icon: '📊',  label: 'Stats'    },
-  { id: 'rank',     icon: '⭐',  label: 'Rank'     },
+  { id: 'workout',   icon: '⚔️',  label: 'Workout'   },
+  { id: 'coach',     icon: '🤖',  label: 'Coach'     },
+  { id: 'nutrition', icon: '🍽️',  label: 'Nutrition' },
+  { id: 'rank',      icon: '⭐',  label: 'Rank'      },
 ];
 
 const MORE_TABS = [
+  { id: 'stats',    icon: '📊',  label: 'Stats'    },
   { id: 'checkin',  icon: '📋',  label: 'Check-in' },
   { id: 'summary',  icon: '📝',  label: 'Summary'  },
   { id: 'ach',      icon: '🏆',  label: 'Awards'   },
@@ -82,7 +84,7 @@ export default function App() {
     state, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
-    resetAll, resetToday, startSession, backfillWeek, addAIHistory, importData
+    resetAll, resetToday, startSession, backfillWeek, addAIHistory, logMeal, importData
   } = useGameState();
 
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -256,6 +258,15 @@ export default function App() {
               onSaveHistory={addAIHistory}
             />
           </div>
+          {activeTab === 'nutrition' && (
+            <LazyTab>
+              <NutritionTab
+                state={state}
+                onLogMeal={logMeal}
+                mealLogs={state.mealLogs || []}
+              />
+            </LazyTab>
+          )}
           {activeTab === 'stats' && <LazyTab><StatsTab state={state} /></LazyTab>}
           {activeTab === 'rank' && <LazyTab><RankTab state={state} /></LazyTab>}
           {activeTab === 'checkin' && (

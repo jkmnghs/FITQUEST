@@ -366,6 +366,14 @@ export function useGameState() {
     }));
   }, [setState]);
 
+  const logMeal = useCallback((meal) => {
+    setState(prev => ({
+      ...prev,
+      mealLogs: [...(prev.mealLogs || []), meal]
+    }));
+    showToast(`Meal logged — ${meal.totals.calories} kcal ✓`);
+  }, [setState, showToast]);
+
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
@@ -488,6 +496,7 @@ export function useGameState() {
     submitCheckin,
     updateSetting,
     addAIHistory,
+    logMeal,
     importData
   };
 }
