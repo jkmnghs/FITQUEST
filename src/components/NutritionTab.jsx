@@ -61,6 +61,7 @@ export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
   const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open
   const swipeRef = useRef({}); // { startX, startY, moved, idx, baseX }
   const cardRefs = useRef({});  // idx -> card DOM element
+  const trashRefs = useRef({}); // idx -> trash DOM element
   const fileRef = useRef();
   const galleryRef = useRef();
 
@@ -544,13 +545,17 @@ Guidelines:
                   clipPath: 'inset(0 round 14px)',
                 }}
               >
-                {/* Trash — always behind the card */}
-                <div style={{
-                  position: 'absolute', right: 0, top: 0, bottom: 0,
-                  width: TRASH_W,
-                  background: 'rgba(255,23,68,0.9)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+                {/* Trash — hidden until swiped */}
+                <div
+                  ref={el => { trashRefs.current[idx] = el; }}
+                  style={{
+                    position: 'absolute', right: 0, top: 0, bottom: 0,
+                    width: TRASH_W,
+                    background: 'rgba(255,23,68,0.9)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: isOpen ? 1 : 0,
+                    transition: 'opacity 0.28s ease',
+                  }}>
                   <button
                     onClick={() => {
                       setFoods(prev => prev.filter((_, i) => i !== idx));
@@ -586,8 +591,10 @@ Guidelines:
                       idx,
                       baseX,
                     };
-                    // Disable transition so the card follows the finger exactly
+                    // Disable transitions so card + trash follow finger exactly
                     if (el) el.style.transition = 'none';
+                    const tr = trashRefs.current[idx];
+                    if (tr) tr.style.transition = 'none';
                   }}
                   onTouchMove={e => {
                     const { startX, startY, baseX } = swipeRef.current;
@@ -598,6 +605,7 @@ Guidelines:
                     swipeRef.current.moved = true;
                     e.preventDefault(); // lock scroll once we're swiping horizontally
                     const el = cardRefs.current[idx];
+                    const tr = trashRefs.current[idx];
                     if (!el) return;
                     // Clamp: can't go past fully open (-TRASH_W) or past closed (0)
                     // Add slight resistance past the limits for a rubber-band feel
@@ -605,12 +613,16 @@ Guidelines:
                     if (newX > 0) newX = newX * 0.2;           // resist overdrag right
                     if (newX < -TRASH_W) newX = -TRASH_W + (newX + TRASH_W) * 0.2; // resist overdrag left
                     el.style.transform = `translateX(${newX}px)`;
+                    // Drive trash opacity in sync with the drag (0 → 1 as card slides -TRASH_W)
+                    if (tr) tr.style.opacity = Math.min(1, -newX / TRASH_W).toFixed(2);
                   }}
                   onTouchEnd={e => {
                     const { moved, idx: sIdx, baseX, startX } = swipeRef.current;
                     const el = cardRefs.current[sIdx];
-                    // Re-enable the smooth snap transition
+                    const tr = trashRefs.current[sIdx];
+                    // Re-enable smooth snap transitions
                     if (el) el.style.transition = 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                    if (tr) tr.style.transition = 'opacity 0.28s ease';
                     if (!moved) return;
                     const dx = e.changedTouches[0].clientX - startX;
                     // Snap open if dragged left >30px from closed, or snap closed if dragged right >20px from open
