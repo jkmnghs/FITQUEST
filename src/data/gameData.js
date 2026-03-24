@@ -125,5 +125,6 @@ export const DEFAULT_STATE = {
   sessionStartTime: null,
   weeklyCheckins: [],
   notificationsEnabled: false,
-  aiCoachHistory: []
+  aiCoachHistory: [],
+  mealLogs: []
 };
