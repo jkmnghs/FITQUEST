@@ -1,7 +1,26 @@
 import React, { useState, useRef } from 'react';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
+const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 const PORTION_MULT = { S: 0.75, M: 1.0, L: 1.5 };
+
+async function searchUSDA(query) {
+  const key = import.meta.env.VITE_USDA_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(`${USDA_URL}?query=${encodeURIComponent(query)}&api_key=${key}&dataType=Foundation,SR%20Legacy&pageSize=1`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.foods || data.foods.length === 0) return null;
+    const nutrients = data.foods[0].foodNutrients || [];
+    const get = (id) => { const n = nutrients.find(n => n.nutrientId === id); return n ? n.value : null; };
+    const calories = get(1008);
+    if (calories == null) return null;
+    return { calories, protein: get(1003) || 0, carbs: get(1005) || 0, fat: get(1004) || 0 };
+  } catch {
+    return null;
+  }
+}
 
 function getAdjusted(food) {
   const m = food.customGrams != null && food.grams > 0
@@ -139,7 +158,17 @@ Guidelines:
         throw new Error('No food items detected. Try a clearer photo.');
       }
 
-      setFoods(parsed.map(f => ({
+      // Enrich Claude's macro estimates with USDA verified data in parallel
+      const enriched = await Promise.all(parsed.map(async (f) => {
+        const usda = await searchUSDA(f.name);
+        if (usda && f.grams > 0) {
+          const m = f.grams / 100;
+          return { ...f, calories: Math.round(usda.calories * m), protein: Math.round(usda.protein * m * 10) / 10, carbs: Math.round(usda.carbs * m * 10) / 10, fat: Math.round(usda.fat * m * 10) / 10 };
+        }
+        return f;
+      }));
+
+      setFoods(enriched.map(f => ({
         name: f.name || 'Unknown',
         grams: Number(f.grams) || 0,
         calories: Number(f.calories) || 0,
@@ -162,48 +191,65 @@ Guidelines:
     setAdding(true);
     setAddError(null);
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 512,
-          messages: [{
-            role: 'user',
-            content: `Give me the nutritional info for: "${query}"
-
-Return ONLY a valid JSON array — no markdown, no explanation:
-[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]
-
-- Use realistic gram weight for the quantity described
-- Accurate macros for that gram amount`,
-          }],
+      // Run USDA lookup and Claude in parallel
+      const [usdaPer100g, claudeRes] = await Promise.all([
+        searchUSDA(query),
+        fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 256,
+            messages: [{
+              role: 'user',
+              content: usdaPer100g
+                ? `Estimate the gram weight for: "${query}". Return ONLY JSON: {"name":"<food name>","grams":<number>}`
+                : `Give nutritional info for: "${query}". Return ONLY a JSON array — no markdown:\n[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]\n- Realistic gram weight for the quantity described\n- Accurate macros for that gram amount`,
+            }],
+          }),
         }),
-      });
+      ]);
 
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data = await res.json();
-      const text = data.content[0].text.trim();
+      if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
+      const claudeData = await claudeRes.json();
+      const text = claudeData.content[0].text.trim();
 
-      let parsed;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        const match = text.match(/\[[\s\S]*\]/);
-        if (match) parsed = JSON.parse(match[0]);
-        else throw new Error('Could not parse response.');
-      }
-
-      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No items returned.');
-
-      setFoods(prev => [
-        ...prev,
-        ...parsed.map(f => ({
+      if (usdaPer100g) {
+        // USDA has data — Claude just estimates grams & name
+        let parsed = {};
+        try {
+          const match = text.match(/\{[\s\S]*\}/);
+          if (match) parsed = JSON.parse(match[0]);
+        } catch {}
+        const grams = Number(parsed.grams) || 100;
+        const m = grams / 100;
+        setFoods(prev => [...prev, {
+          name: parsed.name || query,
+          grams,
+          calories: Math.round(usdaPer100g.calories * m),
+          protein: Math.round(usdaPer100g.protein * m * 10) / 10,
+          carbs: Math.round(usdaPer100g.carbs * m * 10) / 10,
+          fat: Math.round(usdaPer100g.fat * m * 10) / 10,
+          portion: 'M',
+          customGrams: null,
+        }]);
+      } else {
+        // USDA found nothing — fall back to Claude's full nutrition estimate
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          const match = text.match(/\[[\s\S]*\]/);
+          if (match) parsed = JSON.parse(match[0]);
+          else throw new Error('Could not parse response.');
+        }
+        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No items returned.');
+        setFoods(prev => [...prev, ...parsed.map(f => ({
           name: f.name || query,
           grams: Number(f.grams) || 0,
           calories: Number(f.calories) || 0,
@@ -212,8 +258,8 @@ Return ONLY a valid JSON array — no markdown, no explanation:
           fat: Number(f.fat) || 0,
           portion: 'M',
           customGrams: null,
-        })),
-      ]);
+        }))]);
+      }
       setAddText('');
     } catch (err) {
       setAddError(err.message || 'Failed to add item.');
