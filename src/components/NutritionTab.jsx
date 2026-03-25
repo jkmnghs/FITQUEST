@@ -4,19 +4,30 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 const PORTION_MULT = { S: 0.75, M: 1.0, L: 1.5 };
 
-async function searchUSDA(query) {
+async function searchUSDA(query, claudeCalsPer100g) {
   const key = import.meta.env.VITE_USDA_API_KEY;
   if (!key) return null;
   try {
-    const res = await fetch(`${USDA_URL}?query=${encodeURIComponent(query)}&api_key=${key}&dataType=Foundation,SR%20Legacy&pageSize=1`);
+    const res = await fetch(`${USDA_URL}?query=${encodeURIComponent(query)}&api_key=${key}&dataType=Foundation,SR%20Legacy&pageSize=8`);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.foods || data.foods.length === 0) return null;
-    const nutrients = data.foods[0].foodNutrients || [];
-    const get = (id) => { const n = nutrients.find(n => n.nutrientId === id); return n ? n.value : null; };
-    const calories = get(1008);
-    if (calories == null) return null;
-    return { calories, protein: get(1003) || 0, carbs: get(1005) || 0, fat: get(1004) || 0 };
+    const parseFood = (food) => {
+      const nutrients = food.foodNutrients || [];
+      const get = (id) => { const n = nutrients.find(n => n.nutrientId === id); return n ? n.value : null; };
+      const calories = get(1008);
+      if (calories == null) return null;
+      return { calories, protein: get(1003) || 0, carbs: get(1005) || 0, fat: get(1004) || 0 };
+    };
+    const candidates = data.foods.map(parseFood).filter(Boolean);
+    if (candidates.length === 0) return null;
+    // Pick the candidate whose calorie density is closest to Claude's estimate
+    if (claudeCalsPer100g > 0) {
+      candidates.sort((a, b) =>
+        Math.abs(a.calories - claudeCalsPer100g) - Math.abs(b.calories - claudeCalsPer100g)
+      );
+    }
+    return candidates[0];
   } catch {
     return null;
   }
@@ -175,7 +186,9 @@ Guidelines:
       // Enrich Claude's macro estimates with USDA verified data in parallel
       // Only accept USDA data if it doesn't zero-out a macro Claude already estimated
       const enriched = await Promise.all(parsed.map(async (f) => {
-        const usda = await searchUSDA(f.name);
+        // Pass Claude's per-100g calorie estimate so USDA picks the closest match
+        const claudeCalsPer100g = f.grams > 0 ? (f.calories / f.grams) * 100 : 0;
+        const usda = await searchUSDA(f.name, claudeCalsPer100g);
         if (usda && f.grams > 0) {
           const m = f.grams / 100;
           const usdaResult = {
@@ -190,12 +203,6 @@ Guidelines:
             (f.carbs   > 2 && usdaResult.carbs   === 0) ||
             (f.fat     > 2 && usdaResult.fat      === 0);
           if (suspicious) return f;
-          // Reject USDA if calorie density differs >2.5x from Claude's estimate
-          // (catches e.g. fresh banana vs dried banana chips)
-          if (f.calories > 0 && usdaResult.calories > 0) {
-            const ratio = usdaResult.calories / f.calories;
-            if (ratio > 2.5 || ratio < 0.4) return f;
-          }
           return { ...f, ...usdaResult };
         }
         return f;
