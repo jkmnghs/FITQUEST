@@ -17,6 +17,22 @@ A Claude-powered coaching tab with 5 modes:
 
 The AI coach knows ALL your data: current week, lift weights, PRs, RPE history, body weight trend, session completion rates.
 
+### 🍽️ Nutrition Scanner (New)
+AI-powered meal photo analysis:
+- **Camera or gallery upload** — snap your meal and Claude Vision identifies every food item
+- **Portion size buttons** — S / M / L per item, with gram weights shown
+- **USDA enrichment** — verified nutritional data from USDA FoodData Central, with fallback to Claude's estimate for branded supplements/foods not in the database
+- **Manual add** — type any food (e.g. "2 scrambled eggs") and it's looked up + estimated automatically
+- **Daily progress bars** — calories, protein, carbs, fat tracked vs your AI coach targets; bars and labels turn red when over goal
+- **Meal log** — every logged meal is stored and included in the AI coach report
+
+### 🎯 Nutrition Goals (New)
+Goals set by your AI coach are stored and tracked:
+- **Defaults**: 2,000 kcal · 155g protein · 190g carbs · 60g fat
+- **Editable** in Settings tab
+- **Progress bars** always visible on the Nutrition tab (even before your first meal)
+- **Included in AI coach report** alongside today's actual intake
+
 ### 🔔 Push Notifications (New)
 - Mon/Wed/Fri workout reminders (fires on app open if it's a training day)
 - Sunday check-in reminder
@@ -48,16 +64,19 @@ npm run build
 npm run preview
 ```
 
-### API Key for AI Coach
+### API Keys
 
-The AI Coach uses the Anthropic API. You need to configure your API key.
+The AI Coach and Nutrition Scanner use the Anthropic API. The Nutrition Scanner also queries USDA FoodData Central.
 
-**Option A: Vite environment variable (recommended for local dev)**
+**Option A: Vite environment variables (recommended for local dev)**
 
 Create `.env.local` in the project root:
 ```
 VITE_ANTHROPIC_API_KEY=sk-ant-...
+VITE_USDA_API_KEY=your-usda-key
 ```
+
+Get a free USDA API key at https://fdc.nal.usda.gov/api-key-signup
 
 Then update `src/components/AICoachTab.jsx` — find the fetch call and add:
 ```js
@@ -92,7 +111,8 @@ fitquest/
     ├── utils/
     │   ├── storage.js      # localStorage + sessionStorage fallback
     │   ├── gameLogic.js    # Pure functions (XP, rank, phase, weight conversion)
-    │   └── notifications.js # Push notification registration + scheduling
+    │   ├── notifications.js # Push notification registration + scheduling
+    │   └── coachExport.js  # Formats full state snapshot for AI coach context
     ├── hooks/
     │   └── useGameState.js # Central state management hook
     └── components/
@@ -105,7 +125,8 @@ fitquest/
         ├── StatsTab.jsx    # Stats, weight chart, PRs, lift progression
         ├── RankTab.jsx     # Rank display + ladder
         ├── CheckinTab.jsx  # Sunday check-in form + history
-        ├── AICoachTab.jsx  # 🤖 Claude-powered AI coaching (NEW)
+        ├── AICoachTab.jsx  # 🤖 Claude-powered AI coaching
+        ├── NutritionTab.jsx # 🍽️ AI meal scanner + daily macro tracking
         └── OtherTabs.jsx   # Achievements, Log, Summary, Settings
 ```
 
