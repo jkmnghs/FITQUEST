@@ -190,6 +190,12 @@ Guidelines:
             (f.carbs   > 2 && usdaResult.carbs   === 0) ||
             (f.fat     > 2 && usdaResult.fat      === 0);
           if (suspicious) return f;
+          // Reject USDA if calorie density differs >2.5x from Claude's estimate
+          // (catches e.g. fresh banana vs dried banana chips)
+          if (f.calories > 0 && usdaResult.calories > 0) {
+            const ratio = usdaResult.calories / f.calories;
+            if (ratio > 2.5 || ratio < 0.4) return f;
+          }
           return { ...f, ...usdaResult };
         }
         return f;
