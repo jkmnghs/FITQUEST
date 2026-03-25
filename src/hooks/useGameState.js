@@ -374,6 +374,14 @@ export function useGameState() {
     showToast(`Meal logged — ${meal.totals.calories} kcal ✓`);
   }, [setState, showToast]);
 
+  const deleteMeal = useCallback((mealId) => {
+    setState(prev => ({
+      ...prev,
+      mealLogs: (prev.mealLogs || []).filter(m => m.id !== mealId)
+    }));
+    showToast('Meal deleted');
+  }, [setState, showToast]);
+
   // Retroactively mark sessions for a past week (for backfilling lost data)
   // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
@@ -497,6 +505,7 @@ export function useGameState() {
     updateSetting,
     addAIHistory,
     logMeal,
+    deleteMeal,
     importData
   };
 }

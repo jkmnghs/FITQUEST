@@ -48,7 +48,7 @@ function sumTotals(foods) {
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 }
 
-export default function NutritionTab({ state, onLogMeal, mealLogs = [] }) {
+export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs = [] }) {
   const [image, setImage] = useState(null); // { base64, preview, type }
   const [analyzing, setAnalyzing] = useState(false);
   const [foods, setFoods] = useState([]);
@@ -229,7 +229,7 @@ Guidelines:
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-sonnet-4-5',
           max_tokens: 256,
           messages: [{
             role: 'user',
@@ -490,6 +490,50 @@ Guidelines:
             <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
               Fit <span style={{ color: 'var(--cyan)' }}>all food items</span> within the frame for accurate analysis. Good lighting helps too.
             </div>
+          </div>
+
+          {/* Quick add — always visible */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 8 }}>
+              NO PHOTO? ADD MANUALLY
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                value={addText}
+                onChange={e => { setAddText(e.target.value); setAddError(null); }}
+                onKeyDown={e => e.key === 'Enter' && !adding && addFoodByText()}
+                placeholder="e.g. 2 scrambled eggs"
+                style={{
+                  flex: 1, padding: '11px 14px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 10, color: 'var(--text1)',
+                  fontFamily: 'Rajdhani', fontSize: 14,
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={addFoodByText}
+                disabled={adding || !addText.trim()}
+                style={{
+                  padding: '11px 16px', borderRadius: 10, border: 'none',
+                  background: adding || !addText.trim()
+                    ? 'rgba(255,255,255,0.08)'
+                    : 'rgba(0,229,255,0.15)',
+                  color: adding || !addText.trim() ? 'var(--text3)' : 'var(--cyan)',
+                  fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                  cursor: adding || !addText.trim() ? 'default' : 'pointer',
+                  flexShrink: 0,
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {adding ? '...' : 'ADD'}
+              </button>
+            </div>
+            {addError && (
+              <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>{addError}</div>
+            )}
           </div>
         </div>
       ) : (
@@ -759,7 +803,7 @@ Guidelines:
             );
           })}
 
-          {/* Add missing item */}
+          {/* Add missing item — when image is loaded, keep field available */}
           {!logged && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 8 }}>
@@ -923,10 +967,10 @@ Guidelines:
               border: '1px solid rgba(255,255,255,0.06)',
               borderRadius: 12, padding: '12px 14px',
               marginBottom: 8, display: 'flex',
-              justifyContent: 'space-between', alignItems: 'center',
+              justifyContent: 'space-between', alignItems: 'center', gap: 8,
             }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Rajdhani', fontWeight: 600, marginBottom: 2 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Rajdhani', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {meal.foods.map(f => f.name).join(', ').substring(0, 40)}
                   {meal.foods.map(f => f.name).join(', ').length > 40 ? '...' : ''}
                 </div>
@@ -938,6 +982,18 @@ Guidelines:
                 </div>
                 <div style={{ fontSize: 9, color: 'var(--text3)' }}>kcal</div>
               </div>
+              {onDeleteMeal && meal.id && (
+                <button
+                  onClick={() => onDeleteMeal(meal.id)}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: 'rgba(255,68,68,0.6)', fontSize: 16,
+                    cursor: 'pointer', padding: '4px 2px', flexShrink: 0,
+                    lineHeight: 1,
+                  }}
+                  title="Delete meal"
+                >🗑️</button>
+              )}
             </div>
           ))}
         </div>
