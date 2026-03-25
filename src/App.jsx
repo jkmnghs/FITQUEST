@@ -84,7 +84,7 @@ export default function App() {
     state, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
-    resetAll, resetToday, startSession, backfillWeek, addAIHistory, logMeal, importData
+    resetAll, resetToday, startSession, backfillWeek, addAIHistory, logMeal, deleteMeal, importData
   } = useGameState();
 
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -263,6 +263,7 @@ export default function App() {
               <NutritionTab
                 state={state}
                 onLogMeal={logMeal}
+                onDeleteMeal={deleteMeal}
                 mealLogs={state.mealLogs || []}
               />
             </LazyTab>
