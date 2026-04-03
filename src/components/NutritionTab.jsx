@@ -197,11 +197,16 @@ Guidelines:
             carbs: Math.round(usda.carbs * m * 10) / 10,
             fat: Math.round(usda.fat * m * 10) / 10,
           };
-          // Reject USDA if it zeroes out a macro that Claude said was present
+          // Reject USDA if it zeroes out a macro that Claude said was present,
+          // or if the values are physically implausible (e.g. fat >= food weight,
+          // or calorie density exceeds pure fat ~900 kcal/100g)
+          const usdaCalsPer100g = f.grams > 0 ? (usdaResult.calories / f.grams) * 100 : 0;
           const suspicious =
             (f.protein > 2 && usdaResult.protein === 0) ||
             (f.carbs   > 2 && usdaResult.carbs   === 0) ||
-            (f.fat     > 2 && usdaResult.fat      === 0);
+            (f.fat     > 2 && usdaResult.fat      === 0) ||
+            (f.grams > 0 && usdaResult.fat >= f.grams) ||
+            (usdaCalsPer100g > 900);
           if (suspicious) return f;
           return { ...f, ...usdaResult };
         }
