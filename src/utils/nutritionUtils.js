@@ -1,11 +1,8 @@
-const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 export const PORTION_MULT = { S: 0.75, M: 1.0, L: 1.5 };
 
 export async function searchUSDA(query, claudeCalsPer100g) {
-  const key = import.meta.env.VITE_USDA_API_KEY;
-  if (!key) return null;
   try {
-    const res = await fetch(`${USDA_URL}?query=${encodeURIComponent(query)}&api_key=${key}&dataType=Foundation,SR%20Legacy&pageSize=8`);
+    const res = await fetch(`/api/usda?query=${encodeURIComponent(query)}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.foods || data.foods.length === 0) return null;

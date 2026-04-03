@@ -203,9 +203,10 @@ export default function AICoachTab({ state, onSaveHistory }) {
 
   // Warn on mount if API key is not configured
   useEffect(() => {
-    if (!import.meta.env.VITE_ANTHROPIC_API_KEY) {
-      setApiKeyMissing(true);
-    }
+    // Check coach is reachable (will 500 if server env var not set)
+    fetch('/api/coach', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      .then(r => { if (r.status === 500) setApiKeyMissing(true); })
+      .catch(() => {});
   }, []);
 
   // Tick down the cooldown counter
@@ -224,12 +225,6 @@ export default function AICoachTab({ state, onSaveHistory }) {
   async function sendMessage(overrideMessage) {
     if (loading) return;
     if (cooldownLeft > 0) return;
-
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      setError('No API key found. Create a .env.local file in the project root and add:\nVITE_ANTHROPIC_API_KEY=sk-ant-...\nThen restart the dev server.');
-      return;
-    }
 
     const text = (overrideMessage ?? userMessage).trim();
     const systemPrompt = buildSystemPrompt(state, activeMode);
@@ -275,14 +270,9 @@ export default function AICoachTab({ state, onSaveHistory }) {
           .map(m => ({ role: m.role, content: m.content }));
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/coach', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 500,
@@ -383,9 +373,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
           background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
           fontSize: 12, color: 'var(--gold)', lineHeight: 1.6
         }}>
-          <strong>API key not configured.</strong> Create a <code>.env.local</code> file in the project root with:<br />
-          <code>VITE_ANTHROPIC_API_KEY=sk-ant-...</code><br />
-          Then restart the dev server.
+          <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
         </div>
       )}
 

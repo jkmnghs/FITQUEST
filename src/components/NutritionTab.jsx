@@ -3,7 +3,7 @@ import { searchUSDA, validateUSDAMacros, getAdjusted, sumTotals, PORTION_MULT } 
 import DailySummaryBar from './nutrition/DailySummaryBar';
 import TodaysMealHistory from './nutrition/TodaysMealHistory';
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
+const API_URL = '/api/nutrition';
 
 export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs = [] }) {
   const [image, setImage] = useState(null); // { base64, preview, type }
@@ -67,12 +67,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5',
           max_tokens: 1024,
@@ -193,12 +188,7 @@ Guidelines:
       const usdaPer100g = await searchUSDA(query);
       const claudeRes = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5',
           max_tokens: 256,
