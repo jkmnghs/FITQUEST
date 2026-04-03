@@ -33,6 +33,31 @@ async function searchUSDA(query, claudeCalsPer100g) {
   }
 }
 
+// Validates USDA macro data for physical plausibility and internal consistency.
+// Returns true only if the data is trustworthy enough to override Claude's estimate.
+function validateUSDAMacros(usdaResult, foodGrams) {
+  const { calories, protein, carbs, fat } = usdaResult;
+
+  // No individual macro can equal or exceed the total food weight
+  if (fat >= foodGrams || protein >= foodGrams || carbs >= foodGrams) return false;
+
+  // Sum of macros can't exceed food weight (water/fiber make up the rest)
+  if (protein + carbs + fat > foodGrams * 1.05) return false;
+
+  // Calorie density can't exceed pure fat (~900 kcal/100g)
+  if (foodGrams > 0 && (calories / foodGrams) * 100 > 900) return false;
+
+  // Atwater cross-check: stated calories must be consistent with macros
+  // Formula: protein×4 + carbs×4 + fat×9 (±20% tolerance for fiber, alcohol, rounding)
+  const impliedCalories = protein * 4 + carbs * 4 + fat * 9;
+  if (impliedCalories > 0 && calories > 0) {
+    const deviation = Math.abs(calories - impliedCalories) / calories;
+    if (deviation > 0.20) return false;
+  }
+
+  return true;
+}
+
 function getAdjusted(food) {
   const m = food.customGrams != null && food.grams > 0
     ? food.customGrams / food.grams
@@ -197,17 +222,14 @@ Guidelines:
             carbs: Math.round(usda.carbs * m * 10) / 10,
             fat: Math.round(usda.fat * m * 10) / 10,
           };
-          // Reject USDA if it zeroes out a macro that Claude said was present,
-          // or if the values are physically implausible (e.g. fat >= food weight,
-          // or calorie density exceeds pure fat ~900 kcal/100g)
-          const usdaCalsPer100g = f.grams > 0 ? (usdaResult.calories / f.grams) * 100 : 0;
-          const suspicious =
+          // Reject USDA if values are physically implausible or internally inconsistent,
+          // or if it zeroes out a macro that Claude already estimated as present
+          const usdaValid = validateUSDAMacros(usdaResult, f.grams);
+          const usdaZeroesClaudeMacro =
             (f.protein > 2 && usdaResult.protein === 0) ||
             (f.carbs   > 2 && usdaResult.carbs   === 0) ||
-            (f.fat     > 2 && usdaResult.fat      === 0) ||
-            (f.grams > 0 && usdaResult.fat >= f.grams) ||
-            (usdaCalsPer100g > 900);
-          if (suspicious) return f;
+            (f.fat     > 2 && usdaResult.fat      === 0);
+          if (!usdaValid || usdaZeroesClaudeMacro) return f;
           return { ...f, ...usdaResult };
         }
         return f;
