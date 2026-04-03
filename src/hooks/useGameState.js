@@ -15,6 +15,13 @@ function mergeState(saved) {
   return { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...saved };
 }
 
+const PRUNE_DAYS = 90;
+function pruneOldEntries(arr, dateKey = 'date') {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - PRUNE_DAYS);
+  return (arr || []).filter(e => new Date(e[dateKey]) >= cutoff);
+}
+
 function checkDayReset(state) {
   const t = today();
   let next = { ...state };
@@ -222,7 +229,7 @@ export function useGameState() {
         weeklyRPE,
         personalRecords,
         liftWeights,
-        log: [...prev.log, logEntry]
+        log: pruneOldEntries([...prev.log, logEntry])
       };
     });
     // Schedule outside setState to avoid React StrictMode double-invocation
@@ -292,7 +299,7 @@ export function useGameState() {
         weekProgress,
         currentWeek: nextWeek,
         sessionStartTime: null,
-        log: [...prev.log, logEntry]
+        log: pruneOldEntries([...prev.log, logEntry])
       };
     });
     // Schedule outside setState to avoid React StrictMode double-invocation
@@ -331,7 +338,7 @@ export function useGameState() {
         ...prev,
         checkins: prev.checkins + 1,
         weeklyCheckins: [...prev.weeklyCheckins, entry],
-        log: [...prev.log, logEntry]
+        log: pruneOldEntries([...prev.log, logEntry])
       };
     });
     setTimeout(() => addXP(pendingXP), 50);
@@ -369,7 +376,7 @@ export function useGameState() {
   const logMeal = useCallback((meal) => {
     setState(prev => ({
       ...prev,
-      mealLogs: [...(prev.mealLogs || []), meal]
+      mealLogs: pruneOldEntries([...(prev.mealLogs || []), meal])
     }));
     showToast(`Meal logged — ${meal.totals.calories} kcal ✓`);
   }, [setState, showToast]);
@@ -459,7 +466,7 @@ export function useGameState() {
         totalMinutes: prev.totalMinutes + newSessions * durationMins,
         totalVolume: prev.totalVolume + addedVolume,
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
-        log: [...prev.log, ...newLogEntries],
+        log: pruneOldEntries([...prev.log, ...newLogEntries]),
       };
 
       const newlyUnlocked = checkAchievements(updatedState);

@@ -1,88 +1,9 @@
 import React, { useState, useRef } from 'react';
+import { searchUSDA, validateUSDAMacros, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
+import DailySummaryBar from './nutrition/DailySummaryBar';
+import TodaysMealHistory from './nutrition/TodaysMealHistory';
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
-const PORTION_MULT = { S: 0.75, M: 1.0, L: 1.5 };
-
-async function searchUSDA(query, claudeCalsPer100g) {
-  const key = import.meta.env.VITE_USDA_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch(`${USDA_URL}?query=${encodeURIComponent(query)}&api_key=${key}&dataType=Foundation,SR%20Legacy&pageSize=8`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.foods || data.foods.length === 0) return null;
-    const parseFood = (food) => {
-      const nutrients = food.foodNutrients || [];
-      const get = (id) => { const n = nutrients.find(n => n.nutrientId === id); return n ? n.value : null; };
-      const calories = get(1008);
-      if (calories == null) return null;
-      return { calories, protein: get(1003) || 0, carbs: get(1005) || 0, fat: get(1004) || 0 };
-    };
-    const candidates = data.foods.map(parseFood).filter(Boolean);
-    if (candidates.length === 0) return null;
-    // Pick the candidate whose calorie density is closest to Claude's estimate
-    if (claudeCalsPer100g > 0) {
-      candidates.sort((a, b) =>
-        Math.abs(a.calories - claudeCalsPer100g) - Math.abs(b.calories - claudeCalsPer100g)
-      );
-    }
-    return candidates[0];
-  } catch {
-    return null;
-  }
-}
-
-// Validates USDA macro data for physical plausibility and internal consistency.
-// Returns true only if the data is trustworthy enough to override Claude's estimate.
-function validateUSDAMacros(usdaResult, foodGrams) {
-  const { calories, protein, carbs, fat } = usdaResult;
-
-  // No individual macro can equal or exceed the total food weight
-  if (fat >= foodGrams || protein >= foodGrams || carbs >= foodGrams) return false;
-
-  // Sum of macros can't exceed food weight (water/fiber make up the rest)
-  if (protein + carbs + fat > foodGrams * 1.05) return false;
-
-  // Calorie density can't exceed pure fat (~900 kcal/100g)
-  if (foodGrams > 0 && (calories / foodGrams) * 100 > 900) return false;
-
-  // Atwater cross-check: stated calories must be consistent with macros
-  // Formula: protein×4 + carbs×4 + fat×9 (±20% tolerance for fiber, alcohol, rounding)
-  const impliedCalories = protein * 4 + carbs * 4 + fat * 9;
-  if (impliedCalories > 0 && calories > 0) {
-    const deviation = Math.abs(calories - impliedCalories) / calories;
-    if (deviation > 0.20) return false;
-  }
-
-  return true;
-}
-
-function getAdjusted(food) {
-  const m = food.customGrams != null && food.grams > 0
-    ? food.customGrams / food.grams
-    : (PORTION_MULT[food.portion] ?? PORTION_MULT['M']);
-  const grams = food.customGrams != null ? food.customGrams : Math.round(food.grams * m);
-  return {
-    grams,
-    calories: Math.round(food.calories * m),
-    protein: Math.round(food.protein * m * 10) / 10,
-    carbs: Math.round(food.carbs * m * 10) / 10,
-    fat: Math.round(food.fat * m * 10) / 10,
-  };
-}
-
-function sumTotals(foods) {
-  return foods.reduce((acc, f) => {
-    const adj = getAdjusted(f);
-    return {
-      calories: acc.calories + adj.calories,
-      protein: Math.round((acc.protein + adj.protein) * 10) / 10,
-      carbs: Math.round((acc.carbs + adj.carbs) * 10) / 10,
-      fat: Math.round((acc.fat + adj.fat) * 10) / 10,
-    };
-  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-}
+const API_URL = '/api/nutrition';
 
 export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs = [] }) {
   const [image, setImage] = useState(null); // { base64, preview, type }
@@ -146,12 +67,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5',
           max_tokens: 1024,
@@ -272,12 +188,7 @@ Guidelines:
       const usdaPer100g = await searchUSDA(query);
       const claudeRes = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5',
           max_tokens: 256,
@@ -411,62 +322,7 @@ Guidelines:
         </div>
       </div>
 
-      {/* Daily summary bar */}
-      <div style={{
-        background: 'rgba(0,229,255,0.05)',
-        border: '1px solid rgba(0,229,255,0.12)',
-        borderRadius: 12, padding: '12px 14px',
-        marginBottom: 20,
-      }}>
-        {/* Calorie row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)', letterSpacing: 1 }}>TODAY</div>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 16, fontWeight: 700, color: 'var(--cyan)' }}>
-            {dayTotals.calories}
-            <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 3 }}>/ {goals.calories} kcal</span>
-          </div>
-        </div>
-        {/* Calorie progress bar */}
-        <div style={{ height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 3, marginBottom: 10, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', borderRadius: 3,
-            width: `${Math.min(100, (dayTotals.calories / goals.calories) * 100)}%`,
-            background: dayTotals.calories > goals.calories ? 'var(--fire2)' : 'var(--cyan)',
-            transition: 'width 0.4s ease',
-          }} />
-        </div>
-        {/* Macro rows */}
-        {[
-          { label: 'PROTEIN', value: dayTotals.protein, goal: goals.protein, color: '#a78bfa' },
-          { label: 'CARBS',   value: dayTotals.carbs,   goal: goals.carbs,   color: '#34d399' },
-          { label: 'FAT',     value: dayTotals.fat,     goal: goals.fat,     color: '#fbbf24' },
-        ].map(m => {
-          const over = m.value > m.goal;
-          return (
-            <div key={m.label} style={{ marginBottom: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                <span style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 1 }}>{m.label}</span>
-                <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: over ? '#ff4444' : m.color, fontWeight: 700 }}>
-                  {Math.round(m.value)}g / {m.goal}g
-                </span>
-              </div>
-              <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 2,
-                  width: `${Math.min(100, (m.value / m.goal) * 100)}%`,
-                  background: over ? '#ff4444' : m.color,
-                  transition: 'width 0.4s ease',
-                }} />
-              </div>
-            </div>
-          );
-        })}
-        {todayMeals.length > 0 && (
-          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, textAlign: 'right' }}>
-            {todayMeals.length} meal{todayMeals.length !== 1 ? 's' : ''} logged
-          </div>
-        )}
-      </div>
+      <DailySummaryBar dayTotals={dayTotals} goals={goals} mealCount={todayMeals.length} />
 
       {/* Hidden file inputs */}
       <input
@@ -1018,49 +874,7 @@ Guidelines:
         </div>
       )}
 
-      {/* Today's meal history */}
-      {todayMeals.length > 0 && (
-        <div style={{ marginTop: 28 }}>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 12 }}>
-            TODAY'S MEALS
-          </div>
-          {todayMeals.map((meal, i) => (
-            <div key={meal.id || i} style={{
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 12, padding: '12px 14px',
-              marginBottom: 8, display: 'flex',
-              justifyContent: 'space-between', alignItems: 'center', gap: 8,
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Rajdhani', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {meal.foods.map(f => f.name).join(', ').substring(0, 40)}
-                  {meal.foods.map(f => f.name).join(', ').length > 40 ? '...' : ''}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text3)' }}>{meal.dateStr}</div>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>
-                  {meal.totals.calories}
-                </div>
-                <div style={{ fontSize: 9, color: 'var(--text3)' }}>kcal</div>
-              </div>
-              {onDeleteMeal && meal.id && (
-                <button
-                  onClick={() => onDeleteMeal(meal.id)}
-                  style={{
-                    background: 'none', border: 'none',
-                    color: 'rgba(255,68,68,0.6)', fontSize: 16,
-                    cursor: 'pointer', padding: '4px 2px', flexShrink: 0,
-                    lineHeight: 1,
-                  }}
-                  title="Delete meal"
-                >🗑️</button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <TodaysMealHistory todayMeals={todayMeals} onDeleteMeal={onDeleteMeal} />
     </div>
   );
 }
