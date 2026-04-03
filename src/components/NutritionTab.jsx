@@ -231,16 +231,33 @@ Guidelines:
           }]);
           return;
         }
-        // USDA failed validation — fall through to Claude's full estimate below
+        // USDA failed validation — fall through to Claude's full estimate below,
+        // but we need a new request since the previous one only asked for grams
       }
 
-      // USDA not found or failed validation — use Claude's full nutrition estimate
-      {
+      // USDA not found or failed validation — ask Claude for full nutrition estimate
+      const needsFullEstimate = !usdaPer100g || true; // always re-request if we reach here
+      if (needsFullEstimate) {
+        const fullRes = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 256,
+            messages: [{
+              role: 'user',
+              content: `Give nutritional info for: "${query}". Return ONLY a JSON array — no markdown:\n[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]\n- Realistic gram weight for the quantity described\n- Accurate macros for that gram amount`,
+            }],
+          }),
+        });
+        if (!fullRes.ok) throw new Error(`API error ${fullRes.status}`);
+        const fullData = await fullRes.json();
+        const fullText = fullData.content[0].text.trim();
         let parsed;
         try {
-          parsed = JSON.parse(text);
+          parsed = JSON.parse(fullText);
         } catch {
-          const match = text.match(/\[[\s\S]*\]/);
+          const match = fullText.match(/\[[\s\S]*\]/);
           if (match) parsed = JSON.parse(match[0]);
           else throw new Error('Could not parse response.');
         }
