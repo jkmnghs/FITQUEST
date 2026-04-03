@@ -61,7 +61,7 @@ function validateUSDAMacros(usdaResult, foodGrams) {
 function getAdjusted(food) {
   const m = food.customGrams != null && food.grams > 0
     ? food.customGrams / food.grams
-    : PORTION_MULT[food.portion];
+    : (PORTION_MULT[food.portion] ?? PORTION_MULT['M']);
   const grams = food.customGrams != null ? food.customGrams : Math.round(food.grams * m);
   return {
     grams,
@@ -208,6 +208,16 @@ Guidelines:
         throw new Error('No food items detected. Try a clearer photo.');
       }
 
+      // Sanitize parsed fields — guard against non-numeric values from Claude
+      parsed = parsed.map(f => ({
+        name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : 'Unknown food',
+        grams:    Number(f.grams)    > 0  ? Number(f.grams)    : 100,
+        calories: Number(f.calories) >= 0 ? Number(f.calories) : 0,
+        protein:  Number(f.protein)  >= 0 ? Number(f.protein)  : 0,
+        carbs:    Number(f.carbs)    >= 0 ? Number(f.carbs)    : 0,
+        fat:      Number(f.fat)      >= 0 ? Number(f.fat)      : 0,
+      }));
+
       // Enrich Claude's macro estimates with USDA verified data in parallel
       // Only accept USDA data if it doesn't zero-out a macro Claude already estimated
       const enriched = await Promise.all(parsed.map(async (f) => {
@@ -291,20 +301,30 @@ Guidelines:
           const match = text.match(/\{[\s\S]*\}/);
           if (match) parsed = JSON.parse(match[0]);
         } catch {}
-        const grams = Number(parsed.grams) || 100;
+        const grams = Number(parsed.grams) > 0 ? Number(parsed.grams) : 100;
         const m = grams / 100;
-        setFoods(prev => [...prev, {
-          name: parsed.name || query,
-          grams,
+        const usdaResult = {
           calories: Math.round(usdaPer100g.calories * m),
           protein: Math.round(usdaPer100g.protein * m * 10) / 10,
           carbs: Math.round(usdaPer100g.carbs * m * 10) / 10,
           fat: Math.round(usdaPer100g.fat * m * 10) / 10,
-          portion: 'M',
-          customGrams: null,
-        }]);
-      } else {
-        // USDA found nothing — fall back to Claude's full nutrition estimate
+        };
+        // Validate USDA data before applying — same check as the image analysis path
+        if (validateUSDAMacros(usdaResult, grams)) {
+          setFoods(prev => [...prev, {
+            name: parsed.name || query,
+            grams,
+            ...usdaResult,
+            portion: 'M',
+            customGrams: null,
+          }]);
+          return;
+        }
+        // USDA failed validation — fall through to Claude's full estimate below
+      }
+
+      // USDA not found or failed validation — use Claude's full nutrition estimate
+      {
         let parsed;
         try {
           parsed = JSON.parse(text);
@@ -315,12 +335,12 @@ Guidelines:
         }
         if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No items returned.');
         setFoods(prev => [...prev, ...parsed.map(f => ({
-          name: f.name || query,
-          grams: Number(f.grams) || 0,
-          calories: Number(f.calories) || 0,
-          protein: Number(f.protein) || 0,
-          carbs: Number(f.carbs) || 0,
-          fat: Number(f.fat) || 0,
+          name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : query,
+          grams:    Number(f.grams)    > 0  ? Number(f.grams)    : 100,
+          calories: Number(f.calories) >= 0 ? Number(f.calories) : 0,
+          protein:  Number(f.protein)  >= 0 ? Number(f.protein)  : 0,
+          carbs:    Number(f.carbs)    >= 0 ? Number(f.carbs)    : 0,
+          fat:      Number(f.fat)      >= 0 ? Number(f.fat)      : 0,
           portion: 'M',
           customGrams: null,
         }))]);
@@ -344,7 +364,7 @@ Guidelines:
   function handleLogMeal() {
     const totals = sumTotals(foods);
     const meal = {
-      id: Date.now(),
+      id: Date.now() * 1000 + Math.floor(Math.random() * 1000),
       date: new Date().toISOString(),
       dateStr: new Date().toLocaleDateString('en-US', {
         weekday: 'short', month: 'short', day: 'numeric',
@@ -371,9 +391,12 @@ Guidelines:
   // Today's logged meals
   const today = new Date().toDateString();
   const todayMeals = mealLogs.filter(m => new Date(m.date).toDateString() === today);
-  const dayTotals = sumTotals(
-    todayMeals.flatMap(m => m.foods.map(f => ({ ...f, portion: 'M' })))
-  );
+  const dayTotals = todayMeals.reduce((acc, meal) => ({
+    calories: acc.calories + meal.totals.calories,
+    protein: Math.round((acc.protein + meal.totals.protein) * 10) / 10,
+    carbs:   Math.round((acc.carbs   + meal.totals.carbs)   * 10) / 10,
+    fat:     Math.round((acc.fat     + meal.totals.fat)     * 10) / 10,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   const goals = state.nutritionGoals || { calories: 2000, protein: 155, carbs: 190, fat: 60 };
 
   return (
