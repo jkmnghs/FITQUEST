@@ -507,7 +507,12 @@ function MessageBubble({ msg }) {
     );
   }
 
-  const formatted = msg.content
+  const escaped = msg.content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  const formatted = escaped
     .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>');
 
