@@ -837,6 +837,215 @@ When the existing single user (Jake) creates an account:
 
 ---
 
+## 13. Subscription & Pricing Model
+
+### 13a. Pricing Tiers
+
+| Plan | Price | Effective/month | Savings | Best For |
+|---|---|---|---|---|
+| Monthly | **₱350/mo** | ₱350 | — | Trying it out |
+| 6-Month | **₱1,800** (pay once) | ₱300 | Save ₱300 | Committed users |
+| Annual | **₱3,360** (pay once) | ₱280 | 2 months free | Best value |
+
+**Why ₱350 base (not ₱199):**
+- At ₱199 you need 45+ paying users to profit. At ₱350 you need only 25.
+- Filipino fitness apps (Freeletics, MyFitnessPal Premium in PH) range ₱300–600/month.
+- The AI coach is a genuine differentiator — don't underprice it.
+
+**Anchor pricing psychology:** Show annual first, monthly last. Most users will pick the middle option (6-month) — which is exactly where you want them (upfront cash, committed).
+
+### 13b. Why Annual Plans Change the Game
+
+```
+10 annual subscribers × ₱3,360 = ₱33,600 upfront on day 1
+= ~21 months of Vercel Pro + Supabase Pro combined ($45/mo)
+= AI budget for 17+ months at 10 users
+
+Monthly subscribers give you: ₱3,500/mo (10 users × ₱350)
+Annual subscribers give you:  ₱33,600 day 1 → ₱0 for 11 more months
+```
+
+Annual plan users also churn at **~5% vs ~30% for monthly** — they're invested.
+
+### 13c. Updated Break-Even Analysis (₱350 pricing)
+
+| Premium users | Monthly revenue | Infrastructure + AI | Net/month |
+|---|---|---|---|
+| 10 | ₱3,500 (~$62) | ~$63 | ≈ Break-even |
+| 20 | ₱7,000 (~$124) | ~$80 | **+$44/mo** |
+| 50 | ₱17,500 (~$309) | ~$159 | **+$150/mo** |
+| 100 | ₱35,000 (~$618) | ~$272 | **+$346/mo** |
+
+Payment processing: PayMongo charges **3.5% per transaction**.
+- Monthly plan: 3.5% of ₱350 = ₱12.25 fee per user/month
+- Annual plan: 3.5% of ₱3,360 = ₱117.60 fee once (vs ₱147 if paid monthly × 12)
+- Annual wins on processing fees too.
+
+### 13d. Payment Processor — PayMongo
+
+**Why PayMongo (not Stripe):**
+- Accepts **GCash** and **Maya** natively — essential for Filipino users (60%+ of PH payments)
+- Accepts all major credit/debit cards
+- Accepts GrabPay
+- 3.5% transaction fee, no monthly fee, free to register
+- Webhook-based — sends events to your Vercel API when subscription renews/cancels
+- Used by Kumu, Edamama, and most Filipino startups
+
+**Stripe alternative:** Better global coverage but GCash requires a separate integration (via PayMongo anyway). Use Stripe only if targeting international users.
+
+### 13e. Subscription State in Supabase
+
+Add a `subscriptions` table (separate from `user_profiles`) for auditability:
+
+```sql
+create table public.subscriptions (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid references auth.users(id) on delete cascade,
+  tier         text not null default 'free',     -- 'free' | 'premium'
+  plan         text,                             -- 'monthly' | '6month' | 'annual'
+  status       text not null default 'active',   -- 'active' | 'cancelled' | 'expired'
+  started_at   timestamptz not null default now(),
+  expires_at   timestamptz,                      -- null = free tier (never expires)
+  provider     text,                             -- 'paymongo'
+  provider_id  text,                             -- PayMongo subscription/payment ID
+  updated_at   timestamptz not null default now()
+);
+
+alter table public.subscriptions enable row level security;
+create policy "Users read own" on public.subscriptions for select using (auth.uid() = user_id);
+-- Writes only via service role key (server-side webhook handler)
+```
+
+**Why separate table (not inside `user_profiles.state`):**
+- Payment/subscription data must be write-protected from the client
+- Only the server-side PayMongo webhook (using Supabase `service_role` key) should update subscription status
+- Auditable — full history of payments and status changes
+- Row-level security: user can read their own status, never write it
+
+### 13f. Subscription Check in the App
+
+```js
+// src/hooks/useSubscription.js — new file
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+
+export function useSubscription(userId) {
+  const [tier, setTier] = useState('free');   // 'free' | 'premium'
+  const [expiresAt, setExpiresAt] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !userId) { setLoading(false); return; }
+    supabase
+      .from('subscriptions')
+      .select('tier, status, expires_at')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('expires_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data && data.tier === 'premium') {
+          // Double-check expiry client-side
+          const expired = data.expires_at && new Date(data.expires_at) < new Date();
+          setTier(expired ? 'free' : 'premium');
+          setExpiresAt(data.expires_at);
+        }
+        setLoading(false);
+      });
+  }, [userId]);
+
+  const isPremium = tier === 'premium';
+  return { tier, isPremium, expiresAt, loading };
+}
+```
+
+### 13g. PayMongo Webhook Handler
+
+```js
+// api/webhook-paymongo.js — Vercel serverless function
+// Called by PayMongo when payment succeeds, subscription renews, or cancels
+
+import { createClient } from '@supabase/supabase-js';
+
+// Uses SERVICE_ROLE key — never expose to client
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+export default async function handler(req, res) {
+  // Verify PayMongo webhook signature
+  const signature = req.headers['paymongo-signature'];
+  if (!verifySignature(req.body, signature, process.env.PAYMONGO_WEBHOOK_SECRET)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  const { type, data } = req.body;
+  const userId = data.attributes.metadata?.user_id;
+
+  if (type === 'payment.paid') {
+    const plan = data.attributes.metadata?.plan; // 'monthly' | '6month' | 'annual'
+    const months = { monthly: 1, '6month': 6, annual: 12 }[plan] ?? 1;
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + months);
+
+    await supabaseAdmin.from('subscriptions').upsert({
+      user_id: userId,
+      tier: 'premium',
+      plan,
+      status: 'active',
+      provider: 'paymongo',
+      provider_id: data.id,
+      expires_at: expiresAt.toISOString(),
+    }, { onConflict: 'provider_id' });
+  }
+
+  if (type === 'payment.failed' || type === 'subscription.cancelled') {
+    await supabaseAdmin.from('subscriptions')
+      .update({ status: 'cancelled' })
+      .eq('provider_id', data.id);
+  }
+
+  res.status(200).json({ received: true });
+}
+```
+
+**Environment variable needed:** `SUPABASE_SERVICE_ROLE_KEY` — add to Vercel (server-only, never in client code), `PAYMONGO_WEBHOOK_SECRET`.
+
+### 13h. Free Tier Quest Message Limit (5/week)
+
+Store the count in the user's state:
+
+```js
+// Added to DEFAULT_STATE:
+questMessagesThisWeek: 0,
+questMessagesWeekStart: null,   // ISO date string — resets every Mon
+
+// In useGameState.js — reset logic (runs on load):
+function checkQuestReset(state) {
+  const now = new Date();
+  const weekStart = getWeekStart(now); // Monday midnight
+  if (!state.questMessagesWeekStart || state.questMessagesWeekStart !== weekStart) {
+    return { ...state, questMessagesThisWeek: 0, questMessagesWeekStart: weekStart };
+  }
+  return state;
+}
+```
+
+Gate the AI coach send button:
+```jsx
+// In CoachTab.jsx:
+const { isPremium } = useSubscription(user?.id);
+const atLimit = !isPremium && state.questMessagesThisWeek >= 5;
+
+<button disabled={atLimit} onClick={sendMessage}>
+  {atLimit ? 'Upgrade for unlimited Quest access' : 'Send'}
+</button>
+```
+
+---
+
 ## 14. Infrastructure Limits & Upgrade Triggers
 
 ### 14a. Supabase Free Tier — What You Get & Where It Breaks
