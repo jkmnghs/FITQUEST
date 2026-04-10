@@ -837,7 +837,138 @@ When the existing single user (Jake) creates an account:
 
 ---
 
-## 14. AI Coach Cost Analysis
+## 14. Infrastructure Limits & Upgrade Triggers
+
+### 14a. Supabase Free Tier — What You Get & Where It Breaks
+
+| Limit | Free Tier | FitQuest Usage | Risk |
+|---|---|---|---|
+| Database storage | 500 MB | 50 users × ~200 KB state = 10 MB | ✅ Safe |
+| Bandwidth | 2 GB/month | 50 users × 10 saves/day × 10 KB = 150 MB/mo | ✅ Safe |
+| Monthly active users | 50,000 | 50 users | ✅ Safe |
+| Auth users | Unlimited | — | ✅ Safe |
+| **Project auto-pause** | **After 1 week inactivity** | **Any holiday/gap = app breaks for first user back** | ❌ **Real risk** |
+
+**The pausing problem is the #1 Supabase free tier issue.**
+Supabase free projects are paused after 7 days of zero database activity. When a user opens the app after a pause, the first request takes 30–60 seconds to "wake" the project — long enough to look like the app is broken.
+
+**Fix options:**
+1. **Cron ping** — a scheduled Vercel function hits the database every 3 days (keeps it awake). Free, easy to implement. Add to plan.
+2. **Upgrade to Supabase Pro ($25/month)** — no auto-pause, 8 GB storage, daily backups. Required once you start charging users.
+
+### 14b. Vercel Free Tier (Hobby) — The Commercial Use Problem
+
+| Limit | Free (Hobby) | FitQuest Usage | Risk |
+|---|---|---|---|
+| Bandwidth | 100 GB/month | Minimal (PWA, static assets) | ✅ Safe |
+| Serverless function invocations | 100,000/month | 50 users × 8 API calls/day = 12,000/mo | ✅ Safe |
+| **Function timeout** | **10 seconds** | **Claude API calls take 5–15s** | ⚠️ **Occasional timeouts** |
+| **Commercial use** | **❌ Prohibited** | **Any paid subscription = ToS violation** | ❌ **Critical** |
+| Build minutes | 6,000/month | ~50/month | ✅ Safe |
+
+**Two blockers on Hobby tier:**
+
+1. **Commercial use is prohibited.** Vercel Hobby is for personal/non-commercial projects. The moment you charge a single user ₱199, you're in violation of ToS and risk account suspension. **Upgrade to Pro ($20/month) before launching any paid tier.**
+
+2. **10-second function timeout.** The `/api/coach` Claude API call regularly takes 8–14 seconds (larger context = slower). On Hobby, ~30% of AI calls may time out. Vercel Pro extends this to **60 seconds**.
+
+### 14c. Updated Total Cost Model
+
+**Phase 1 — Beta / Free users only (0 paying users):**
+
+| Item | Cost |
+|---|---|
+| Supabase Free | $0 |
+| Vercel Hobby | $0 |
+| Claude API (50 users, free tier only — no Quest access) | $0 |
+| **Total** | **$0/month** |
+
+> Free users don't get Quest access → zero AI cost during beta. Sustainable indefinitely on free tiers, **but keep a cron ping running to prevent Supabase pausing.**
+
+**Phase 2 — Launch (first paying users):**
+
+| Item | Cost |
+|---|---|
+| Supabase Pro | $25/month |
+| Vercel Pro | $20/month |
+| Claude API (20 premium users × 5 calls/day) | ~$18/month |
+| **Total infrastructure** | **~$63/month** |
+| Revenue (20 users × ₱199 = ₱3,980) | ~$70/month |
+| **Net** | **~+$7/month** ← barely positive |
+
+**Phase 3 — Growth (50 premium users):**
+
+| Item | Cost |
+|---|---|
+| Supabase Pro | $25/month |
+| Vercel Pro | $20/month |
+| Claude API (50 premium users × 5 calls/day) | ~$114/month |
+| **Total** | **~$159/month** |
+| Revenue (50 × ₱199) | ~$176/month |
+| **Net** | **~+$17/month** |
+
+> You need ~50 paying premium users just to be meaningfully profitable. The product needs a mix of free users (for growth/word-of-mouth) and premium conversions.
+
+### 14d. The Cron Keep-Alive (implement before launch)
+
+Add a lightweight Vercel Cron Job that pings Supabase every 3 days to prevent project pausing:
+
+```js
+// api/ping.js — called by vercel.json cron every 3 days
+import { supabase } from '../src/lib/supabaseClient';
+
+export default async function handler(req, res) {
+  // Minimal read to keep Supabase active
+  await supabase.from('user_profiles').select('id').limit(1);
+  res.status(200).json({ ok: true });
+}
+```
+
+```json
+// vercel.json
+{
+  "crons": [{ "path": "/api/ping", "schedule": "0 9 */3 * *" }]
+}
+```
+
+> Vercel Cron is available on Hobby tier (1 cron job free). This solves the Supabase pausing problem for free during beta.
+
+### 14e. Upgrade Decision Triggers
+
+| When | Upgrade | Why |
+|---|---|---|
+| Any user pays for premium | Vercel Hobby → **Pro ($20/mo)** | ToS compliance + 60s timeout |
+| App gets any real users | Add **Supabase cron ping** | Prevent pausing (free) |
+| 10+ premium users | Supabase Free → **Pro ($25/mo)** | No pausing, daily backups, reliability |
+| 100+ premium users | Evaluate Supabase compute upgrades | Read replicas, performance |
+
+### 14f. Free vs Premium Tier Design
+
+Based on the cost model — AI coach being premium-only is the right call:
+
+| Feature | Free | Premium (₱199/mo) |
+|---|---|---|
+| Workout tracking | ✅ | ✅ |
+| Basic programs | ✅ | ✅ |
+| Progress charts | ✅ | ✅ |
+| Quest AI Coach | 5 messages/week | Unlimited |
+| Macro tracking | 3 logs/day | Unlimited |
+| Program switching | Once (safety net) | Unlimited |
+| Advanced analytics | ❌ | ✅ |
+| Priority support | ❌ | ✅ |
+
+**Why 5 free Quest messages/week instead of zero:**
+- Filipino market needs to *experience* Quest before paying (*hiya* — reluctant to pay for unknowns)
+- 5 messages is enough to feel the value, not enough to rely on it
+- At 5 msg/week for 50 free users: 250 calls/week × 2,300 tokens = ~$0.50/week → negligible
+
+**Why one free program switch:**
+- If assessment assigns wrong program, user is stuck → churn risk
+- One switch gives a safety net without undermining the premium upsell
+
+---
+
+## 15. AI Coach Cost Analysis
 
 ### 14a. Token Budget Per Call
 
