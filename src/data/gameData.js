@@ -94,7 +94,7 @@ export const FORM_TIPS = {
 };
 
 export const DEFAULT_STATE = {
-  name: 'Jake',
+  name: '',
   level: 1,
   xp: 0,
   totalXp: 0,
@@ -127,5 +127,20 @@ export const DEFAULT_STATE = {
   notificationsEnabled: false,
   aiCoachHistory: [],
   mealLogs: [],
-  nutritionGoals: { calories: 2000, protein: 155, carbs: 190, fat: 60 }
+  nutritionGoals: { calories: 2000, protein: 155, carbs: 190, fat: 60 },
+  // Program & schedule
+  programId: 'fullbody_3x',
+  sessionsPerWeek: 3,
+  activeExercises: null, // null = use EXERCISES from gameData (backwards compat)
+  // Onboarding assessment
+  assessment: {
+    completed: false,
+    goal: null,         // 'recomp' | 'fat_loss' | 'muscle' | 'strength'
+    level: null,        // 'beginner' | 'intermediate' | 'advanced'
+    daysPerWeek: null,  // 2 | 3 | 4 | 5
+    equipment: null,    // 'full_gym' | 'dumbbells' | 'barbell_home' | 'bodyweight'
+    trainingDays: [],   // ['mon', 'wed', 'fri']
+    injuries: '',
+    programId: null,
+  }
 };
