@@ -837,6 +837,97 @@ When the existing single user (Jake) creates an account:
 
 ---
 
+## 14. AI Coach Cost Analysis
+
+### 14a. Token Budget Per Call
+
+| Component | Tokens | Notes |
+|---|---|---|
+| Base system prompt (Quest identity, rules, behavior) | ~700 | Fixed — rarely changes |
+| `{user_profile}` injection | ~200 | Name, goal, lifts, PRs, flags, episodic notes |
+| `{conversation_history}` (last 5 messages) | ~400 | ~80 tokens/message avg |
+| **Total system context** | **~1,300–1,500** | |
+| User message (input) | ~200–350 | Typical coaching question |
+| Quest response (output) | ~400–650 | 3–5 sentences per spec |
+| **Total per call** | **~2,300** | |
+
+### 14b. Cost Projection — 50 Users
+
+```
+50 users × 5 calls/day × 2,300 tokens = 575,000 tokens/day
+
+Input  ($3.00/1M):  575,000 × 0.7 ≈ 402,500 input tokens  → ~$1.21/day
+Output ($15.00/1M): 575,000 × 0.3 ≈ 172,500 output tokens → ~$2.59/day
+                                               Total: ~$3.80/day
+                                                   = ~$114/month
+```
+
+> Token split assumed 70% input / 30% output based on prompt-heavy architecture.
+> At 5 calls/user/day — this is an active-user estimate (most users will average 2–3 calls/day).
+
+**Conservative estimate (2 calls/user/day):**
+
+```
+50 × 2 × 2,300 = 230,000 tokens/day
+Input:  ~$0.48/day | Output: ~$1.04/day = ~$1.52/day = ~$46/month
+```
+
+### 14c. Scale Projections
+
+| Users | Calls/day | Tokens/day | Monthly cost |
+|---|---|---|---|
+| 10 | 2 avg | 46,000 | ~$9 |
+| 50 | 2 avg | 230,000 | ~$46 |
+| 50 | 5 avg | 575,000 | ~$114 |
+| 100 | 3 avg | 690,000 | ~$136 |
+| 200 | 3 avg | 1,380,000 | ~$272 |
+
+### 14d. Cost Optimizations (implement if needed)
+
+**1. Prompt caching** ← biggest win, implement from day 1
+
+The base Quest system prompt (~700 tokens) never changes. Anthropic's prompt caching reduces repeated input tokens by **~90%**:
+```
+Cache write:  $3.75/1M tokens (once per ~5 min TTL)
+Cache hit:    $0.30/1M tokens (vs $3.00 uncached)
+Savings:      90% on the static portion of system prompt
+```
+At 50 users × 5 calls/day, caching the 700-token base prompt saves ~**$0.47/day = $14/month**.
+
+Implementation: wrap the static portion in `{"type": "text", "cache_control": {"type": "ephemeral"}}` in the messages array.
+
+**2. Trim conversation history aggressively**
+
+Current spec: last 5 messages (~400 tokens). Drop to last 3 messages → saves ~130 tokens/call.
+At scale: 50 users × 5 calls × 130 tokens = 32,500 tokens/day saved → ~$0.05/day (minimal but free).
+
+**3. Compress `{user_profile}` injection**
+
+The profile builder produces ~200 tokens. A compressed version (key:value pairs, no labels) can cut to ~80 tokens. Trade-off: slightly less natural for the AI to parse.
+
+**4. Response length cap**
+
+System prompt already says "3–5 sentences max" — enforce this with `max_tokens: 250` in the API call. Prevents runaway long responses that spike output cost.
+
+**5. Rate-limit power users**
+
+A small number of users will generate 20+ calls/day (chatty sessions). Add a soft daily limit of 15 AI messages/user with a gentle message: "I'll be back tomorrow, lodi! 💪" Cost protection without impacting most users.
+
+### 14e. Break-Even Pricing
+
+If FitQuest charges a subscription:
+
+| Price point | Users needed to cover AI cost ($114/mo at 50 users, 5 calls/day) |
+|---|---|
+| Free (ads) | N/A — needs separate revenue |
+| ₱99/mo (~$1.75) | 66 paying users to break even on AI alone |
+| ₱199/mo (~$3.50) | 33 paying users |
+| ₱499/mo (~$8.80) | 13 paying users |
+
+At 50 active users paying ₱199/mo: **₱9,950/mo revenue vs ~₱6,400/mo AI cost** → margin positive at this scale.
+
+---
+
 ## 15. File Change Summary
 
 | File | Action | Change Size | Key Change |
