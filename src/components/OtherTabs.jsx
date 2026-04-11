@@ -223,7 +223,7 @@ export function SummaryTab({ state }) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(1);
@@ -241,11 +241,34 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
       }}>SETTINGS</div>
 
+      {/* Account section */}
+      {userEmail && (
+        <div style={{
+          background: 'var(--card)', border: '1px solid rgba(0,229,255,0.1)',
+          borderRadius: 13, padding: '14px 16px', marginBottom: 8,
+          backdropFilter: 'blur(20px)',
+        }}>
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
+          }}>ACCOUNT</div>
+          <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 12, wordBreak: 'break-all' }}>
+            {userEmail}
+          </div>
+          <button onClick={onSignOut} style={{
+            padding: '9px 18px', borderRadius: 10, border: 'none',
+            background: 'rgba(255,23,68,0.12)', color: 'var(--red)',
+            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+            cursor: 'pointer', letterSpacing: 0.5,
+          }}>SIGN OUT</button>
+        </div>
+      )}
+
       {/* Name */}
       <SettingRow label="Name">
         <input
           value={state.name} maxLength={20}
-          onChange={e => onUpdate('name', e.target.value || 'Jake')}
+          onChange={e => onUpdate('name', e.target.value)}
           style={inputStyle}
         />
       </SettingRow>

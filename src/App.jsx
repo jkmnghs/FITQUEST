@@ -4,8 +4,12 @@ import Toast from './components/Toast';
 import Header from './components/Header';
 import WorkoutTab from './components/WorkoutTab';
 import AICoachTab from './components/AICoachTab';
+import LoginScreen from './components/LoginScreen';
+import OnboardingScreen from './components/OnboardingScreen';
+import { useAuth } from './hooks/useAuth';
 import { useGameState } from './hooks/useGameState';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
+import { EXERCISES } from './data/gameData';
 
 const StatsTab = lazy(() => import('./components/StatsTab'));
 const RankTab = lazy(() => import('./components/RankTab'));
@@ -72,7 +76,26 @@ const MORE_TABS = [
 
 const ALL_TABS = [...PRIMARY_TABS, ...MORE_TABS];
 
+// Full-screen loading placeholder
+function FullScreenLoader({ label = 'LOADING...' }) {
+  return (
+    <div style={{
+      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg)', gap: 16,
+    }}>
+      <div style={{
+        fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
+        color: 'var(--cyan)', letterSpacing: 2,
+        animation: 'pulse 1.4s ease-in-out infinite',
+      }}>{label}</div>
+    </div>
+  );
+}
+
 export default function App() {
+  const { user, loading: authLoading, authError, signIn, signUp, signOut } = useAuth();
+
   const [activeTab, setActiveTab] = useState('workout');
   const [modalOpen, setModalOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -81,11 +104,19 @@ export default function App() {
   );
 
   const {
-    state, toast, showToast,
+    state, cloudLoading, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
-    resetAll, resetToday, startSession, backfillWeek, addAIHistory, logMeal, deleteMeal, importData
-  } = useGameState();
+    resetAll, resetToday, startSession, backfillWeek,
+    addAIHistory, logMeal, deleteMeal, importData,
+    completeAssessment,
+  } = useGameState(user?.id);
+
+  // Auth / onboarding gates — render before anything else
+  if (authLoading) return <><BgFx /><FullScreenLoader label="LOADING..." /></>;
+  if (!user) return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
+  if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
+  if (!state.assessment?.completed) return <><BgFx /><OnboardingScreen onComplete={completeAssessment} /></>;
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installDismissed, setInstallDismissed] = useState(false);
@@ -246,6 +277,7 @@ export default function App() {
           <div style={{ display: activeTab === 'workout' ? 'block' : 'none' }}>
             <WorkoutTab
               state={state}
+              exercises={state.activeExercises || EXERCISES}
               onCompleteExercise={completeExercise}
               onFinishSession={finishSession}
               onStartSession={startSession}
@@ -287,6 +319,8 @@ export default function App() {
                 notifStatus={notifStatus}
                 onRequestNotif={handleRequestNotif}
                 onImport={importData}
+                userEmail={user?.email}
+                onSignOut={signOut}
               />
             </LazyTab>
           )}

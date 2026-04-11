@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { EXERCISES, FORM_TIPS } from '../data/gameData';
+import { FORM_TIPS } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay } from '../utils/gameLogic';
 import RestTimer from './RestTimer';
 
@@ -10,8 +10,8 @@ function makeDefaultSets(ex, count, weightKg) {
   }));
 }
 
-export default function ExerciseModal({ exId, week, unit, liftWeights, todayExDone, todayExDetails, savedSets, onSetsChange, onClose, onComplete }) {
-  const ex = EXERCISES.find(e => e.id === exId);
+export default function ExerciseModal({ exId, exercises, week, unit, liftWeights, todayExDone, todayExDetails, savedSets, onSetsChange, onClose, onComplete }) {
+  const ex = (exercises || []).find(e => e.id === exId);
   if (!ex) { onClose?.(); return null; }
   const baseSets = getSetsForWeek(ex, week);
   const baseWeightKg = getWeightForExercise(ex, week, liftWeights);

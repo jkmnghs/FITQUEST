@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear } from '../utils/storage';
+import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
+import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
+import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
 
 // Module-level guard — lives completely outside React, reset only on page reload.
 // Initialized from localStorage so page reloads are also covered.
@@ -12,7 +14,11 @@ const _backfillGuard = Object.fromEntries(
 );
 
 function mergeState(saved) {
-  return { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...saved };
+  const base = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  const merged = { ...base, ...saved };
+  // Deep-merge assessment so new fields (parqFlagged, sessionLength, body stats) appear
+  merged.assessment = { ...base.assessment, ...(saved.assessment || {}) };
+  return merged;
 }
 
 const PRUNE_DAYS = 90;
@@ -42,49 +48,94 @@ function checkDayReset(state) {
   return next;
 }
 
-export function useGameState() {
+/** Reset Quest message quota if the week has rolled over (Monday midnight). */
+function checkQuestReset(state) {
+  const now = new Date();
+  // Week starts on Monday — compute Monday midnight ISO
+  const day = now.getDay(); // 0=Sun, 1=Mon...
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((day + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const weekStart = monday.toISOString().slice(0, 10);
+  if (!state.questMessagesWeekStart || state.questMessagesWeekStart !== weekStart) {
+    return { ...state, questMessagesThisWeek: 0, questMessagesWeekStart: weekStart };
+  }
+  return state;
+}
+
+export function useGameState(userId) {
   const [state, setStateRaw] = useState(() => {
     const saved = storageGet();
     const merged = saved ? mergeState(saved) : { ...DEFAULT_STATE };
-    return checkDayReset(merged);
+    return checkQuestReset(checkDayReset(merged));
   });
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
+  const [cloudLoading, setCloudLoading] = useState(!!userId);
 
   const isFinishingSession = useRef(false);
 
-  // Ref-based synchronous lock for backfill — tracks the highest session count
-  // already applied per week. Updated synchronously before setState so rapid
-  // re-clicks are blocked even before React commits the state update.
+  // Ref-based synchronous lock for backfill
   const backfillApplied = useRef((() => {
     const saved = storageGet();
     const wp = saved?.weekProgress ?? {};
     return Object.fromEntries(Object.entries(wp).map(([w, d]) => [w, d.count ?? 0]));
   })());
 
-  // Auto-save on state change
+  // ── Cloud load on mount / userId change ──────────────────────────────────
+  useEffect(() => {
+    if (!userId) {
+      setCloudLoading(false);
+      return;
+    }
+    setCloudLoading(true);
+    cloudGet(userId).then(cloudData => {
+      if (cloudData && Object.keys(cloudData).length > 0) {
+        // Cloud wins over localStorage
+        const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
+        setStateRaw(merged);
+        storageSet(merged);
+      } else {
+        // Cloud is empty — check if localStorage has data to migrate
+        const localData = storageGet();
+        if (localData && localData.totalSessions > 0) {
+          // Auto-migrate: mark assessment completed so onboarding is skipped
+          const migrateData = mergeState(localData);
+          if (!migrateData.assessment?.completed) {
+            migrateData.assessment = { ...migrateData.assessment, completed: true };
+          }
+          const merged = checkQuestReset(checkDayReset(migrateData));
+          cloudSet(userId, merged);
+          setStateRaw(merged);
+          storageSet(merged);
+          // Toast shown after cloudLoading resolves
+          setTimeout(() => showToast('Progress synced to account ✓'), 800);
+        }
+      }
+      setCloudLoading(false);
+    }).catch(() => setCloudLoading(false));
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-save: localStorage + debounced cloud ─────────────────────────────
   useEffect(() => {
     storageSet(state);
-  }, [state]);
+    if (userId) cloudSetDebounced(userId, state);
+  }, [state, userId]);
 
   // Re-run day reset whenever the app becomes visible or the minute ticks over midnight
   useEffect(() => {
     function maybeDayReset() {
       setStateRaw(prev => {
-        const next = checkDayReset(prev);
-        // Only trigger a re-render if something actually changed
-        return next.todayExDate !== prev.todayExDate ? next : prev;
+        const next = checkQuestReset(checkDayReset(prev));
+        return next.todayExDate !== prev.todayExDate ||
+               next.questMessagesWeekStart !== prev.questMessagesWeekStart
+          ? next : prev;
       });
     }
-
-    // Check on tab focus (user comes back to app)
     const onVisible = () => { if (document.visibilityState === 'visible') maybeDayReset(); };
     document.addEventListener('visibilitychange', onVisible);
-
-    // Also check every minute (catches midnight without needing a reload)
     const interval = setInterval(maybeDayReset, 60_000);
-
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       clearInterval(interval);
@@ -96,16 +147,19 @@ export function useGameState() {
     maybeFireOpenNotification(state);
   }, []); // eslint-disable-line
 
-  // Save on page hide / unload
+  // Save on page hide / unload (synchronous best-effort)
   useEffect(() => {
-    const save = () => storageSet(state);
+    const save = () => {
+      storageSet(state);
+      if (userId) cloudSet(userId, state);
+    };
     window.addEventListener('pagehide', save);
     window.addEventListener('beforeunload', save);
     return () => {
       window.removeEventListener('pagehide', save);
       window.removeEventListener('beforeunload', save);
     };
-  }, [state]);
+  }, [state, userId]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -138,11 +192,54 @@ export function useGameState() {
 
   const resetAll = useCallback(() => {
     storageClear();
+    if (userId) cloudClear(userId);
     backfillApplied.current = {};
     Object.keys(_backfillGuard).forEach(k => delete _backfillGuard[k]);
     setStateRaw({ ...DEFAULT_STATE });
     showToast('Progress reset!');
-  }, [showToast]);
+  }, [showToast, userId]);
+
+  // ── completeAssessment ───────────────────────────────────────────────────
+  const completeAssessment = useCallback((assessment) => {
+    const programId       = selectProgram(assessment);
+    const program         = getProgramById(programId);
+    const { liftWeights, liftHistory } = buildInitialWeights(program);
+    const nutritionGoals  = calcNutritionGoals(assessment);
+    const { bmi, category: bmiCategory } = calcBMI(assessment.weightKg, assessment.heightCm);
+    const waistToHeightRatio = calcWaistToHeight(assessment.waistCm, assessment.heightCm);
+
+    setStateRaw(prev => {
+      const newState = {
+        ...prev,
+        assessment: { ...assessment, completed: true, programId },
+        programId,
+        sessionsPerWeek: program.sessionsPerWeek,
+        activeExercises: program.exercises,
+        trainingDays: assessment.trainingDays,
+        liftWeights,
+        liftHistory,
+        nutritionGoals,
+        bmi,
+        bmiCategory,
+        waistToHeightRatio,
+      };
+      // Immediate cloud save (not debounced) — assessment completion is critical
+      if (userId) cloudSet(userId, newState);
+      return newState;
+    });
+  }, [userId]);
+
+  // ── addAIEpisodic ────────────────────────────────────────────────────────
+  const addAIEpisodic = useCallback((note) => {
+    setState(prev => ({
+      ...prev,
+      aiEpisodic: [...(prev.aiEpisodic || []), {
+        id: `ep_${Date.now()}`,
+        ...note,
+        createdAt: new Date().toISOString().slice(0, 10),
+      }]
+    }));
+  }, [setState]);
 
   const completeExercise = useCallback((exId, sets) => {
     let pendingXP = 0;
@@ -171,15 +268,32 @@ export function useGameState() {
       const xp = Math.max(5, 10 + setsCompleted * 5 - missedPrescribed * 3);
       pendingXP = xp;
 
-      // Progressive overload
+      // Progressive overload — RPE-based + 2-for-2 rule tracking
       let overloadSuggestions = { ...prev.overloadSuggestions };
       let weeklyRPE = { ...prev.weeklyRPE };
+      let consecutiveCompletions = { ...prev.consecutiveCompletions };
+
       if (!isDeload && maxRPE > 0) {
         if (!weeklyRPE[exId]) weeklyRPE[exId] = {};
         weeklyRPE[exId][prev.currentWeek] = maxRPE;
         if (maxRPE <= 8) overloadSuggestions[exId] = 'increase';
         else if (maxRPE === 9) overloadSuggestions[exId] = 'repeat';
         else overloadSuggestions[exId] = 'deload';
+      }
+
+      // 2-for-2 rule: track consecutive full completions
+      const ex = (prev.activeExercises || []).find(e => e.id === exId);
+      const targetReps = ex?.reps ?? 10;
+      const allSetsHitTarget = setsCompleted >= baseSets &&
+        sets.filter(s => !s.isExtra && s.done).every(s => (s.reps || 0) >= targetReps);
+
+      if (!isDeload && allSetsHitTarget) {
+        consecutiveCompletions[exId] = (consecutiveCompletions[exId] || 0) + 1;
+        if (consecutiveCompletions[exId] >= 2) {
+          overloadSuggestions[exId] = 'increase';
+        }
+      } else if (!isDeload) {
+        consecutiveCompletions[exId] = 0;
       }
 
       // PRs
@@ -198,7 +312,6 @@ export function useGameState() {
       }
       pendingPR = newPR;
 
-      // Persist the weight used so next session loads it automatically
       const liftWeights = { ...prev.liftWeights };
       if (!isDeload && maxWeightUsed > 0) {
         liftWeights[exId] = maxWeightUsed;
@@ -209,9 +322,7 @@ export function useGameState() {
         ...prev.todayExDetails,
         [exId]: { setsCompleted, setsPrescribed: baseSets, extraSets, volume: vol, maxRPE, maxWeight: maxWeightUsed }
       };
-
       const sessionStartTime = prev.sessionStartTime || Date.now();
-
       const logEntry = {
         name: `${exId} (${setsCompleted}/${baseSets} sets)`,
         xp, date: today(), type: 'exercise', week: prev.currentWeek,
@@ -221,18 +332,14 @@ export function useGameState() {
       return {
         ...prev,
         totalVolume: prev.totalVolume + vol,
-        todayExDone,
-        todayExDetails,
+        todayExDone, todayExDetails,
         todaySessionFinished: false,
         sessionStartTime,
-        overloadSuggestions,
-        weeklyRPE,
-        personalRecords,
-        liftWeights,
+        overloadSuggestions, weeklyRPE, consecutiveCompletions,
+        personalRecords, liftWeights,
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
-    // Schedule outside setState to avoid React StrictMode double-invocation
     setTimeout(() => {
       addXP(pendingXP);
       if (pendingPR) setTimeout(() => showToast(`🏅 NEW PR: ${exId}!`), 1200);
@@ -248,8 +355,9 @@ export function useGameState() {
       if (prev.todaySessionFinished) return prev;
       const w = prev.currentWeek;
       const isDeload = w === 9;
+      const exercises = prev.activeExercises || [];
       const doneCount = (prev.todayExDone || []).length;
-      const totalEx = 7; // EXERCISES.length
+      const totalEx = exercises.length || 7;
       const completionPct = Math.round((doneCount / totalEx) * 100);
       const missedCount = totalEx - doneCount;
       const bonusXP = Math.max(10, 50 - missedCount * 8);
@@ -257,7 +365,6 @@ export function useGameState() {
 
       const updatedWithStreak = updateStreak(prev);
 
-      // Update week progress
       const weekProgress = { ...prev.weekProgress };
       if (!weekProgress[w]) weekProgress[w] = { count: 0, dates: [], completed: false, sessions: [] };
       const wp = { ...weekProgress[w] };
@@ -267,12 +374,11 @@ export function useGameState() {
         date: today(), exercisesDone: [...(prev.todayExDone || [])], completion: completionPct
       }];
 
+      const sessionsNeeded = prev.sessionsPerWeek || 3;
       let nextWeek = w;
-      if (wp.count >= 3 && !wp.completed) {
+      if (wp.count >= sessionsNeeded && !wp.completed) {
         wp.completed = true;
-        if (isDeload) {
-          setTimeout(() => showToast('🧘 Deload complete! Great recovery week.'), 500);
-        }
+        if (isDeload) setTimeout(() => showToast('🧘 Deload complete! Great recovery week.'), 500);
         if (w < 12) {
           nextWeek = w + 1;
           setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1} 🎉`), 1000);
@@ -284,7 +390,7 @@ export function useGameState() {
       weekProgress[w] = wp;
 
       const logEntry = {
-        name: `Session ${wp.count}/3 • ${doneCount}/${totalEx} exercises (${completionPct}%)`,
+        name: `Session ${wp.count}/${sessionsNeeded} • ${doneCount}/${totalEx} exercises (${completionPct}%)`,
         xp: bonusXP, date: today(), type: 'session', week: w,
         dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       };
@@ -294,28 +400,24 @@ export function useGameState() {
         todaySessionFinished: true,
         totalSessions: prev.totalSessions + 1,
         totalMinutes: prev.totalMinutes + 50,
-        perfectWeeks: (wp.count >= 3 && !prev.weekProgress[w]?.completed) ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
-        deloadDone: isDeload && wp.count >= 3 ? true : prev.deloadDone,
+        perfectWeeks: (wp.count >= sessionsNeeded && !prev.weekProgress[w]?.completed) ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
+        deloadDone: isDeload && wp.count >= sessionsNeeded ? true : prev.deloadDone,
         weekProgress,
         currentWeek: nextWeek,
         sessionStartTime: null,
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
-    // Schedule outside setState to avoid React StrictMode double-invocation
     setTimeout(() => addXP(pendingXP), 100);
     if (pendingAdvance !== null) {
       setTimeout(() => {
         setState(s => {
-          // Only clear daily fields if user hasn't manually navigated to a different week
           if (s.currentWeek !== pendingAdvance) return s;
           return {
             ...s,
-            todayExDone: [],
-            todayExDetails: {},
+            todayExDone: [], todayExDetails: {},
             todaySessionFinished: false,
-            sessionStartTime: null,
-            todayExDate: today()
+            sessionStartTime: null, todayExDate: today()
           };
         });
         isFinishingSession.current = false;
@@ -326,7 +428,6 @@ export function useGameState() {
   }, [setState, addXP, showToast]);
 
   const submitCheckin = useCallback((weight, waist, sleep) => {
-    let pendingXP = 25;
     setState(prev => {
       const entry = { week: prev.currentWeek, weight, waist: waist || 0, sleep: sleep || 0, date: today() };
       const logEntry = {
@@ -341,7 +442,7 @@ export function useGameState() {
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
-    setTimeout(() => addXP(pendingXP), 50);
+    setTimeout(() => addXP(25), 50);
   }, [setState, addXP]);
 
   const updateSetting = useCallback((key, value) => {
@@ -351,10 +452,8 @@ export function useGameState() {
   const resetToday = useCallback(() => {
     setState(prev => ({
       ...prev,
-      todayExDone: [],
-      todayExDetails: {},
-      todaySessionFinished: false,
-      sessionStartTime: null,
+      todayExDone: [], todayExDetails: {},
+      todaySessionFinished: false, sessionStartTime: null,
     }));
     showToast("Today's session cleared!");
   }, [setState, showToast]);
@@ -367,9 +466,13 @@ export function useGameState() {
   }, [setState]);
 
   const addAIHistory = useCallback((messages) => {
+    setState(prev => ({ ...prev, aiCoachHistory: messages }));
+  }, [setState]);
+
+  const incrementQuestMessages = useCallback(() => {
     setState(prev => ({
       ...prev,
-      aiCoachHistory: messages
+      questMessagesThisWeek: (prev.questMessagesThisWeek || 0) + 1
     }));
   }, [setState]);
 
@@ -389,20 +492,16 @@ export function useGameState() {
     showToast('Meal deleted');
   }, [setState, showToast]);
 
-  // Retroactively mark sessions for a past week (for backfilling lost data)
-  // completionPct: 0-100, customWeights: { [exId]: kg }, customSets: { [exId]: n }, durationMins: per session
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
-    // --- Module-level guard (outermost, synchronous, outside React entirely) ---
     const key = String(week);
     const guardCount = _backfillGuard[key] ?? 0;
     if (sessionCount <= guardCount) {
       showToast(`Week ${week}: already recorded ${guardCount}/3 sessions`);
       return;
     }
-    _backfillGuard[key] = sessionCount; // lock immediately
+    _backfillGuard[key] = sessionCount;
 
     setStateRaw(prev => {
-      // --- State-level guard (atomic, persisted in localStorage via state) ---
       const lockedCount = prev.backfillLock?.[week] ?? 0;
       if (sessionCount <= lockedCount) return prev;
 
@@ -411,25 +510,23 @@ export function useGameState() {
       const newSessions = Math.max(0, sessionCount - prevSessionCount);
       if (newSessions === 0) return prev;
 
-      const completed = sessionCount >= 3;
+      const sessionsNeeded = prev.sessionsPerWeek || 3;
+      const completed = sessionCount >= sessionsNeeded;
       const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
 
-      // Populate exercisesDone with exercises that had sets > 0 in the form
       const doneExIds = Object.entries(customSets)
         .filter(([, sets]) => sets > 0)
         .map(([exId]) => exId);
 
       const sessions = fakeDates.map(d => ({
         date: `Week ${week} ${d} (backfilled)`,
-        exercisesDone: doneExIds,
-        completion: completionPct
+        exercisesDone: doneExIds, completion: completionPct
       }));
 
       const weekProgress = {
         ...prev.weekProgress,
         [week]: { count: sessionCount, dates: fakeDates, completed, sessions }
       };
-
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
       let addedVolume = 0;
@@ -444,23 +541,19 @@ export function useGameState() {
       const xpGain = newSessions * sessionXp;
       const { xp, totalXp, level } = applyXP(prev, xpGain);
 
-      // Build log entries for each newly backfilled session so Summary/Log tabs reflect them
       const totalExCount = Object.keys(customSets).length || 7;
       const dayLabels = ['Mon', 'Wed', 'Fri'];
       const newLogEntries = [];
       for (let i = prevSessionCount; i < sessionCount; i++) {
         newLogEntries.push({
-          name: `Session ${i + 1}/3 • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
+          name: `Session ${i + 1}/${sessionsNeeded} • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
           xp: sessionXp, date: `Week ${week} (backfill)`, type: 'session', week,
           dateStr: `Week ${week} ${dayLabels[i] || `S${i + 1}`} (backfill)`
         });
       }
 
       const updatedState = {
-        ...prev,
-        xp, totalXp, level,
-        weekProgress,
-        liftWeights,
+        ...prev, xp, totalXp, level, weekProgress, liftWeights,
         backfillLock: { ...prev.backfillLock, [week]: sessionCount },
         totalSessions: prev.totalSessions + newSessions,
         totalMinutes: prev.totalMinutes + newSessions * durationMins,
@@ -478,7 +571,7 @@ export function useGameState() {
         });
       }
 
-      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/3 sessions set ✓`), 0);
+      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/${sessionsNeeded} sessions set ✓`), 0);
       return updatedState;
     });
   }, [setStateRaw, showToast]);
@@ -491,28 +584,25 @@ export function useGameState() {
       showToast('Invalid backup: missing required fields.');
       return;
     }
-    const merged = checkDayReset(mergeState(data));
+    const merged = checkQuestReset(checkDayReset(mergeState(data)));
     storageSet(merged);
+    if (userId) cloudSet(userId, merged);
     backfillApplied.current = {};
     setStateRaw(merged);
     showToast('Progress restored from backup! ✓');
-  }, [showToast]);
+  }, [showToast, userId]);
 
   return {
-    state, setState,
+    state, setState, cloudLoading,
     toast, showToast,
     addXP,
-    resetAll,
-    resetToday,
-    startSession,
-    backfillWeek,
-    completeExercise,
-    finishSession,
-    submitCheckin,
-    updateSetting,
-    addAIHistory,
-    logMeal,
-    deleteMeal,
-    importData
+    resetAll, resetToday,
+    startSession, backfillWeek,
+    completeExercise, finishSession,
+    submitCheckin, updateSetting,
+    addAIHistory, addAIEpisodic,
+    incrementQuestMessages,
+    logMeal, deleteMeal,
+    importData, completeAssessment,
   };
 }

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { EXERCISES } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 
-export default function WorkoutTab({ state, onCompleteExercise, onFinishSession, onStartSession, onModalChange }) {
+export default function WorkoutTab({ state, exercises, onCompleteExercise, onFinishSession, onStartSession, onModalChange }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -164,7 +163,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
       )}
 
       {/* Exercise cards */}
-      {EXERCISES.map(ex => {
+      {exercises.map(ex => {
         const isDone = todayDone.includes(ex.id);
         const sug = overloadSuggestions?.[ex.id];
         const wt = getWeightForExercise(ex, w, liftWeights);
@@ -228,6 +227,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
       {isCurrentWeek && !todaySessionFinished && todayDone.length > 0 && (
         <FinishArea
           state={state}
+          exercises={exercises}
           onFinish={() => setShowFinishConfirm(true)}
         />
       )}
@@ -252,6 +252,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
       {activeExId && (
         <ExerciseModal
           exId={activeExId}
+          exercises={exercises}
           week={state.currentWeek}
           unit={unit}
           liftWeights={liftWeights}
@@ -274,6 +275,7 @@ export default function WorkoutTab({ state, onCompleteExercise, onFinishSession,
       {showFinishConfirm && (
         <FinishConfirmModal
           state={state}
+          exercises={exercises}
           onCancel={() => setShowFinishConfirm(false)}
           onConfirm={() => {
             setShowFinishConfirm(false);
@@ -353,9 +355,9 @@ function SessionTimerBar({ startTime }) {
   );
 }
 
-function FinishArea({ state, onFinish }) {
+function FinishArea({ state, exercises, onFinish }) {
   const { todayExDone, todayExDetails, currentWeek } = state;
-  const totalEx = EXERCISES.length;
+  const totalEx = exercises.length;
   const doneCount = todayExDone.length;
   const missedCount = totalEx - doneCount;
   const completionPct = Math.round((doneCount / totalEx) * 100);
@@ -370,7 +372,7 @@ function FinishArea({ state, onFinish }) {
     }}>
       {/* Exercise list */}
       <div style={{ marginBottom: 12 }}>
-        {EXERCISES.map(e => {
+        {exercises.map(e => {
           const done = todayExDone.includes(e.id);
           const det = todayExDetails?.[e.id];
           return (
@@ -467,11 +469,11 @@ function ProgramCompleteModal({ state, onClose }) {
   );
 }
 
-function FinishConfirmModal({ state, onCancel, onConfirm }) {
+function FinishConfirmModal({ state, exercises, onCancel, onConfirm }) {
   const { todayExDone, currentWeek } = state;
-  const total = EXERCISES.length;
+  const total = exercises.length;
   const done = todayExDone.length;
-  const missed = EXERCISES.filter(e => !todayExDone.includes(e.id)).map(e => e.name);
+  const missed = exercises.filter(e => !todayExDone.includes(e.id)).map(e => e.name);
 
   return (
     <div style={{

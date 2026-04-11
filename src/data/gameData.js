@@ -121,26 +121,43 @@ export const DEFAULT_STATE = {
   liftHistory: { squat: [], bench: [], rdl: [], pulldown: [], ohp: [], legcurl: [] },
   weeklyRPE: {},
   overloadSuggestions: {},
+  consecutiveCompletions: {},  // { [exId]: number } — for 2-for-2 progressive overload rule
   personalRecords: {},
   sessionStartTime: null,
   weeklyCheckins: [],
   notificationsEnabled: false,
   aiCoachHistory: [],
+  aiEpisodic: [],              // curated coaching notes (injuries, preferences, milestones)
   mealLogs: [],
   nutritionGoals: { calories: 2000, protein: 155, carbs: 190, fat: 60 },
+  // Quest AI message quota (free tier: 5/week)
+  questMessagesThisWeek: 0,
+  questMessagesWeekStart: null, // ISO date string — resets every Monday
+  // Body composition (populated from assessment)
+  bmi: null,
+  bmiCategory: null,           // Asian-adjusted WHO 2004 categories
+  waistToHeightRatio: null,    // ≥0.5 = elevated cardiometabolic risk
   // Program & schedule
   programId: 'fullbody_3x',
   sessionsPerWeek: 3,
-  activeExercises: null, // null = use EXERCISES from gameData (backwards compat)
-  // Onboarding assessment
+  activeExercises: null,       // null = use EXERCISES from gameData (backwards compat)
+  // Onboarding assessment (7-step, research-validated)
   assessment: {
     completed: false,
-    goal: null,         // 'recomp' | 'fat_loss' | 'muscle' | 'strength'
-    level: null,        // 'beginner' | 'intermediate' | 'advanced'
-    daysPerWeek: null,  // 2 | 3 | 4 | 5
-    equipment: null,    // 'full_gym' | 'dumbbells' | 'barbell_home' | 'bodyweight'
-    trainingDays: [],   // ['mon', 'wed', 'fri']
+    parqFlagged: false,        // true if any PAR-Q+ question was Yes
+    goal: null,                // 'recomp' | 'fat_loss' | 'muscle' | 'strength'
+    level: null,               // 'beginner' | 'intermediate' | 'advanced'
+    daysPerWeek: null,         // 2 | 3 | 4 | 5
+    sessionLength: null,       // 30 | 45 | 60 | 90 (minutes)
+    equipment: null,           // 'full_gym' | 'dumbbells' | 'barbell_home' | 'bodyweight'
+    trainingDays: [],          // e.g. ['tue', 'thu', 'sat']
     injuries: '',
     programId: null,
+    // Body stats (Step 6)
+    age: null,
+    sex: null,                 // 'male' | 'female'
+    weightKg: null,
+    heightCm: null,
+    waistCm: null,             // for Asian central obesity screening
   }
 };
