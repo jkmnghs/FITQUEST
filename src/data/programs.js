@@ -4,12 +4,14 @@
  * All programs share the same 12-week / 4-phase structure so getPhase() in gameLogic works unchanged.
  */
 
-// ── Shared phase structure (same for all programs) ──────────────────────────
+// ── Shared phase structure with deload weeks (Phase 4.1) ──────────────────
 export const SHARED_PHASES = [
-  { weeks: [1, 2],   name: 'PHASE 1', desc: 'Foundation — Find working baselines',    icon: '🔍' },
-  { weeks: [3, 8],   name: 'PHASE 2', desc: 'Linear Progression — +2.5kg/week',        icon: '📈' },
-  { weeks: [9, 9],   name: 'PHASE 3', desc: 'Deload — 80% weight, 2 sets',             icon: '🧘' },
-  { weeks: [10, 12], name: 'PHASE 4', desc: 'Continued Progression',                   icon: '⚡' }
+  { weeks: [1, 3],   name: 'PHASE 1', desc: 'Adaptation — Build foundations',          icon: '🔍' },
+  { weeks: [4, 4],   name: 'DELOAD',  desc: 'Deload — Recovery week (reduced volume)', icon: '🧘' },
+  { weeks: [5, 7],   name: 'PHASE 2', desc: 'Hypertrophy — Progressive overload',      icon: '📈' },
+  { weeks: [8, 8],   name: 'DELOAD',  desc: 'Deload — Recovery week (reduced volume)', icon: '🧘' },
+  { weeks: [9, 11],  name: 'PHASE 3', desc: 'Strength/Peak — Intensity focus',         icon: '⚡' },
+  { weeks: [12, 12], name: 'DELOAD',  desc: 'Deload + Program Review',                 icon: '🏆' },
 ];
 
 // ── Program definitions ──────────────────────────────────────────────────────
@@ -161,35 +163,100 @@ export function getProgramById(id) {
 }
 
 /**
- * Selects the best program given an assessment object.
+ * Goal alignment scoring for program selection (Phase 3.8)
+ */
+function goalAlignmentScore(program, goal) {
+  if (!goal) return 0;
+  return (program.targetGoals || []).includes(goal) ? 10 : 0;
+}
+function levelScore(program, level) {
+  if (!level) return 0;
+  return (program.targetLevels || []).includes(level) ? 5 : 0;
+}
+function sessionLengthScore(program, sessionLength) {
+  if (!sessionLength) return 0;
+  const exCount = (program.exercises || []).length;
+  if (sessionLength <= 30 && exCount <= 5) return 3;
+  if (sessionLength >= 60 && exCount >= 6) return 3;
+  if (sessionLength === 45 && exCount >= 5 && exCount <= 7) return 3;
+  return 1;
+}
+
+/**
+ * Selects the best program given an assessment object (Phase 3.8 — enhanced).
  * Returns the program id string.
  */
 export function selectProgram(assessment) {
-  const { equipment, daysPerWeek, level } = assessment;
+  const { equipment, daysPerWeek, level, goal, splitPreference, sessionLength } = assessment;
 
   if (equipment === 'bodyweight') return 'bodyweight_3x';
-
   if (equipment === 'dumbbells_only') return 'dumbbell_only_3x';
 
-  if (equipment === 'dumbbells') {
-    return daysPerWeek >= 4 && level !== 'beginner' ? 'dumbbell_4x' : 'dumbbell_3x';
+  // Step 1: Filter by equipment
+  let candidates = PROGRAMS.filter(p =>
+    (p.targetEquipment || []).includes(equipment)
+  );
+  if (candidates.length === 0) candidates = [...PROGRAMS];
+
+  // Step 2: Filter by frequency
+  const freqCandidates = candidates.filter(p => p.sessionsPerWeek === daysPerWeek);
+  if (freqCandidates.length > 0) candidates = freqCandidates;
+
+  // Step 3: Filter by split preference (if provided)
+  if (splitPreference && splitPreference !== 'no_preference') {
+    const splitMap = { full_body: 'fullbody', upper_lower: 'upper_lower', ppl: 'ppl' };
+    const splitKey = splitMap[splitPreference];
+    if (splitKey) {
+      const splitCandidates = candidates.filter(p => p.id.includes(splitKey));
+      if (splitCandidates.length > 0) candidates = splitCandidates;
+    }
   }
 
-  // full_gym or barbell_home
-  if (daysPerWeek <= 2) return 'fullbody_2x';
-  if (daysPerWeek >= 4 && level !== 'beginner') return 'fullbody_4x';
-  return 'fullbody_3x';
+  // Step 4: Score remaining by goal/level/session-length alignment
+  candidates = candidates.map(p => ({
+    ...p,
+    _score: goalAlignmentScore(p, goal)
+          + levelScore(p, level)
+          + sessionLengthScore(p, sessionLength)
+  }));
+
+  // Step 5: Select highest scoring program
+  candidates.sort((a, b) => b._score - a._score);
+  return candidates[0]?.id || 'fullbody_3x';
 }
 
 /**
  * Builds the initial liftWeights and liftHistory for a given program.
- * Called when a user completes the assessment and a program is assigned.
+ * If assessment provides estimatedMaxes, use 65% of stated max as starting weight.
  */
-export function buildInitialWeights(program) {
+export function buildInitialWeights(program, assessment) {
   const liftWeights = {};
   const liftHistory = {};
+
+  // Map max IDs to exercise IDs
+  const maxToExercise = {
+    squat: ['squat', 'dbsquat'],
+    bench: ['bench', 'dbbench'],
+    deadlift: ['rdl', 'dbrdl'],
+    ohp: ['ohp', 'dbohp'],
+  };
+
+  const estimatedMaxes = assessment?.estimatedMaxes || {};
+
   for (const ex of program.exercises) {
-    liftWeights[ex.id] = ex.startKg;
+    let startWeight = ex.startKg;
+
+    // Check if we have an estimated max for this exercise
+    for (const [maxKey, exIds] of Object.entries(maxToExercise)) {
+      if (exIds.includes(ex.id) && estimatedMaxes[maxKey]) {
+        const max = parseFloat(estimatedMaxes[maxKey]);
+        if (max > 0 && max < 500) {
+          startWeight = Math.round(max * 0.65 * 2) / 2; // 65% of max, round to 2.5
+        }
+      }
+    }
+
+    liftWeights[ex.id] = startWeight;
     liftHistory[ex.id] = [];
   }
   return { liftWeights, liftHistory };

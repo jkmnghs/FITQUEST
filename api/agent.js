@@ -13,6 +13,33 @@
 import { createClient } from '@supabase/supabase-js';
 import { PROGRAMS, getProgramById, buildInitialWeights } from './_programs.js';
 
+// ── Rate limiting: max 10 agent calls per user per hour (in-memory) ──
+const agentRateLimitMap = new Map();
+const AGENT_RATE_WINDOW_MS = 3600_000;
+const AGENT_RATE_MAX = 10;
+
+function checkAgentRateLimit(userId) {
+  const now = Date.now();
+  const entry = agentRateLimitMap.get(userId);
+  if (!entry || now - entry.windowStart > AGENT_RATE_WINDOW_MS) {
+    agentRateLimitMap.set(userId, { windowStart: now, count: 1 });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= AGENT_RATE_MAX;
+}
+
+// ── Request body validation ──
+function validateAgentRequest(body) {
+  if (!body || typeof body !== 'object') return 'Request body must be a JSON object';
+  if (typeof body.trigger !== 'string' || !body.trigger.trim()) return 'trigger must be a non-empty string';
+  if (typeof body.userId !== 'string' || !body.userId.trim()) return 'userId must be a non-empty string';
+  // UUID format check
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(body.userId)) return 'userId must be a valid UUID';
+  return null;
+}
+
 // ── Supabase admin client (service role — bypasses RLS) ─────────────────────
 function getSupabase() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -103,7 +130,7 @@ const AGENT_TOOLS = [
   },
   {
     name: 'switch_program',
-    description: 'Switch the user to a different training program. Use when: equipment changes (e.g. got gym access), frequency needs to change, or level progression warrants it. Always send a coach message explaining why. Available programs: fullbody_3x, fullbody_2x, fullbody_4x, dumbbell_only_3x, dumbbell_3x, dumbbell_4x, bodyweight_3x.',
+    description: 'Propose a program switch for the user. This creates a pending switch that requires user confirmation — the switch is NOT applied immediately. The user will see a confirmation dialog. Only use at phase boundaries (week 4, 8, 12) unless user explicitly requests. Available programs: fullbody_3x, fullbody_2x, fullbody_4x, dumbbell_only_3x, dumbbell_3x, dumbbell_4x, bodyweight_3x.',
     input_schema: {
       type: 'object',
       properties: {
@@ -245,42 +272,43 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const newProgram = getProgramById(input.newProgramId);
       if (!newProgram) return { error: `Unknown program: ${input.newProgramId}` };
 
-      // Build fresh weights for new exercises; preserve weights for exercises that carry over
-      const { liftWeights: freshWeights, liftHistory: freshHistory } = buildInitialWeights(newProgram);
-      const mergedWeights = { ...freshWeights, ...state.liftWeights };
-      // Only keep history for exercises in the new program
-      const mergedHistory = {};
-      for (const ex of newProgram.exercises) {
-        mergedHistory[ex.id] = state.liftHistory?.[ex.id] || [];
-      }
-
+      // Store as pending switch — requires user confirmation (Phase 4.7)
       const switchMsg = {
         id: `agent_sw_${Date.now()}`,
-        message: `**Program switched to ${newProgram.name}** — ${input.reason}`,
-        trigger: 'program_switch',
+        message: `**Program switch suggested: ${newProgram.name}** — ${input.reason}\n\n_This change requires your confirmation. Check your settings to review and accept._`,
+        trigger: 'program_switch_proposal',
         emoji: '🔄',
         read: false,
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), switchMsg];
 
+      // Add episodic note about the switch proposal
+      const switchNote = {
+        id: `ep_sw_${Date.now()}`,
+        note: `Proposed switch to ${newProgram.id}: ${input.reason}`,
+        category: 'general',
+        source: 'agent',
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+      const aiEpisodic = [...(state.aiEpisodic || []), switchNote];
+
       await supabase
         .from('user_profiles')
         .update({
           state: {
             ...state,
-            programId: newProgram.id,
-            activeExercises: newProgram.exercises,
-            sessionsPerWeek: newProgram.sessionsPerWeek,
-            liftWeights: mergedWeights,
-            liftHistory: mergedHistory,
             agentMessages,
-            // Flag for client to reload exercises
-            programSwitchedAt: new Date().toISOString(),
+            aiEpisodic,
+            pendingProgramSwitch: {
+              newProgramId: input.newProgramId,
+              reason: input.reason,
+              proposedAt: new Date().toISOString(),
+            },
           },
         })
         .eq('id', input.userId);
-      return { ok: true, newProgram: newProgram.id, exercises: newProgram.exercises.map(e => e.id) };
+      return { ok: true, pending: true, newProgram: newProgram.id, message: 'Switch proposed — awaiting user confirmation' };
     }
 
     case 'update_lift_weight': {
@@ -353,6 +381,29 @@ function buildTriggerContext(trigger, state, userId) {
     .map(c => `Wk${c.week}: ${c.weight}${unit}`)
     .join(' → ');
 
+  // Phase 5.3: Enhanced coach context with new data
+  const lifestyle = state.lifestyle || {};
+  const motivation = state.motivation || {};
+  const painRegions = state.assessment?.painRegions || {};
+  const dietary = state.dietary || {};
+  const recentRecovery = (state.recoveryScores || []).slice(-7)
+    .map(r => `${r.date}: sleep=${r.sleep} body=${r.bodyFeel} energy=${r.energy}`)
+    .join(', ');
+  const episodicMemory = (state.aiEpisodic || []).slice(-5)
+    .map(e => `[${e.category}] ${e.note}`)
+    .join(' | ');
+
+  // Overtraining status
+  const weeklySessions = wp.count || 0;
+  const otStatus = weeklySessions > sessionsPerWeek + 2 ? 'BLOCKED'
+    : weeklySessions > sessionsPerWeek + 1 ? 'WARNING'
+    : weeklySessions > sessionsPerWeek ? 'CAUTION' : 'OK';
+
+  const painSummary = Object.entries(painRegions)
+    .filter(([, v]) => v !== 'none')
+    .map(([region, sev]) => `${region}:${sev}`)
+    .join(', ') || 'none';
+
   const baseContext = `
 USER_ID: ${userId}
 USER: ${name} | Wk ${week}/12 | Lv ${state.level || 1} | Streak: ${streak}d | Total sessions: ${sessions}
@@ -361,6 +412,13 @@ LIFTS: ${liftSummary}
 OVERLOAD Status: ${overloadSummary}
 WEIGHT TREND: ${weightTrend || 'no check-ins yet'}
 SESSIONS this week: ${wp.count || 0}/${sessionsPerWeek}
+OVERTRAINING STATUS: ${otStatus}
+LIFESTYLE: activity=${lifestyle.dailyActivity || 'unknown'} sleep=${lifestyle.sleepHours || 'unknown'} stress=${lifestyle.stressLevel || 'unknown'}
+MOTIVATION: primary=${motivation.primaryMotivation || 'unknown'} quit_history=${motivation.previousQuitReason || 'none'}
+PAIN REGIONS: ${painSummary}
+DIETARY: restrictions=${(dietary.restrictions || []).join(',') || 'none'} tracking=${dietary.trackingExperience || 'unknown'}
+RECENT RECOVERY (last 7d): ${recentRecovery || 'none logged'}
+EPISODIC MEMORY (last 5): ${episodicMemory || 'none'}
 `.trim();
 
   const contextByTrigger = {
@@ -456,21 +514,32 @@ Always send a coach message explaining the switch. Never switch more than once p
 export default async function handler(req, res) {
   // Auth check — all calls (cron or webhook) must include the secret
   const secret = process.env.AGENT_SECRET;
+  if (!secret) {
+    return res.status(500).json({ error: 'AGENT_SECRET is not configured' });
+  }
   const provided = req.headers['x-agent-secret'] || req.query?.secret;
-  if (secret && provided !== secret) {
+  if (provided !== secret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { trigger, userId } = req.body || {};
-  if (!trigger || !userId) {
-    return res.status(400).json({ error: 'trigger and userId are required' });
+  // ── Request body validation ──
+  const validationError = validateAgentRequest(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
+
+  const { trigger, userId } = req.body;
 
   const validTriggers = ['post_workout', 'reengagement', 'pr_milestone', 'onboarding', 'weekly_review'];
   if (!validTriggers.includes(trigger)) {
     return res.status(400).json({ error: `Invalid trigger. Must be one of: ${validTriggers.join(', ')}` });
+  }
+
+  // ── Rate limiting: max 10 agent calls per user per hour ──
+  if (!checkAgentRateLimit(userId)) {
+    return res.status(429).json({ error: 'Agent rate limit exceeded. Max 10 calls per hour.' });
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -481,6 +550,8 @@ export default async function handler(req, res) {
   catch (e) { return res.status(500).json({ error: e.message }); }
 
   const agentLog = [];
+  const startTime = new Date().toISOString();
+  console.log(`[Quest Agent] ${startTime} | trigger=${trigger} | userId=${userId}`);
 
   try {
     // --- Step 1: fetch initial state ---
@@ -552,12 +623,17 @@ export default async function handler(req, res) {
     }
 
     // --- Step 3: Log agent run ---
+    const endTime = new Date().toISOString();
+    const toolsCalled = agentLog.map(l => l.tool);
+    console.log(`[Quest Agent] ${endTime} | COMPLETE | trigger=${trigger} | userId=${userId} | tools=${toolsCalled.join(',')} | loops=${loopCount}`);
+
     await supabase.from('agent_runs').insert({
       user_id: userId,
       trigger,
       tool_calls: agentLog,
       loop_count: loopCount,
-      ran_at: new Date().toISOString(),
+      ran_at: startTime,
+      completed_at: endTime,
     }).select(); // .select() is a no-op if the table doesn't exist — fails silently
 
     return res.status(200).json({

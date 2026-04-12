@@ -9,18 +9,20 @@ export const EXERCISES = [
 ];
 
 export const PHASES = [
-  { weeks: [1, 2],      name: 'PHASE 1', desc: 'Foundation — Find RPE 8 baselines',       icon: '🔍' },
-  { weeks: [3, 8],      name: 'PHASE 2', desc: 'Linear Progression — +2.5kg/week',         icon: '📈' },
-  { weeks: [9, 9],      name: 'PHASE 3', desc: 'Deload — 80% weight, 2 sets',              icon: '🧘' },
-  { weeks: [10, 12],    name: 'PHASE 4', desc: 'Continued Progression',                    icon: '⚡' }
+  { weeks: [1, 3],   name: 'PHASE 1', desc: 'Adaptation — Build foundations',          icon: '🔍' },
+  { weeks: [4, 4],   name: 'DELOAD',  desc: 'Deload — Recovery week (reduced volume)', icon: '🧘' },
+  { weeks: [5, 7],   name: 'PHASE 2', desc: 'Hypertrophy — Progressive overload',      icon: '📈' },
+  { weeks: [8, 8],   name: 'DELOAD',  desc: 'Deload — Recovery week (reduced volume)', icon: '🧘' },
+  { weeks: [9, 11],  name: 'PHASE 3', desc: 'Strength/Peak — Intensity focus',         icon: '⚡' },
+  { weeks: [12, 12], name: 'DELOAD',  desc: 'Deload + Program Review',                 icon: '🏆' },
 ];
 
 export const RANKS = [
   { l: 'E', name: 'Novice',      minLevel: 1,  color: '#78909c' },
-  { l: 'D', name: 'Apprentice',  minLevel: 3,  color: '#66bb6a' },
-  { l: 'C', name: 'Warrior',     minLevel: 6,  color: '#00e5ff' },
-  { l: 'B', name: 'Champion',    minLevel: 10, color: '#b388ff' },
-  { l: 'A', name: 'Elite',       minLevel: 15, color: '#ff9100' },
+  { l: 'D', name: 'Apprentice',  minLevel: 4,  color: '#66bb6a' },
+  { l: 'C', name: 'Warrior',     minLevel: 7,  color: '#00e5ff' },
+  { l: 'B', name: 'Champion',    minLevel: 11, color: '#b388ff' },
+  { l: 'A', name: 'Elite',       minLevel: 16, color: '#ff9100' },
   { l: 'S', name: 'Legendary',   minLevel: 20, color: '#ffd600' }
 ];
 
@@ -159,8 +161,44 @@ export const DEFAULT_STATE = {
     weightKg: null,
     heightCm: null,
     waistCm: null,             // for Asian central obesity screening
+    // Phase 3 new assessment fields
+    movementCompetency: {},
+    estimatedMaxes: { squat: null, bench: null, deadlift: null, ohp: null },
+    painRegions: { shoulders: 'none', lowerBack: 'none', knees: 'none', hips: 'none', wrists: 'none', neck: 'none' },
+    splitPreference: null,
   },
   // Quest Agent
   agentMessages: [],           // proactive messages from the AI agent
   agentDeloadSuggested: false, // agent has recommended a deload
+  // ── v2 State Fields ──
+  stateVersion: 2,
+  dailyXPEarned: 0,
+  dailySessionCount: 0,
+  lastDayReset: null,
+  // Lifestyle
+  lifestyle: {
+    dailyActivity: 'sedentary',
+    sleepHours: '7-8',
+    stressLevel: 'moderate',
+  },
+  // Dietary
+  dietary: {
+    restrictions: [],
+    trackingExperience: 'never',
+    mealsPerDay: 3,
+  },
+  // Motivation
+  motivation: {
+    primaryMotivation: null,
+    previousQuitReason: null,
+  },
+  // Recovery tracking
+  recoveryScores: [],
+  // Daily habits
+  dailyHabits: {
+    waterGlasses: 0,
+    vegetablesEaten: false,
+    fruitEaten: false,
+    supplementsTaken: false,
+  },
 };

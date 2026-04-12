@@ -12,32 +12,31 @@ import {
   getWeightForExercise,
   getSetsForWeek,
   formatElapsed,
+  calculateSessionXP,
+  calculateAdherenceXP,
+  overtrainingCheck,
+  isDeloadWeek,
+  calculateRestDayXP,
 } from '../gameLogic';
 
 // ---------------------------------------------------------------------------
-// xpForLevel
+// xpForLevel — new exponential curve (Phase 2.3)
 // ---------------------------------------------------------------------------
 describe('xpForLevel', () => {
-  it('level 1 requires 80 XP', () => {
-    expect(xpForLevel(1)).toBe(80);
+  it('level 1 ~ 71 XP (exponential curve)', () => {
+    expect(xpForLevel(1)).toBe(Math.round(60 * Math.pow(1.18, 1)));
   });
 
-  it('level 2 requires 115 XP', () => {
-    expect(xpForLevel(2)).toBe(115);
-  });
-
-  it('level 10 requires 395 XP (matches in-app display)', () => {
-    expect(xpForLevel(10)).toBe(395);
-  });
-
-  it('level 20 requires 745 XP', () => {
-    expect(xpForLevel(20)).toBe(745);
-  });
-
-  it('each level costs exactly 35 more XP than the previous', () => {
-    for (let l = 2; l <= 15; l++) {
-      expect(xpForLevel(l) - xpForLevel(l - 1)).toBe(35);
+  it('each level requires more XP than the previous (exponential)', () => {
+    for (let l = 2; l <= 20; l++) {
+      expect(xpForLevel(l)).toBeGreaterThan(xpForLevel(l - 1));
     }
+  });
+
+  it('level 20 ~ 1720 XP (requires sustained effort)', () => {
+    const xp20 = xpForLevel(20);
+    expect(xp20).toBeGreaterThan(1500);
+    expect(xp20).toBeLessThan(2000);
   });
 });
 
@@ -50,11 +49,11 @@ describe('xpToLevel', () => {
   });
 
   it('xpToLevel(2) equals xpForLevel(1)', () => {
-    expect(xpToLevel(2)).toBe(xpForLevel(1)); // 80
+    expect(xpToLevel(2)).toBe(xpForLevel(1));
   });
 
   it('xpToLevel(3) equals sum of levels 1 and 2', () => {
-    expect(xpToLevel(3)).toBe(xpForLevel(1) + xpForLevel(2)); // 195
+    expect(xpToLevel(3)).toBe(xpForLevel(1) + xpForLevel(2));
   });
 
   it('xpToLevel is strictly cumulative', () => {
@@ -67,39 +66,31 @@ describe('xpToLevel', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getRank
+// getRank — updated thresholds (Phase 2.3)
 // ---------------------------------------------------------------------------
 describe('getRank', () => {
   it('level 1 → Novice (E)', () => {
     expect(getRank(1)).toMatchObject({ l: 'E', name: 'Novice' });
   });
 
-  it('level 2 → still Novice (below threshold of 3)', () => {
-    expect(getRank(2)).toMatchObject({ l: 'E', name: 'Novice' });
+  it('level 3 → still Novice (below threshold of 4)', () => {
+    expect(getRank(3)).toMatchObject({ l: 'E', name: 'Novice' });
   });
 
-  it('level 3 → Apprentice (D)', () => {
-    expect(getRank(3)).toMatchObject({ l: 'D', name: 'Apprentice' });
+  it('level 4 → Apprentice (D)', () => {
+    expect(getRank(4)).toMatchObject({ l: 'D', name: 'Apprentice' });
   });
 
-  it('level 5 → still Apprentice (below threshold of 6)', () => {
-    expect(getRank(5)).toMatchObject({ l: 'D', name: 'Apprentice' });
+  it('level 7 → Warrior (C)', () => {
+    expect(getRank(7)).toMatchObject({ l: 'C', name: 'Warrior' });
   });
 
-  it('level 6 → Warrior (C)', () => {
-    expect(getRank(6)).toMatchObject({ l: 'C', name: 'Warrior' });
+  it('level 11 → Champion (B)', () => {
+    expect(getRank(11)).toMatchObject({ l: 'B', name: 'Champion' });
   });
 
-  it('level 10 → Champion (B) — matches Jake screenshot', () => {
-    expect(getRank(10)).toMatchObject({ l: 'B', name: 'Champion' });
-  });
-
-  it('level 14 → still Champion (below Elite threshold of 15)', () => {
-    expect(getRank(14)).toMatchObject({ l: 'B', name: 'Champion' });
-  });
-
-  it('level 15 → Elite (A)', () => {
-    expect(getRank(15)).toMatchObject({ l: 'A', name: 'Elite' });
+  it('level 16 → Elite (A)', () => {
+    expect(getRank(16)).toMatchObject({ l: 'A', name: 'Elite' });
   });
 
   it('level 20 → Legendary (S)', () => {
@@ -112,35 +103,169 @@ describe('getRank', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getPhase
+// getPhase — new deload schedule (Phase 4.1)
 // ---------------------------------------------------------------------------
 describe('getPhase', () => {
-  it('week 1 → PHASE 1', () => {
+  it('weeks 1-3 → PHASE 1 (Adaptation)', () => {
     expect(getPhase(1).name).toBe('PHASE 1');
+    expect(getPhase(3).name).toBe('PHASE 1');
   });
 
-  it('week 2 → PHASE 1', () => {
-    expect(getPhase(2).name).toBe('PHASE 1');
+  it('week 4 → DELOAD', () => {
+    expect(getPhase(4).name).toBe('DELOAD');
   });
 
-  it('week 3 → PHASE 2', () => {
-    expect(getPhase(3).name).toBe('PHASE 2');
+  it('weeks 5-7 → PHASE 2 (Hypertrophy)', () => {
+    expect(getPhase(5).name).toBe('PHASE 2');
+    expect(getPhase(7).name).toBe('PHASE 2');
   });
 
-  it('week 8 → PHASE 2 (last week of linear progression)', () => {
-    expect(getPhase(8).name).toBe('PHASE 2');
+  it('week 8 → DELOAD', () => {
+    expect(getPhase(8).name).toBe('DELOAD');
   });
 
-  it('week 9 → PHASE 3 (deload)', () => {
+  it('weeks 9-11 → PHASE 3 (Strength/Peak)', () => {
     expect(getPhase(9).name).toBe('PHASE 3');
+    expect(getPhase(11).name).toBe('PHASE 3');
   });
 
-  it('week 10 → PHASE 4', () => {
-    expect(getPhase(10).name).toBe('PHASE 4');
+  it('week 12 → DELOAD (final)', () => {
+    expect(getPhase(12).name).toBe('DELOAD');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isDeloadWeek
+// ---------------------------------------------------------------------------
+describe('isDeloadWeek', () => {
+  it('weeks 4, 8, 12 are deload weeks', () => {
+    expect(isDeloadWeek(4)).toBe(true);
+    expect(isDeloadWeek(8)).toBe(true);
+    expect(isDeloadWeek(12)).toBe(true);
   });
 
-  it('week 12 → PHASE 4 (final week)', () => {
-    expect(getPhase(12).name).toBe('PHASE 4');
+  it('other weeks are not deload weeks', () => {
+    expect(isDeloadWeek(1)).toBe(false);
+    expect(isDeloadWeek(3)).toBe(false);
+    expect(isDeloadWeek(5)).toBe(false);
+    expect(isDeloadWeek(9)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculateSessionXP (Phase 2.1)
+// ---------------------------------------------------------------------------
+describe('calculateSessionXP', () => {
+  it('first session of the day gets full XP', () => {
+    const xp = calculateSessionXP({ setsCompleted: 6 }, 1);
+    expect(xp).toBe(Math.min(150, 50 + 6 * 5)); // 80
+  });
+
+  it('second session of the day gets 50% XP', () => {
+    const xp = calculateSessionXP({ setsCompleted: 6 }, 2);
+    expect(xp).toBe(Math.round((50 + 30) * 0.5)); // 40
+  });
+
+  it('third+ session gets 10% XP', () => {
+    const xp = calculateSessionXP({ setsCompleted: 6 }, 3);
+    expect(xp).toBe(Math.round((50 + 30) * 0.1)); // 8
+  });
+
+  it('daily XP never exceeds 150', () => {
+    const xp = calculateSessionXP({ setsCompleted: 50 }, 1);
+    expect(xp).toBeLessThanOrEqual(150);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculateAdherenceXP (Phase 2.2)
+// ---------------------------------------------------------------------------
+describe('calculateAdherenceXP', () => {
+  it('prescribed session on target RPE with overload = 90 XP', () => {
+    const { xp, reasons } = calculateAdherenceXP(
+      { matchesPrescribedDay: true, avgRPE: 7, overloadAchieved: true },
+      { completedSessions: 1 },
+      { sessionsPerWeek: 3 }
+    );
+    expect(xp).toBe(90); // 40 + 20 + 30
+    expect(reasons.length).toBe(3);
+  });
+
+  it('non-prescribed session with no overload = 0 XP', () => {
+    const { xp } = calculateAdherenceXP(
+      { matchesPrescribedDay: false, avgRPE: 5, overloadAchieved: false },
+      { completedSessions: 1 },
+      { sessionsPerWeek: 3 }
+    );
+    expect(xp).toBe(0);
+  });
+
+  it('exceeding prescribed+1 reduces XP to 10%', () => {
+    const { xp, reasons } = calculateAdherenceXP(
+      { matchesPrescribedDay: true, avgRPE: 7, overloadAchieved: true },
+      { completedSessions: 5 }, // 5 sessions when prescribed is 3
+      { sessionsPerWeek: 3 }
+    );
+    expect(xp).toBe(Math.round(90 * 0.1)); // 9
+    expect(reasons).toContainEqual(expect.stringContaining('reduced'));
+  });
+
+  it('XP capped at 150', () => {
+    const { xp } = calculateAdherenceXP(
+      { matchesPrescribedDay: true, avgRPE: 7, overloadAchieved: true },
+      { completedSessions: 0 },
+      { sessionsPerWeek: 3 }
+    );
+    expect(xp).toBeLessThanOrEqual(150);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// overtrainingCheck (Phase 2.4)
+// ---------------------------------------------------------------------------
+describe('overtrainingCheck', () => {
+  it('at or below prescribed sessions = ok', () => {
+    const result = overtrainingCheck({ completedSessions: 3 }, 3);
+    expect(result.status).toBe('ok');
+    expect(result.xpMultiplier).toBe(1.0);
+  });
+
+  it('prescribed+1 = caution with 0.75x', () => {
+    const result = overtrainingCheck({ completedSessions: 4 }, 3);
+    expect(result.status).toBe('caution');
+    expect(result.xpMultiplier).toBe(0.75);
+  });
+
+  it('prescribed+2 = warning with 0.5x', () => {
+    const result = overtrainingCheck({ completedSessions: 5 }, 3);
+    expect(result.status).toBe('warning');
+    expect(result.xpMultiplier).toBe(0.5);
+  });
+
+  it('prescribed+3 = blocked with 0x', () => {
+    const result = overtrainingCheck({ completedSessions: 6 }, 3);
+    expect(result.status).toBe('blocked');
+    expect(result.xpMultiplier).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculateRestDayXP
+// ---------------------------------------------------------------------------
+describe('calculateRestDayXP', () => {
+  it('rest day honored awards 15 XP', () => {
+    const { xp } = calculateRestDayXP(false, false);
+    expect(xp).toBe(15);
+  });
+
+  it('working out on non-training day = 0 rest XP', () => {
+    const { xp } = calculateRestDayXP(false, true);
+    expect(xp).toBe(0);
+  });
+
+  it('training day = 0 rest XP', () => {
+    const { xp } = calculateRestDayXP(true, false);
+    expect(xp).toBe(0);
   });
 });
 
@@ -166,9 +291,10 @@ describe('applyXP', () => {
   });
 
   it('XP overflows correctly into the next level', () => {
-    const result = applyXP({ xp: 70, totalXp: 70, level: 1 }, 20); // 70+20=90 > 80
+    const threshold = xpForLevel(1); // ~71
+    const result = applyXP({ xp: threshold - 1, totalXp: threshold - 1, level: 1 }, 20);
     expect(result.level).toBe(2);
-    expect(result.xp).toBe(10); // 90 - 80 = 10 remaining
+    expect(result.xp).toBe(19); // (threshold-1)+20 - threshold = 19
     expect(result.leveledUp).toBe(true);
   });
 
@@ -456,23 +582,33 @@ describe('getWeightForExercise', () => {
     expect(getWeightForExercise(ex, 5, {})).toBe(45);
   });
 
-  it('week 9 (deload) returns 80% of base weight rounded to nearest 0.5', () => {
-    const result = getWeightForExercise(ex, 9, { squat: 100 });
+  it('deload week 4 returns 80% of base weight', () => {
+    const result = getWeightForExercise(ex, 4, { squat: 100 });
     expect(result).toBe(80); // 100 * 0.8 = 80
   });
 
-  it('week 9 deload rounds to nearest 0.5 kg', () => {
-    const result = getWeightForExercise(ex, 9, { squat: 75 });
-    expect(result % 0.5).toBe(0); // must be a 0.5 multiple
+  it('deload week 8 returns 80% of base weight', () => {
+    const result = getWeightForExercise(ex, 8, { squat: 100 });
+    expect(result).toBe(80);
+  });
+
+  it('deload week 12 returns 80% of base weight', () => {
+    const result = getWeightForExercise(ex, 12, { squat: 100 });
+    expect(result).toBe(80);
+  });
+
+  it('deload rounds to nearest 0.5 kg', () => {
+    const result = getWeightForExercise(ex, 4, { squat: 75 });
+    expect(result % 0.5).toBe(0);
     expect(result).toBeCloseTo(75 * 0.8, 0);
   });
 
-  it('week 8 is not deload', () => {
-    expect(getWeightForExercise(ex, 8, { squat: 100 })).toBe(100);
+  it('week 5 is not deload', () => {
+    expect(getWeightForExercise(ex, 5, { squat: 100 })).toBe(100);
   });
 
-  it('week 10 is not deload', () => {
-    expect(getWeightForExercise(ex, 10, { squat: 100 })).toBe(100);
+  it('week 9 is not deload', () => {
+    expect(getWeightForExercise(ex, 9, { squat: 100 })).toBe(100);
   });
 });
 
@@ -486,18 +622,27 @@ describe('getSetsForWeek', () => {
     expect(getSetsForWeek(ex, 5)).toBe(3);
   });
 
-  it('week 9 (deload) always returns 2', () => {
-    expect(getSetsForWeek({ sets: 3 }, 9)).toBe(2);
-    expect(getSetsForWeek({ sets: 2 }, 9)).toBe(2);
-    expect(getSetsForWeek({ sets: 4 }, 9)).toBe(2);
+  it('deload week 4 drops 1 set (min 1)', () => {
+    expect(getSetsForWeek({ sets: 3 }, 4)).toBe(2); // 3-1=2
+    expect(getSetsForWeek({ sets: 2 }, 4)).toBe(1); // 2-1=1
+    expect(getSetsForWeek({ sets: 4 }, 4)).toBe(3); // 4-1=3
+    expect(getSetsForWeek({ sets: 1 }, 4)).toBe(1); // max(1, 0)=1
   });
 
-  it('week 8 returns normal sets', () => {
-    expect(getSetsForWeek(ex, 8)).toBe(3);
+  it('deload week 8 drops 1 set', () => {
+    expect(getSetsForWeek({ sets: 3 }, 8)).toBe(2);
   });
 
-  it('week 10 returns normal sets', () => {
-    expect(getSetsForWeek(ex, 10)).toBe(3);
+  it('deload week 12 drops 1 set', () => {
+    expect(getSetsForWeek({ sets: 3 }, 12)).toBe(2);
+  });
+
+  it('week 5 returns normal sets', () => {
+    expect(getSetsForWeek(ex, 5)).toBe(3);
+  });
+
+  it('week 9 returns normal sets', () => {
+    expect(getSetsForWeek(ex, 9)).toBe(3);
   });
 });
 

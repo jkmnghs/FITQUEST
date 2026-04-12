@@ -20,6 +20,26 @@ const PARQ_QUESTIONS = [
   'Do you know of any other reason why you should not do physical activity?',
 ];
 
+const MOVEMENTS = [
+  { id: 'squat', name: 'Barbell Back Squat' },
+  { id: 'deadlift', name: 'Barbell Deadlift' },
+  { id: 'benchPress', name: 'Barbell Bench Press' },
+  { id: 'overheadPress', name: 'Overhead Press' },
+  { id: 'pullUp', name: 'Pull-up / Chin-up' },
+  { id: 'barbellRow', name: 'Barbell Row' },
+];
+
+const PAIN_REGIONS = [
+  { id: 'shoulders', name: 'Shoulders' },
+  { id: 'lowerBack', name: 'Lower Back' },
+  { id: 'knees', name: 'Knees' },
+  { id: 'hips', name: 'Hips' },
+  { id: 'wrists', name: 'Wrists / Elbows' },
+  { id: 'neck', name: 'Neck' },
+];
+
+const SEVERITY_OPTIONS = ['none', 'mild', 'moderate', 'severe'];
+
 function Card({ children, style }) {
   return (
     <div style={{
@@ -50,6 +70,32 @@ function OptionBtn({ selected, onClick, children }) {
         width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
         border: selected ? '5px solid var(--cyan)' : '2px solid rgba(255,255,255,0.3)',
         background: 'transparent', display: 'inline-block',
+      }} />
+      {children}
+    </button>
+  );
+}
+
+function CheckBtn({ selected, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '10px 14px', marginBottom: 6, marginRight: 6,
+        borderRadius: 10,
+        border: selected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
+        background: selected ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
+        color: selected ? 'var(--cyan)' : 'var(--text)',
+        fontSize: 14, fontFamily: 'Rajdhani', fontWeight: 600,
+        cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+        transition: 'all 0.15s',
+      }}
+    >
+      <span style={{
+        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+        border: selected ? '2px solid var(--cyan)' : '2px solid rgba(255,255,255,0.3)',
+        background: selected ? 'var(--cyan)' : 'transparent',
+        display: 'inline-block',
       }} />
       {children}
     </button>
@@ -135,10 +181,29 @@ function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, 
         cursor: nextDisabled ? 'not-allowed' : 'pointer',
         boxShadow: nextDisabled ? 'none' : '0 0 20px rgba(0,229,255,0.2)',
         transition: 'all 0.2s',
-      }}>{nextLabel} {!nextDisabled && step < 7 ? '→' : ''}</button>
+      }}>{nextLabel} {!nextDisabled && step < TOTAL_STEPS ? '→' : ''}</button>
     </div>
   );
 }
+
+function RadioRow({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {options.map(opt => (
+        <button key={opt} onClick={() => onChange(opt)} style={{
+          padding: '6px 10px', borderRadius: 8, fontSize: 11,
+          fontFamily: 'Rajdhani', fontWeight: 600, cursor: 'pointer',
+          border: value === opt ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
+          background: value === opt ? 'rgba(0,229,255,0.1)' : 'transparent',
+          color: value === opt ? 'var(--cyan)' : 'var(--text3)',
+          textTransform: 'capitalize',
+        }}>{opt}</button>
+      ))}
+    </div>
+  );
+}
+
+const TOTAL_STEPS = 14;
 
 export default function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(1);
@@ -158,12 +223,29 @@ export default function OnboardingScreen({ onComplete }) {
     waistCm: '',
     trainingDays: [],
     injuries: '',
+    // Phase 3 new fields
+    movementCompetency: {},
+    estimatedMaxes: { squat: '', bench: '', deadlift: '', ohp: '' },
+    painRegions: { shoulders: 'none', lowerBack: 'none', knees: 'none', hips: 'none', wrists: 'none', neck: 'none' },
+    splitPreference: null,
+    // Lifestyle
+    dailyActivity: null,
+    sleepHours: null,
+    stressLevel: null,
+    // Dietary
+    dietaryRestrictions: [],
+    trackingExperience: null,
+    mealsPerDay: null,
+    // Motivation
+    primaryMotivation: null,
+    previousQuitReason: null,
   });
 
   const set = (key, val) => setData(d => ({ ...d, [key]: val }));
+  const isAdvanced = data.level === 'intermediate' || data.level === 'advanced';
 
   function handleNext() {
-    if (step < 7) setStep(s => s + 1);
+    if (step < TOTAL_STEPS) setStep(s => s + 1);
     else {
       const assessment = {
         ...data,
@@ -172,6 +254,12 @@ export default function OnboardingScreen({ onComplete }) {
         weightKg: parseFloat(data.weightKg) || null,
         heightCm: parseFloat(data.heightCm) || null,
         waistCm: data.waistCm ? parseFloat(data.waistCm) : null,
+        estimatedMaxes: {
+          squat: data.estimatedMaxes.squat ? parseFloat(data.estimatedMaxes.squat) : null,
+          bench: data.estimatedMaxes.bench ? parseFloat(data.estimatedMaxes.bench) : null,
+          deadlift: data.estimatedMaxes.deadlift ? parseFloat(data.estimatedMaxes.deadlift) : null,
+          ohp: data.estimatedMaxes.ohp ? parseFloat(data.estimatedMaxes.ohp) : null,
+        },
         completed: true,
       };
       onComplete(assessment);
@@ -185,7 +273,7 @@ export default function OnboardingScreen({ onComplete }) {
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
-          <StepHeader step={1} total={7} title="Health & Safety Screening" />
+          <StepHeader step={1} total={TOTAL_STEPS} title="Health & Safety Screening" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6 }}>
             Please answer honestly. This is the PAR-Q+ safety screening used by health professionals worldwide.
           </div>
@@ -246,7 +334,7 @@ export default function OnboardingScreen({ onComplete }) {
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
-          <StepHeader step={2} total={7} title="What's Your Main Goal?" />
+          <StepHeader step={2} total={TOTAL_STEPS} title="What's Your Main Goal?" />
           {goals.map(g => (
             <OptionBtn key={g.id} selected={data.goal === g.id} onClick={() => set('goal', g.id)}>
               <div>
@@ -271,7 +359,7 @@ export default function OnboardingScreen({ onComplete }) {
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
-          <StepHeader step={3} total={7} title="What's Your Fitness Level?" />
+          <StepHeader step={3} total={TOTAL_STEPS} title="What's Your Fitness Level?" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
             Be honest — this is the single most important factor in building your program.
           </div>
@@ -289,8 +377,121 @@ export default function OnboardingScreen({ onComplete }) {
     );
   }
 
-  // ── Step 4: Schedule ──
+  // ── Step 4: Movement Competency (Phase 3.1) ──
   if (step === 4) {
+    const competencyLevels = ['confident', 'unsure', 'never'];
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+        <Card>
+          <StepHeader step={4} total={TOTAL_STEPS} title="Movement Competency" />
+          <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6 }}>
+            Which of these movements can you currently perform with good form?
+          </div>
+          {MOVEMENTS.map(m => (
+            <div key={m.id} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
+            }}>
+              <div style={{ flex: 1, fontSize: 14, color: 'var(--text)' }}>{m.name}</div>
+              <RadioRow
+                options={competencyLevels}
+                value={data.movementCompetency[m.id]}
+                onChange={v => set('movementCompetency', { ...data.movementCompetency, [m.id]: v })}
+              />
+            </div>
+          ))}
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 5: Estimated Current Lifts (Intermediate/Advanced only) (Phase 3.2) ──
+  if (step === 5) {
+    if (!isAdvanced) {
+      // Skip this step for beginners
+      if (step === 5) { setStep(6); return null; }
+    }
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+        <Card>
+          <StepHeader step={5} total={TOTAL_STEPS} title="Your Current Lifts" />
+          <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
+            What are your current estimated or known maxes? Leave blank if unsure.
+          </div>
+          <NumInput label="BARBELL SQUAT" value={data.estimatedMaxes.squat}
+            onChange={v => set('estimatedMaxes', { ...data.estimatedMaxes, squat: v })} placeholder="e.g. 100" unit="kg" />
+          <NumInput label="BENCH PRESS" value={data.estimatedMaxes.bench}
+            onChange={v => set('estimatedMaxes', { ...data.estimatedMaxes, bench: v })} placeholder="e.g. 80" unit="kg" />
+          <NumInput label="DEADLIFT" value={data.estimatedMaxes.deadlift}
+            onChange={v => set('estimatedMaxes', { ...data.estimatedMaxes, deadlift: v })} placeholder="e.g. 120" unit="kg" />
+          <NumInput label="OVERHEAD PRESS" value={data.estimatedMaxes.ohp}
+            onChange={v => set('estimatedMaxes', { ...data.estimatedMaxes, ohp: v })} placeholder="e.g. 50" unit="kg" />
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 6: Body Region Pain Assessment (Phase 3.3) ──
+  if (step === 6) {
+    const hasSevere = Object.values(data.painRegions).some(v => v === 'severe');
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+        <Card>
+          <StepHeader step={6} total={TOTAL_STEPS} title="Pain & Limitations" />
+          <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6 }}>
+            Do you currently have pain or limitations in any of these areas?
+          </div>
+          {PAIN_REGIONS.map(r => (
+            <div key={r.id} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
+            }}>
+              <div style={{ flex: 1, fontSize: 14, color: 'var(--text)', minWidth: 90 }}>{r.name}</div>
+              <RadioRow
+                options={SEVERITY_OPTIONS}
+                value={data.painRegions[r.id]}
+                onChange={v => set('painRegions', { ...data.painRegions, [r.id]: v })}
+              />
+            </div>
+          ))}
+          {hasSevere && (
+            <div style={{
+              marginTop: 16, padding: '14px 16px', borderRadius: 12,
+              background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.25)',
+              fontSize: 13, color: '#ff5555', lineHeight: 1.6,
+            }}>
+              🏥 <strong>Important:</strong> You indicated severe pain in one or more areas. We strongly recommend getting medical clearance before starting any exercise program. FitQuest will automatically substitute safer exercises for affected areas.
+            </div>
+          )}
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+              color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
+            }}>ADDITIONAL NOTES (optional)</div>
+            <textarea
+              value={data.injuries}
+              onChange={e => set('injuries', e.target.value)}
+              placeholder="e.g. Had ACL surgery 2 years ago, fully recovered"
+              rows={2}
+              style={{
+                width: '100%', padding: '10px 14px', borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'var(--text)', fontSize: 14, fontFamily: 'Rajdhani',
+                outline: 'none', resize: 'none', boxSizing: 'border-box', lineHeight: 1.5,
+              }}
+            />
+          </div>
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 7: Schedule ──
+  if (step === 7) {
     const daysOpts = [2, 3, 4, 5];
     const lengthOpts = [
       { val: 30, label: '30 min', sub: 'Express session' },
@@ -301,7 +502,7 @@ export default function OnboardingScreen({ onComplete }) {
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
-          <StepHeader step={4} total={7} title="Your Training Schedule" />
+          <StepHeader step={7} total={TOTAL_STEPS} title="Your Training Schedule" />
           <div style={{
             fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
@@ -339,8 +540,8 @@ export default function OnboardingScreen({ onComplete }) {
     );
   }
 
-  // ── Step 5: Equipment ──
-  if (step === 5) {
+  // ── Step 8: Equipment ──
+  if (step === 8) {
     const eqs = [
       { id: 'full_gym',       label: 'Full Gym',              sub: 'Barbells, machines, dumbbells — everything' },
       { id: 'dumbbells',      label: 'Dumbbells + Machines',  sub: 'No barbell, but have cable/machine access' },
@@ -351,7 +552,7 @@ export default function OnboardingScreen({ onComplete }) {
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
-          <StepHeader step={5} total={7} title="What Equipment Do You Have?" />
+          <StepHeader step={8} total={TOTAL_STEPS} title="What Equipment Do You Have?" />
           {eqs.map(eq => (
             <OptionBtn key={eq.id} selected={data.equipment === eq.id}
               onClick={() => set('equipment', eq.id)}>
@@ -367,13 +568,43 @@ export default function OnboardingScreen({ onComplete }) {
     );
   }
 
-  // ── Step 6: Body Stats ──
-  if (step === 6) {
+  // ── Step 9: Split Preference (Intermediate/Advanced only) (Phase 3.7) ──
+  if (step === 9) {
+    if (!isAdvanced) {
+      setStep(10); return null;
+    }
+    const splits = [
+      { id: 'full_body', label: 'Full Body', sub: 'Recommended for most — train everything each session' },
+      { id: 'upper_lower', label: 'Upper / Lower Split', sub: 'Alternate upper and lower body days' },
+      { id: 'ppl', label: 'Push / Pull / Legs', sub: 'Separate pushing, pulling, and leg days' },
+      { id: 'no_preference', label: 'No Preference', sub: 'Choose for me based on my schedule' },
+    ];
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+        <Card>
+          <StepHeader step={9} total={TOTAL_STEPS} title="Training Split Preference" />
+          {splits.map(s => (
+            <OptionBtn key={s.id} selected={data.splitPreference === s.id}
+              onClick={() => set('splitPreference', s.id)}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{s.sub}</div>
+              </div>
+            </OptionBtn>
+          ))}
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 10: Body Stats ──
+  if (step === 10) {
     const bodyValid = data.name?.trim() && data.age && data.sex && data.weightKg && data.heightCm;
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
-          <StepHeader step={6} total={7} title="Your Body Stats" />
+          <StepHeader step={10} total={TOTAL_STEPS} title="Your Body Stats" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
             Used to calculate your personalized calorie targets using the Mifflin-St Jeor formula.
           </div>
@@ -412,8 +643,181 @@ export default function OnboardingScreen({ onComplete }) {
     );
   }
 
-  // ── Step 7: Training Days + Injuries ──
-  if (step === 7) {
+  // ── Step 11: Lifestyle & Recovery (Phase 3.4) ──
+  if (step === 11) {
+    const activityOpts = [
+      { id: 'sedentary', label: 'Sedentary', sub: 'Desk job, minimal walking' },
+      { id: 'lightly_active', label: 'Lightly Active', sub: 'Teacher, retail, some walking' },
+      { id: 'moderately_active', label: 'Moderately Active', sub: 'On feet most of the day' },
+      { id: 'very_active', label: 'Very Active', sub: 'Construction, manual labor, athlete' },
+    ];
+    const sleepOpts = [
+      { id: '<5', label: 'Less than 5 hours' },
+      { id: '5-6', label: '5–6 hours' },
+      { id: '6-7', label: '6–7 hours' },
+      { id: '7-8', label: '7–8 hours' },
+      { id: '8+', label: '8+ hours' },
+    ];
+    const stressOpts = [
+      { id: 'low', label: 'Low', sub: 'Life feels manageable' },
+      { id: 'moderate', label: 'Moderate', sub: 'Some stressors but coping well' },
+      { id: 'high', label: 'High', sub: 'Significant stress from work, life, or relationships' },
+      { id: 'very_high', label: 'Very High', sub: 'Feeling overwhelmed most days' },
+    ];
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+        <Card>
+          <StepHeader step={11} total={TOTAL_STEPS} title="Lifestyle & Recovery" />
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
+          }}>DAILY ACTIVITY LEVEL</div>
+          {activityOpts.map(a => (
+            <OptionBtn key={a.id} selected={data.dailyActivity === a.id} onClick={() => set('dailyActivity', a.id)}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{a.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{a.sub}</div>
+              </div>
+            </OptionBtn>
+          ))}
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
+          }}>TYPICAL SLEEP</div>
+          {sleepOpts.map(s => (
+            <OptionBtn key={s.id} selected={data.sleepHours === s.id} onClick={() => set('sleepHours', s.id)}>
+              {s.label}
+            </OptionBtn>
+          ))}
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
+          }}>STRESS LEVEL</div>
+          {stressOpts.map(s => (
+            <OptionBtn key={s.id} selected={data.stressLevel === s.id} onClick={() => set('stressLevel', s.id)}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{s.sub}</div>
+              </div>
+            </OptionBtn>
+          ))}
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext}
+            nextDisabled={!data.dailyActivity || !data.sleepHours || !data.stressLevel} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 12: Dietary Context (Phase 3.5) ──
+  if (step === 12) {
+    const restrictionOpts = ['None', 'Vegetarian', 'Vegan', 'Halal', 'Lactose Intolerant', 'Gluten-Free'];
+    const toggle = (r) => {
+      if (r === 'None') {
+        set('dietaryRestrictions', data.dietaryRestrictions.includes('None') ? [] : ['None']);
+        return;
+      }
+      const without = data.dietaryRestrictions.filter(x => x !== 'None');
+      set('dietaryRestrictions', without.includes(r) ? without.filter(x => x !== r) : [...without, r]);
+    };
+    const trackOpts = [
+      { id: 'never', label: "Never — I'm new to this" },
+      { id: 'tried', label: 'Tried it briefly' },
+      { id: 'regular', label: 'I do it regularly' },
+    ];
+    const mealOpts = [
+      { id: 2, label: '2 meals' },
+      { id: 3, label: '3 meals' },
+      { id: '4-5', label: '4–5 smaller meals' },
+      { id: 'varies', label: 'Varies / no routine' },
+    ];
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+        <Card>
+          <StepHeader step={12} total={TOTAL_STEPS} title="Dietary Context" />
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
+          }}>DIETARY RESTRICTIONS</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 20 }}>
+            {restrictionOpts.map(r => (
+              <CheckBtn key={r} selected={data.dietaryRestrictions.includes(r)} onClick={() => toggle(r)}>
+                {r}
+              </CheckBtn>
+            ))}
+          </div>
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
+          }}>TRACKING EXPERIENCE</div>
+          {trackOpts.map(t => (
+            <OptionBtn key={t.id} selected={data.trackingExperience === t.id} onClick={() => set('trackingExperience', t.id)}>
+              {t.label}
+            </OptionBtn>
+          ))}
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
+          }}>MEALS PER DAY</div>
+          {mealOpts.map(m => (
+            <OptionBtn key={m.id} selected={data.mealsPerDay === m.id} onClick={() => set('mealsPerDay', m.id)}>
+              {m.label}
+            </OptionBtn>
+          ))}
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 13: Motivation & Adherence History (Phase 3.6) ──
+  if (step === 13) {
+    const quitReasons = [
+      'Got bored / lost motivation',
+      'Got injured',
+      'Life got busy / schedule conflict',
+      "Didn't see results",
+      'Felt too sore / recovery issues',
+      'Felt intimidated at the gym',
+      'This is my first program',
+    ];
+    const motivations = [
+      'Look better (aesthetics)',
+      'Feel better (energy, mood)',
+      'Health / longevity',
+      'Sport / athletic performance',
+      'Mental health (stress, anxiety, depression)',
+      'Doctor recommended',
+    ];
+    return (
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+        <Card>
+          <StepHeader step={13} total={TOTAL_STEPS} title="Your Motivation" />
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
+          }}>HAVE YOU STARTED AND STOPPED BEFORE?</div>
+          {quitReasons.map(r => (
+            <OptionBtn key={r} selected={data.previousQuitReason === r} onClick={() => set('previousQuitReason', r)}>
+              {r}
+            </OptionBtn>
+          ))}
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
+          }}>YOUR #1 REASON FOR TRAINING</div>
+          {motivations.map(m => (
+            <OptionBtn key={m} selected={data.primaryMotivation === m} onClick={() => set('primaryMotivation', m)}>
+              {m}
+            </OptionBtn>
+          ))}
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Step 14: Training Days ──
+  if (step === 14) {
     const needed = data.daysPerWeek || 3;
     const selected = data.trainingDays;
     const exactly = selected.length === needed;
@@ -429,7 +833,7 @@ export default function OnboardingScreen({ onComplete }) {
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
-          <StepHeader step={7} total={7} title="Pick Your Training Days" />
+          <StepHeader step={14} total={TOTAL_STEPS} title="Pick Your Training Days" />
           <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 16 }}>
             Select exactly <strong style={{ color: 'var(--cyan)' }}>{needed} days</strong> per week.
             <span style={{ color: 'var(--text3)', marginLeft: 6 }}>({selected.length}/{needed} selected)</span>
@@ -455,28 +859,6 @@ export default function OnboardingScreen({ onComplete }) {
                 </button>
               );
             })}
-          </div>
-
-          <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
-            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
-          }}>INJURIES OR LIMITATIONS (optional)</div>
-          <textarea
-            value={data.injuries}
-            onChange={e => set('injuries', e.target.value)}
-            placeholder="e.g. Right knee pain, avoid heavy squats"
-            rows={3}
-            style={{
-              width: '100%', padding: '12px 14px', borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.05)',
-              color: 'var(--text)', fontSize: 14, fontFamily: 'Rajdhani',
-              outline: 'none', resize: 'none', boxSizing: 'border-box',
-              lineHeight: 1.5,
-            }}
-          />
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, lineHeight: 1.5 }}>
-            Quest will use this to suggest safer exercise alternatives.
           </div>
           <NavButtons step={step} onBack={handleBack} onNext={handleNext}
             nextLabel="START MY PROGRAM" nextDisabled={!exactly} />

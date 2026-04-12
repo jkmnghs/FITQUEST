@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase } from '../utils/gameLogic';
+import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 import { PROGRAMS } from '../data/programs';
 
@@ -157,7 +157,7 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
 
   const w = viewingWeek;
   const isCurrentWeek = w === state.currentWeek;
-  const isDeload = w === 9;
+  const isDeload = isDeloadWeek(w);
   const { unit, liftWeights, todayExDone, todayExDetails, todaySessionFinished, weekProgress, overloadSuggestions } = state;
 
   const wp = weekProgress?.[w] || { count: 0, dates: [], completed: false, sessions: [] };

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
+import { validateState, repairState } from '../utils/stateSchema';
+import { migrateState } from '../utils/stateMigrations';
 
 // Module-level guard — lives completely outside React, reset only on page reload.
 // Initialized from localStorage so page reloads are also covered.
@@ -18,7 +20,13 @@ function mergeState(saved) {
   const merged = { ...base, ...saved };
   // Deep-merge assessment so new fields (parqFlagged, sessionLength, body stats) appear
   merged.assessment = { ...base.assessment, ...(saved.assessment || {}) };
-  return merged;
+  // Deep-merge new v2 nested objects
+  merged.lifestyle = { ...base.lifestyle, ...(saved.lifestyle || {}) };
+  merged.dietary = { ...base.dietary, ...(saved.dietary || {}) };
+  merged.motivation = { ...base.motivation, ...(saved.motivation || {}) };
+  merged.dailyHabits = { ...base.dailyHabits, ...(saved.dailyHabits || {}) };
+  // Run migration
+  return migrateState(merged);
 }
 
 const PRUNE_DAYS = 90;
@@ -37,6 +45,10 @@ function checkDayReset(state) {
     next.todaySessionFinished = false;
     next.sessionStartTime = null;
     next.todayExDate = t;
+    // Reset daily XP tracking at midnight
+    next.dailyXPEarned = 0;
+    next.dailySessionCount = 0;
+    next.lastDayReset = new Date().toISOString().slice(0, 10);
   }
   // Decay streak if gap since last session exceeds the 3-day rest-day window
   if (next.lastDate && next.lastDate !== t && next.streak > 0) {
@@ -93,14 +105,46 @@ export function useGameState(user) {
     setCloudLoading(true);
     cloudGet(userId).then(cloudData => {
       if (cloudData && Object.keys(cloudData).length > 0) {
-        // Cloud wins over localStorage
-        const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
-        // Populate name from Supabase auth metadata if not already set
-        if (!merged.name && user?.user_metadata?.full_name) {
-          merged.name = user.user_metadata.full_name;
+        const localData = storageGet();
+
+        // Phase 5.2: Conflict resolution — merge when both have data
+        if (localData && localData.totalSessions > 0 && cloudData.totalSessions > 0) {
+          const localModified = localData.lastDate || '';
+          const cloudModified = cloudData.lastDate || '';
+          // Simple merge strategy: take whichever is newer, union workout logs
+          const baseData = cloudModified >= localModified ? cloudData : localData;
+          const merged = checkQuestReset(checkDayReset(mergeState(baseData)));
+          // Union log entries (deduplicate by dateStr)
+          const seenDates = new Set();
+          const mergedLog = [...(cloudData.log || []), ...(localData.log || [])].filter(entry => {
+            const key = entry.dateStr || entry.date;
+            if (seenDates.has(key)) return false;
+            seenDates.add(key);
+            return true;
+          });
+          merged.log = mergedLog.slice(-200); // keep last 200
+          // Take higher XP/level
+          merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
+          merged.level = Math.max(cloudData.level || 1, localData.level || 1);
+          merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
+          // Union achievements
+          merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
+
+          if (!merged.name && user?.user_metadata?.full_name) {
+            merged.name = user.user_metadata.full_name;
+          }
+          setStateRaw(merged);
+          storageSet(merged);
+        } else {
+          // Cloud wins over localStorage
+          const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
+          // Populate name from Supabase auth metadata if not already set
+          if (!merged.name && user?.user_metadata?.full_name) {
+            merged.name = user.user_metadata.full_name;
+          }
+          setStateRaw(merged);
+          storageSet(merged);
         }
-        setStateRaw(merged);
-        storageSet(merged);
       } else {
         // Cloud is empty — check if localStorage has data to migrate
         const localData = storageGet();
@@ -125,7 +169,21 @@ export function useGameState(user) {
   // ── Auto-save: localStorage + debounced cloud ─────────────────────────────
   useEffect(() => {
     storageSet(state);
-    if (userId) cloudSetDebounced(userId, state);
+    if (userId) {
+      const { success, error } = validateState(state);
+      if (success) {
+        cloudSetDebounced(userId, state);
+      } else {
+        console.error('[useGameState] State validation failed, skipping cloud save:', error);
+        // Attempt repair and save the repaired version
+        const repaired = repairState(state);
+        const recheck = validateState(repaired);
+        if (recheck.success) {
+          cloudSetDebounced(userId, repaired);
+          setStateRaw(repaired);
+        }
+      }
+    }
   }, [state, userId]);
 
   // Re-run day reset whenever the app becomes visible or the minute ticks over midnight
@@ -208,7 +266,7 @@ export function useGameState(user) {
   const completeAssessment = useCallback((assessment, onSaved) => {
     const programId       = selectProgram(assessment);
     const program         = getProgramById(programId);
-    const { liftWeights, liftHistory } = buildInitialWeights(program);
+    const { liftWeights, liftHistory } = buildInitialWeights(program, assessment);
     const nutritionGoals  = calcNutritionGoals(assessment);
     const { bmi, category: bmiCategory } = calcBMI(assessment.weightKg, assessment.heightCm);
     const waistToHeightRatio = calcWaistToHeight(assessment.waistCm, assessment.heightCm);
@@ -228,6 +286,22 @@ export function useGameState(user) {
         bmi,
         bmiCategory,
         waistToHeightRatio,
+        // Store new v2 data
+        lifestyle: {
+          dailyActivity: assessment.dailyActivity || 'sedentary',
+          sleepHours: assessment.sleepHours || '7-8',
+          stressLevel: assessment.stressLevel || 'moderate',
+        },
+        dietary: {
+          restrictions: assessment.dietaryRestrictions || [],
+          trackingExperience: assessment.trackingExperience || 'never',
+          mealsPerDay: assessment.mealsPerDay || 3,
+        },
+        motivation: {
+          primaryMotivation: assessment.primaryMotivation || null,
+          previousQuitReason: assessment.previousQuitReason || null,
+        },
+        stateVersion: 2,
       };
       // Immediate cloud save (not debounced) — assessment completion is critical
       if (userId) {
@@ -326,10 +400,12 @@ export function useGameState(user) {
   const completeExercise = useCallback((exId, sets) => {
     let pendingXP = 0;
     let pendingPR = false;
+    let pendingReasons = [];
     setState(prev => {
-      const isDeload = prev.currentWeek === 9;
+      const isDeload = isDeloadWeek(prev.currentWeek);
       let vol = 0, maxRPE = 0, setsCompleted = 0;
       let maxWeightUsed = 0;
+      let totalRPE = 0, rpeCount = 0;
 
       sets.forEach(s => {
         if (s.done) {
@@ -340,15 +416,38 @@ export function useGameState(user) {
             vol += wt * rp;
             if (wt > maxWeightUsed) maxWeightUsed = wt;
             if ((s.rpe || 0) > maxRPE) maxRPE = s.rpe || 0;
+            if (s.rpe) { totalRPE += s.rpe; rpeCount++; }
           }
         }
       });
 
+      // ── Adherence-based XP calculation ──
+      const avgRPE = rpeCount > 0 ? totalRPE / rpeCount : 0;
+      const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase().slice(0, 3);
+      const matchesPrescribedDay = (prev.trainingDays || [])
+        .some(d => d.toLowerCase().startsWith(todayStr));
+      const previousWeight = prev.liftWeights?.[exId] || 0;
+      const overloadAchieved = maxWeightUsed > previousWeight && previousWeight > 0;
+
+      const weeklyState = {
+        completedSessions: prev.weekProgress?.[prev.currentWeek]?.count || 0,
+      };
+      const program = { sessionsPerWeek: prev.sessionsPerWeek || 3 };
+
+      const { xp: adherenceXP, reasons } = calculateAdherenceXP(
+        { matchesPrescribedDay, avgRPE, overloadAchieved, setsCompleted },
+        weeklyState,
+        program
+      );
+
+      // Apply daily XP cap
+      const dailyEarned = prev.dailyXPEarned || 0;
+      const xp = Math.min(150 - dailyEarned, Math.max(5, adherenceXP));
+      pendingXP = xp;
+      pendingReasons = reasons;
+
       const baseSets = sets.filter(s => !s.isExtra).length;
       const extraSets = sets.filter(s => s.isExtra).length;
-      const missedPrescribed = Math.max(0, baseSets - setsCompleted);
-      const xp = Math.max(5, 10 + setsCompleted * 5 - missedPrescribed * 3);
-      pendingXP = xp;
 
       // Progressive overload — RPE-based + 2-for-2 rule tracking
       let overloadSuggestions = { ...prev.overloadSuggestions };
@@ -419,11 +518,15 @@ export function useGameState(user) {
         sessionStartTime,
         overloadSuggestions, weeklyRPE, consecutiveCompletions,
         personalRecords, liftWeights,
+        dailyXPEarned: (prev.dailyXPEarned || 0) + pendingXP,
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
     setTimeout(() => {
-      addXP(pendingXP);
+      if (pendingXP > 0) {
+        const reasonStr = pendingReasons.length > 0 ? `\n${pendingReasons[0]}` : '';
+        addXP(pendingXP, `+${pendingXP} XP${reasonStr}`);
+      }
       if (pendingPR) setTimeout(() => showToast(`🏅 NEW PR: ${exId}!`), 1200);
     }, 50);
   }, [setState, addXP, showToast]);
@@ -436,19 +539,29 @@ export function useGameState(user) {
     setState(prev => {
       if (prev.todaySessionFinished) return prev;
       const w = prev.currentWeek;
-      const isDeload = w === 9;
+      const isDeload = isDeloadWeek(w);
       const exercises = prev.activeExercises || [];
       const doneCount = (prev.todayExDone || []).length;
       const totalEx = exercises.length || 7;
       const completionPct = Math.round((doneCount / totalEx) * 100);
       const missedCount = totalEx - doneCount;
       const bonusXP = Math.max(10, 50 - missedCount * 8);
-      pendingXP = bonusXP;
+
+      // ── Overtraining check (Phase 2.4) ──
+      const weekProgress = { ...prev.weekProgress };
+      if (!weekProgress[w]) weekProgress[w] = { count: 0, dates: [], completed: false, sessions: [] };
+      const currentWeekSessions = weekProgress[w].count || 0;
+      const programFrequency = prev.sessionsPerWeek || 3;
+      const ot = overtrainingCheck({ completedSessions: currentWeekSessions }, programFrequency);
+
+      // Apply overtraining multiplier and daily cap
+      const adjustedXP = Math.round(bonusXP * ot.xpMultiplier);
+      const dailyEarned = prev.dailyXPEarned || 0;
+      pendingXP = Math.min(150 - dailyEarned, adjustedXP);
+      if (pendingXP < 0) pendingXP = 0;
 
       const updatedWithStreak = updateStreak(prev);
 
-      const weekProgress = { ...prev.weekProgress };
-      if (!weekProgress[w]) weekProgress[w] = { count: 0, dates: [], completed: false, sessions: [] };
       const wp = { ...weekProgress[w] };
       wp.count = (wp.count || 0) + 1;
       wp.dates = [...(wp.dates || []), today()];
@@ -487,6 +600,8 @@ export function useGameState(user) {
         weekProgress,
         currentWeek: nextWeek,
         sessionStartTime: null,
+        dailySessionCount: (prev.dailySessionCount || 0) + 1,
+        dailyXPEarned: (prev.dailyXPEarned || 0) + pendingXP,
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
@@ -573,6 +688,25 @@ export function useGameState(user) {
     }));
     showToast('Meal deleted');
   }, [setState, showToast]);
+
+  // ── Recovery check-in (Phase 4.4) ──
+  const logRecovery = useCallback((scores) => {
+    setState(prev => ({
+      ...prev,
+      recoveryScores: [
+        ...(prev.recoveryScores || []).slice(-30), // keep last 30 entries
+        { date: new Date().toISOString().slice(0, 10), ...scores }
+      ]
+    }));
+  }, [setState]);
+
+  // ── Daily habits tracking (Phase 4.5) ──
+  const updateDailyHabits = useCallback((habits) => {
+    setState(prev => ({
+      ...prev,
+      dailyHabits: { ...(prev.dailyHabits || {}), ...habits }
+    }));
+  }, [setState]);
 
   const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
     const key = String(week);
@@ -685,6 +819,7 @@ export function useGameState(user) {
     addAIHistory, addAIEpisodic,
     incrementQuestMessages,
     logMeal, deleteMeal,
+    logRecovery, updateDailyHabits,
     importData, completeAssessment, changeProgram,
     swapExercise, deleteExercise,
   };
