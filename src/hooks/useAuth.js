@@ -40,10 +40,14 @@ export function useAuth() {
     return !error;
   }
 
-  async function signUp(email, password) {
+  async function signUp(email, password, name = '') {
     if (!supabase) return false;
     setAuthError(null);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: name ? { data: { full_name: name } } : undefined,
+    });
     if (error) setAuthError(error.message);
     return !error;
   }

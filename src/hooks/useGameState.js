@@ -63,7 +63,8 @@ function checkQuestReset(state) {
   return state;
 }
 
-export function useGameState(userId) {
+export function useGameState(user) {
+  const userId = user?.id;
   const [state, setStateRaw] = useState(() => {
     const saved = storageGet();
     const merged = saved ? mergeState(saved) : { ...DEFAULT_STATE };
@@ -94,6 +95,10 @@ export function useGameState(userId) {
       if (cloudData && Object.keys(cloudData).length > 0) {
         // Cloud wins over localStorage
         const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
+        // Populate name from Supabase auth metadata if not already set
+        if (!merged.name && user?.user_metadata?.full_name) {
+          merged.name = user.user_metadata.full_name;
+        }
         setStateRaw(merged);
         storageSet(merged);
       } else {
@@ -200,7 +205,7 @@ export function useGameState(userId) {
   }, [showToast, userId]);
 
   // ── completeAssessment ───────────────────────────────────────────────────
-  const completeAssessment = useCallback((assessment) => {
+  const completeAssessment = useCallback((assessment, onSaved) => {
     const programId       = selectProgram(assessment);
     const program         = getProgramById(programId);
     const { liftWeights, liftHistory } = buildInitialWeights(program);
@@ -211,6 +216,7 @@ export function useGameState(userId) {
     setStateRaw(prev => {
       const newState = {
         ...prev,
+        name: assessment.name || prev.name,
         assessment: { ...assessment, completed: true, programId },
         programId,
         sessionsPerWeek: program.sessionsPerWeek,
@@ -224,12 +230,88 @@ export function useGameState(userId) {
         waistToHeightRatio,
       };
       // Immediate cloud save (not debounced) — assessment completion is critical
-      if (userId) cloudSet(userId, newState);
+      if (userId) {
+        cloudSet(userId, newState).then(() => {
+          if (onSaved) onSaved();
+        });
+      } else if (onSaved) {
+        // No cloud — fire immediately
+        setTimeout(onSaved, 0);
+      }
       return newState;
     });
   }, [userId]);
 
-  // ── addAIEpisodic ────────────────────────────────────────────────────────
+  // ── changeProgram ──────────────────────────────────────────────────────
+  // Switches to a new program while preserving weights for shared exercises.
+  const changeProgram = useCallback((newProgramId) => {
+    const program = getProgramById(newProgramId);
+    if (!program) return;
+    setState(prev => {
+      // Merge: keep existing weights for exercises that appear in the new program
+      const { liftWeights: freshWeights, liftHistory: freshHistory } = buildInitialWeights(program);
+      const mergedWeights = { ...freshWeights, ...prev.liftWeights };
+      const mergedHistory = {};
+      for (const ex of program.exercises) {
+        mergedHistory[ex.id] = prev.liftHistory?.[ex.id] || [];
+      }
+      const newState = {
+        ...prev,
+        programId: program.id,
+        activeExercises: program.exercises,
+        sessionsPerWeek: program.sessionsPerWeek,
+        liftWeights: mergedWeights,
+        liftHistory: mergedHistory,
+        assessment: { ...prev.assessment, programId: program.id },
+      };
+      if (userId) cloudSet(userId, newState);
+      return newState;
+    });
+    showToast(`Program changed to ${program.name}`);
+  }, [setState, userId, showToast]);
+
+  // ── swapExercise ──────────────────────────────────────────────────────────
+  const swapExercise = useCallback((oldId, newEx) => {
+    setState(prev => {
+      const liftWeights = { ...prev.liftWeights };
+      if (liftWeights[newEx.id] == null) liftWeights[newEx.id] = newEx.startKg ?? 0;
+
+      // Add mode — append with sensible defaults for sets/reps/rest/rpe
+      if (oldId === '__add__') {
+        const defaults = newEx.isPlank
+          ? { sets: 2, reps: 0,  rest: '60 sec', restSec: 60,  rpe: 0 }
+          : newEx.isBodyweight
+            ? { sets: 3, reps: 12, rest: '60 sec', restSec: 60, rpe: 7 }
+            : { sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8 };
+        const exerciseToAdd = { ...defaults, ...newEx };
+        const newState = { ...prev, activeExercises: [...(prev.activeExercises || []), exerciseToAdd], liftWeights };
+        if (userId) cloudSet(userId, newState);
+        return newState;
+      }
+
+      // Swap mode — replace in place
+      const idx = (prev.activeExercises || []).findIndex(e => e.id === oldId);
+      if (idx === -1) return prev;
+      const updated = [...prev.activeExercises];
+      updated[idx] = { ...updated[idx], id: newEx.id, name: newEx.name, isPlank: !!newEx.isPlank, isBodyweight: !!newEx.isBodyweight };
+      const newState = { ...prev, activeExercises: updated, liftWeights };
+      if (userId) cloudSet(userId, newState);
+      return newState;
+    });
+    showToast(oldId === '__add__' ? `Added ${newEx.name}` : `Swapped to ${newEx.name}`);
+  }, [setState, userId, showToast]);
+
+  // ── deleteExercise ────────────────────────────────────────────────────────
+  const deleteExercise = useCallback((exId) => {
+    setState(prev => {
+      const updated = (prev.activeExercises || []).filter(e => e.id !== exId);
+      const newState = { ...prev, activeExercises: updated };
+      if (userId) cloudSet(userId, newState);
+      return newState;
+    });
+    showToast('Exercise removed');
+  }, [setState, userId, showToast]);
+
   const addAIEpisodic = useCallback((note) => {
     setState(prev => ({
       ...prev,
@@ -603,6 +685,7 @@ export function useGameState(userId) {
     addAIHistory, addAIEpisodic,
     incrementQuestMessages,
     logMeal, deleteMeal,
-    importData, completeAssessment,
+    importData, completeAssessment, changeProgram,
+    swapExercise, deleteExercise,
   };
 }

@@ -305,7 +305,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </div>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
-          Mon/Wed/Fri workout reminders, Sunday check-in, overload nudges
+          Scheduled workout day reminders, weekly check-in nudges, overload alerts
         </div>
         {notifStatus !== 'granted' && notifStatus !== 'denied' && (
           <button onClick={onRequestNotif} style={{

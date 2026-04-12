@@ -1,14 +1,144 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
+import { PROGRAMS } from '../data/programs';
 
-export default function WorkoutTab({ state, exercises, onCompleteExercise, onFinishSession, onStartSession, onModalChange }) {
+// Full categorized exercise library (gym + home)
+const EXERCISE_LIBRARY = [
+  {
+    category: 'Chest', icon: '🫁',
+    exercises: [
+      { id: 'bench',       name: 'Barbell Bench Press',    startKg: 42.5 },
+      { id: 'incbench',    name: 'Incline Barbell Press',  startKg: 35 },
+      { id: 'decbench',    name: 'Decline Bench Press',    startKg: 45 },
+      { id: 'dbbench',     name: 'DB Bench Press',         startKg: 16 },
+      { id: 'incdbench',   name: 'Incline DB Press',       startKg: 14 },
+      { id: 'cablefly',    name: 'Cable Chest Fly',        startKg: 10 },
+      { id: 'pecdeck',     name: 'Pec Deck',               startKg: 35 },
+      { id: 'chestdip',    name: 'Chest Dip',              startKg: 0, isBodyweight: true },
+      { id: 'pushup',      name: 'Push-up',                startKg: 0, isBodyweight: true },
+      { id: 'widepushup',  name: 'Wide Push-up',           startKg: 0, isBodyweight: true },
+      { id: 'pikepushup',  name: 'Pike Push-up',           startKg: 0, isBodyweight: true },
+    ],
+  },
+  {
+    category: 'Back', icon: '↩️',
+    exercises: [
+      { id: 'pulldown',    name: 'Lat Pulldown',           startKg: 47.5 },
+      { id: 'cablerow',    name: 'Seated Cable Row',       startKg: 40 },
+      { id: 'bbrow',       name: 'Barbell Row',            startKg: 50 },
+      { id: 'dbrow',       name: 'DB Bent-Over Row',       startKg: 14 },
+      { id: 'singlerow',   name: 'Single-arm DB Row',      startKg: 14 },
+      { id: 'tbarrow',     name: 'T-Bar Row',              startKg: 40 },
+      { id: 'facepull',    name: 'Face Pull',              startKg: 15 },
+      { id: 'strtpull',    name: 'Straight-arm Pulldown',  startKg: 20 },
+      { id: 'pullup',      name: 'Pull-up',                startKg: 0, isBodyweight: true },
+      { id: 'chinup',      name: 'Chin-up',                startKg: 0, isBodyweight: true },
+      { id: 'hingerow',    name: 'Inverted Row',           startKg: 0, isBodyweight: true },
+    ],
+  },
+  {
+    category: 'Legs', icon: '🦵',
+    exercises: [
+      { id: 'squat',       name: 'Barbell Squat',          startKg: 45 },
+      { id: 'deadlift',    name: 'Conventional Deadlift',  startKg: 60 },
+      { id: 'legpress',    name: 'Leg Press',              startKg: 80 },
+      { id: 'rdl',         name: 'Romanian Deadlift',      startKg: 55 },
+      { id: 'legcurl',     name: 'Leg Curl Machine',       startKg: 40 },
+      { id: 'legext',      name: 'Leg Extension',          startKg: 35 },
+      { id: 'hipthrust',   name: 'Barbell Hip Thrust',     startKg: 40 },
+      { id: 'calfraise',   name: 'Standing Calf Raise',    startKg: 20 },
+      { id: 'bulgsplit',   name: 'Bulgarian Split Squat',  startKg: 10 },
+      { id: 'dblunge',     name: 'DB Reverse Lunge',       startKg: 10 },
+      { id: 'dbsquat',     name: 'DB Goblet Squat',        startKg: 16 },
+      { id: 'dbrdl',       name: 'DB Romanian Deadlift',   startKg: 16 },
+      { id: 'bwsquat',     name: 'Bodyweight Squat',       startKg: 0, isBodyweight: true },
+      { id: 'lunge',       name: 'Reverse Lunge',          startKg: 0, isBodyweight: true },
+      { id: 'walklunge',   name: 'Walking Lunge',          startKg: 0, isBodyweight: true },
+      { id: 'stepup',      name: 'Step-up',                startKg: 0, isBodyweight: true },
+      { id: 'glute',       name: 'Glute Bridge',           startKg: 0, isBodyweight: true },
+      { id: 'jumpsquat',   name: 'Jump Squat',             startKg: 0, isBodyweight: true },
+    ],
+  },
+  {
+    category: 'Shoulders', icon: '⚡',
+    exercises: [
+      { id: 'bbohp',       name: 'Barbell Overhead Press', startKg: 30 },
+      { id: 'ohp',         name: 'DB Overhead Press',      startKg: 15 },
+      { id: 'dbohp',       name: 'Seated DB Press',        startKg: 12 },
+      { id: 'arnoldpress', name: 'Arnold Press',           startKg: 10 },
+      { id: 'machohp',     name: 'Machine Shoulder Press', startKg: 30 },
+      { id: 'lateraise',   name: 'DB Lateral Raise',       startKg: 6 },
+      { id: 'cablelat',    name: 'Cable Lateral Raise',    startKg: 5 },
+      { id: 'frontraise',  name: 'DB Front Raise',         startKg: 6 },
+      { id: 'reardelt',    name: 'Rear Delt Fly',          startKg: 6 },
+    ],
+  },
+  {
+    category: 'Arms', icon: '💪',
+    exercises: [
+      { id: 'bbcurl',      name: 'Barbell Bicep Curl',     startKg: 20 },
+      { id: 'dbcurl',      name: 'DB Bicep Curl',          startKg: 10 },
+      { id: 'hammercurl',  name: 'Hammer Curl',            startKg: 10 },
+      { id: 'cablecurl',   name: 'Cable Curl',             startKg: 15 },
+      { id: 'preachcurl',  name: 'Preacher Curl',          startKg: 15 },
+      { id: 'cgbench',     name: 'Close-Grip Bench Press', startKg: 35 },
+      { id: 'tricpush',    name: 'Tricep Pushdown',        startKg: 20 },
+      { id: 'ohtriext',    name: 'Overhead Tricep Ext.',   startKg: 12 },
+      { id: 'skullcrush',  name: 'Skull Crushers',         startKg: 20 },
+      { id: 'dipbench',    name: 'Tricep Dip',             startKg: 0, isBodyweight: true },
+      { id: 'diamondpush', name: 'Diamond Push-up',        startKg: 0, isBodyweight: true },
+    ],
+  },
+  {
+    category: 'Core', icon: '🔥',
+    exercises: [
+      { id: 'plank',       name: 'Plank',                  startKg: 0, isPlank: true },
+      { id: 'sideplank',   name: 'Side Plank',             startKg: 0, isPlank: true },
+      { id: 'hollowbody',  name: 'Hollow Body Hold',       startKg: 0, isPlank: true },
+      { id: 'mtnclimp',    name: 'Mountain Climbers',      startKg: 0, isBodyweight: true },
+      { id: 'abrollout',   name: 'Ab Wheel Rollout',       startKg: 0, isBodyweight: true },
+      { id: 'hanglegrise', name: 'Hanging Leg Raise',      startKg: 0, isBodyweight: true },
+      { id: 'cablecrnch',  name: 'Cable Crunch',           startKg: 20 },
+      { id: 'rustwist',    name: 'Russian Twist',          startKg: 0, isBodyweight: true },
+      { id: 'deadbug',     name: 'Dead Bug',               startKg: 0, isBodyweight: true },
+      { id: 'crunch',      name: 'Crunch',                 startKg: 0, isBodyweight: true },
+      { id: 'biccrnch',    name: 'Bicycle Crunch',         startKg: 0, isBodyweight: true },
+      { id: 'legrise',     name: 'Lying Leg Raise',        startKg: 0, isBodyweight: true },
+      { id: 'vup',         name: 'V-Up',                   startKg: 0, isBodyweight: true },
+      { id: 'superman',    name: 'Superman Hold',          startKg: 0, isBodyweight: true },
+    ],
+  },
+  {
+    category: 'Cardio', icon: '🏃',
+    exercises: [
+      { id: 'burpees',     name: 'Burpees',                startKg: 0, isBodyweight: true },
+      { id: 'jumpjack',    name: 'Jumping Jacks',          startKg: 0, isBodyweight: true },
+      { id: 'highnknee',   name: 'High Knees',             startKg: 0, isBodyweight: true },
+      { id: 'boxjump',     name: 'Box Jump',               startKg: 0, isBodyweight: true },
+      { id: 'ropewave',    name: 'Battle Rope Waves',      startKg: 0, isBodyweight: true },
+    ],
+  },
+];
+
+export default function WorkoutTab({ state, exercises, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showProgramComplete, setShowProgramComplete] = useState(false);
-  // Stores per-exercise set arrays so checked sets survive modal close/reopen
   const [inProgressSets, setInProgressSets] = useState({});
+  // Swipe state: tracks which card is swiped open
+  const [swipedId, setSwipedId] = useState(null);
+  // Swap picker: which exercise is being swapped
+  const [swapTargetId, setSwapTargetId] = useState(null);
+  // Program switcher panel
+  const [showProgramSwitcher, setShowProgramSwitcher] = useState(false);
+  // Picker filter state
+  const [pickerCategory, setPickerCategory] = useState('All');
+  const [pickerSearch, setPickerSearch] = useState('');
+  // Touch tracking refs
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   // Keep viewingWeek in sync when the program advances to a new week
   useEffect(() => {
@@ -17,8 +147,13 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
 
   // Tell App when any modal/overlay is open so it can hide the tab bar
   useEffect(() => {
-    onModalChange?.(!!activeExId || showFinishConfirm);
-  }, [activeExId, showFinishConfirm]);
+    onModalChange?.(!!activeExId || showFinishConfirm || !!swapTargetId || showProgramSwitcher);
+  }, [activeExId, showFinishConfirm, swapTargetId, showProgramSwitcher]);
+
+  // Reset picker filters whenever the picker opens
+  useEffect(() => {
+    if (swapTargetId) { setPickerCategory('All'); setPickerSearch(''); }
+  }, [swapTargetId]);
 
   const w = viewingWeek;
   const isCurrentWeek = w === state.currentWeek;
@@ -26,6 +161,13 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
   const { unit, liftWeights, todayExDone, todayExDetails, todaySessionFinished, weekProgress, overloadSuggestions } = state;
 
   const wp = weekProgress?.[w] || { count: 0, dates: [], completed: false, sessions: [] };
+
+  const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const DAY_LABELS = { mon: 'M', tue: 'Tu', wed: 'W', thu: 'Th', fri: 'F', sat: 'Sa', sun: 'Su' };
+  const sortedTrainingDays = state.trainingDays?.length
+    ? [...state.trainingDays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+    : ['mon', 'wed', 'fri'];
+  const totalSessions = sortedTrainingDays.length;
 
   function jumpToWeek(n) { setViewingWeek(n); }
 
@@ -52,11 +194,11 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
         background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12
       }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['M', 'W', 'F'].map((d, i) => {
+          {sortedTrainingDays.map((dayId, i) => {
             const done = i < wp.count;
             const isCur = i === wp.count && !wp.completed && isCurrentWeek;
             return (
-              <div key={d} style={{
+              <div key={dayId} style={{
                 width: 32, height: 32, borderRadius: '50%',
                 border: `2px solid ${done ? 'var(--green)' : isCur ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
                 background: done ? 'var(--green)' : 'transparent',
@@ -64,7 +206,7 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
                 animation: isCur ? 'rankPulse 2s infinite' : 'none'
-              }}>{done ? '✓' : d}</div>
+              }}>{done ? '✓' : DAY_LABELS[dayId]}</div>
             );
           })}
         </div>
@@ -74,7 +216,7 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
             fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
             color: wp.completed ? 'var(--green)' : 'var(--cyan)'
           }}>
-            {wp.completed ? '✓ COMPLETE' : `${wp.count}/3 DONE`}
+            {wp.completed ? '✓ COMPLETE' : `${wp.count}/${totalSessions} DONE`}
           </div>
         </div>
       </div>
@@ -169,22 +311,69 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
         const wt = getWeightForExercise(ex, w, liftWeights);
         const convWt = convertWeight(wt, unit);
         const setsCount = getSetsForWeek(ex, w);
+        const isSwiped = swipedId === ex.id;
 
         return (
-          <div key={ex.id}
-            onClick={() => {
-              if (!isCurrentWeek || todaySessionFinished) return;
-              setActiveExId(ex.id);
-            }}
-            style={{
-              background: 'var(--card)', border: '1px solid var(--card-border)',
-              borderRadius: 16, padding: '14px 16px', marginBottom: 10,
-              cursor: isCurrentWeek && !todaySessionFinished ? 'pointer' : 'default',
-              opacity: isDone ? 0.55 : 1, position: 'relative', overflow: 'hidden',
-              backdropFilter: 'blur(20px)',
-              transition: 'opacity 0.3s, border-color 0.2s'
-            }}
-          >
+          <div key={ex.id} style={{ position: 'relative', marginBottom: 10 }}>
+            {/* Action buttons — always at right, revealed when card slides left */}
+            <div style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0,
+              display: 'flex', alignItems: 'stretch', zIndex: 2, borderRadius: 16,
+            }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSwipedId(null); setSwapTargetId(ex.id); }}
+                style={{
+                  width: 72, border: 'none', background: 'rgba(0,229,255,0.18)',
+                  color: 'var(--cyan)', cursor: 'pointer', borderRadius: '16px 0 0 16px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700, letterSpacing: 0.5,
+                }}
+              ><span style={{ fontSize: 18 }}>🔄</span>SWAP</button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm(`Remove ${ex.name} from your program?`)) {
+                    onDeleteExercise?.(ex.id);
+                    setSwipedId(null);
+                  }
+                }}
+                style={{
+                  width: 72, border: 'none', background: 'rgba(255,23,68,0.2)',
+                  color: 'var(--red)', cursor: 'pointer', borderRadius: '0 16px 16px 0',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700, letterSpacing: 0.5,
+                }}
+              ><span style={{ fontSize: 18 }}>🗑️</span>DELETE</button>
+            </div>
+
+            {/* Swipeable card — zIndex above buttons so it slides away to reveal them */}
+            <div
+              onTouchStart={e => {
+                touchStartX.current = e.touches[0].clientX;
+                touchStartY.current = e.touches[0].clientY;
+              }}
+              onTouchEnd={e => {
+                const dx = e.changedTouches[0].clientX - touchStartX.current;
+                const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+                if (dy > 30) return;
+                if (dx < -40) setSwipedId(ex.id);
+                else if (dx > 20) setSwipedId(null);
+              }}
+              onClick={() => {
+                if (isSwiped) { setSwipedId(null); return; }
+                if (!isCurrentWeek || todaySessionFinished) return;
+                setActiveExId(ex.id);
+              }}
+              style={{
+                background: 'var(--card)', border: `1px solid ${isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--card-border)'}`,
+                borderRadius: 16, padding: '14px 16px',
+                cursor: isCurrentWeek && !todaySessionFinished ? 'pointer' : 'default',
+                opacity: isDone ? 0.55 : 1, position: 'relative', overflow: 'hidden',
+                backdropFilter: 'blur(20px)', zIndex: 3,
+                transform: isSwiped ? 'translateX(-144px)' : 'translateX(0)',
+                transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.3s, border-color 0.2s',
+              }}
+            >
             {/* Top line on hover */}
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 2,
@@ -219,9 +408,33 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
               {!ex.isPlank && <Tag type="rpe">RPE {isDeload ? '5-6' : ex.rpe}</Tag>}
               <Tag type="rest">{ex.rest}</Tag>
             </div>
+            </div>
           </div>
         );
       })}
+
+      {/* Tap anywhere else to close swipe */}
+      {swipedId && (
+        <div
+          onClick={() => setSwipedId(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1 }}
+        />
+      )}
+
+      {/* Add Exercise button */}
+      <button
+        onClick={() => setSwapTargetId('__add__')}
+        style={{
+          width: '100%', padding: '11px 0', marginBottom: 10, borderRadius: 13,
+          border: '1px dashed rgba(0,229,255,0.25)',
+          background: 'rgba(0,229,255,0.04)', color: 'var(--cyan)',
+          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+          cursor: 'pointer', letterSpacing: 1, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 7,
+        }}
+      >
+        <span style={{ fontSize: 14 }}>＋</span> ADD EXERCISE
+      </button>
 
       {/* Finish session area */}
       {isCurrentWeek && !todaySessionFinished && todayDone.length > 0 && (
@@ -290,6 +503,99 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
       {showProgramComplete && (
         <ProgramCompleteModal onClose={() => setShowProgramComplete(false)} state={state} />
       )}
+
+      {/* Swap / Add exercise picker */}
+      {swapTargetId && (() => {
+        const isAdd = swapTargetId === '__add__';
+        const currentIds = new Set(exercises.map(e => e.id));
+        // Flat list from library, annotated with category/icon, deduplicated by id
+        const allExercises = EXERCISE_LIBRARY.flatMap(cat =>
+          cat.exercises.map(ex => ({ ...ex, category: cat.category, icon: cat.icon }))
+        );
+        const filtered = allExercises.filter(ex => {
+          if (isAdd && currentIds.has(ex.id)) return false;
+          if (!isAdd && ex.id === swapTargetId) return false;
+          if (pickerCategory !== 'All' && ex.category !== pickerCategory) return false;
+          if (pickerSearch && !ex.name.toLowerCase().includes(pickerSearch.toLowerCase())) return false;
+          return true;
+        });
+        return (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'flex-end',
+          }} onClick={() => setSwapTargetId(null)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              width: '100%', background: 'var(--bg)',
+              border: '1px solid rgba(0,229,255,0.15)', borderRadius: '20px 20px 0 0',
+              padding: '20px 16px 0',
+              animation: 'slideUp 0.25s cubic-bezier(0.4,0,0.2,1)',
+              maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+            }}>
+              {/* Header */}
+              <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 4 }}>
+                {isAdd ? 'ADD EXERCISE' : `SWAP — ${exercises.find(e => e.id === swapTargetId)?.name}`}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>
+                {isAdd ? 'Choose an exercise to add:' : 'Choose a replacement:'}
+              </div>
+              {/* Search */}
+              <input
+                placeholder="Search exercises..."
+                value={pickerSearch}
+                onChange={e => setPickerSearch(e.target.value)}
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '8px 12px',
+                  borderRadius: 9, border: '1px solid rgba(0,229,255,0.15)',
+                  background: 'rgba(255,255,255,0.04)', color: 'var(--text)',
+                  fontSize: 13, marginBottom: 10, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+              {/* Category tabs */}
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10, paddingBottom: 4, flexShrink: 0 }}>
+                {['All', ...EXERCISE_LIBRARY.map(c => c.category)].map(cat => (
+                  <button key={cat} onClick={() => setPickerCategory(cat)} style={{
+                    padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    whiteSpace: 'nowrap', fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                    letterSpacing: 0.5, flexShrink: 0,
+                    background: pickerCategory === cat ? 'rgba(0,229,255,0.18)' : 'rgba(255,255,255,0.05)',
+                    color: pickerCategory === cat ? 'var(--cyan)' : 'var(--text3)',
+                  }}>
+                    {cat === 'All' ? 'ALL' : cat}
+                  </button>
+                ))}
+              </div>
+              {/* Exercise list */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 8 }}>
+                {filtered.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 24, color: 'var(--text3)', fontSize: 13 }}>No exercises found</div>
+                )}
+                {filtered.map(sub => (
+                  <button key={sub.id} onClick={() => {
+                    onSwapExercise?.(isAdd ? '__add__' : swapTargetId, sub);
+                    setSwapTargetId(null);
+                  }} style={{
+                    padding: '11px 14px', borderRadius: 11, textAlign: 'left',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(255,255,255,0.03)', color: 'var(--text)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <span style={{ fontFamily: 'Exo 2, sans-serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{sub.name}</span>
+                    {(sub.isBodyweight || sub.isPlank) && (
+                      <span style={{ fontSize: 10, color: 'var(--text3)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>BW</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setSwapTargetId(null)} style={{
+                margin: '10px 0 28px', width: '100%', padding: 10, borderRadius: 10, border: 'none',
+                background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
+                fontFamily: 'Orbitron', fontSize: 9, cursor: 'pointer', flexShrink: 0,
+              }}>CANCEL</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

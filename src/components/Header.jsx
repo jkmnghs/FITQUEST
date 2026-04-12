@@ -1,9 +1,13 @@
 import React from 'react';
 import { getRank, getPhase, xpForLevel } from '../utils/gameLogic';
 
-function getNextWorkoutLabel() {
+const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+function getNextWorkoutLabel(trainingDays) {
   const day = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
-  const workoutDays = [1, 3, 5];
+  const workoutDays = trainingDays?.length
+    ? trainingDays.map(d => DAY_MAP[d]).filter(n => n !== undefined)
+    : [1, 3, 5];
   if (workoutDays.includes(day)) return 'Today!';
   let d = 1;
   while (d <= 7) {
@@ -18,7 +22,7 @@ export default function Header({ state }) {
   const phase = getPhase(state.currentWeek);
   const n = xpForLevel(state.level);
   const pct = Math.min(100, (state.xp / n) * 100);
-  const nextWorkout = getNextWorkoutLabel();
+  const nextWorkout = getNextWorkoutLabel(state.trainingDays);
 
   return (
     <div style={{ padding: '16px 20px 8px', background: 'rgba(10,14,26,0.7)', backdropFilter: 'blur(12px)' }}>

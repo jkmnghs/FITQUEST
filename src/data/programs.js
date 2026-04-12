@@ -94,7 +94,67 @@ const BODYWEIGHT_3X = {
   ]
 };
 
-export const PROGRAMS = [FULLBODY_3X, FULLBODY_2X, FULLBODY_4X, BODYWEIGHT_3X];
+const DUMBBELL_ONLY_3X = {
+  id: 'dumbbell_only_3x',
+  name: 'Dumbbells Only 3×/week',
+  description: 'True dumbbells-only program — no machines, no barbell. Perfect for home gyms.',
+  sessionsPerWeek: 3,
+  targetGoals: ['recomp', 'fat_loss', 'muscle'],
+  targetLevels: ['beginner', 'intermediate'],
+  targetEquipment: ['dumbbells_only'],
+  phases: SHARED_PHASES,
+  exercises: [
+    { id: 'dbsquat',  name: 'DB Goblet Squat',      sets: 3, reps: 12, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 16,   note: 'Hold DB at chest — sit deep, knees out' },
+    { id: 'dbbench',  name: 'DB Bench Press',        sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 16,   note: 'Full range — touch chest, lock out top' },
+    { id: 'dbrdl',    name: 'DB Romanian Deadlift',  sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 16,   note: 'Hinge at hips — feel hamstring stretch' },
+    { id: 'dbrow',    name: 'DB Bent-Over Row',      sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 14,   note: 'Chest parallel to floor — pull to hip, not chest' },
+    { id: 'dbohp',    name: 'DB Overhead Press',     sets: 2, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 12,   note: 'Seated or standing — control negative' },
+    { id: 'dblunge',  name: 'DB Reverse Lunge',      sets: 2, reps: 10, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 10,   note: '10 reps each leg — knee above floor on back leg' },
+    { id: 'plank',    name: 'Plank',                 sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s — stop if lower back sags', isPlank: true }
+  ]
+};
+
+const DUMBBELL_3X = {
+  id: 'dumbbell_3x',
+  name: 'Dumbbell 3×/week',
+  description: 'Full-body program using dumbbells and machines only. No barbell required.',
+  sessionsPerWeek: 3,
+  targetGoals: ['recomp', 'fat_loss', 'muscle'],
+  targetLevels: ['beginner', 'intermediate'],
+  targetEquipment: ['dumbbells'],
+  phases: SHARED_PHASES,
+  exercises: [
+    { id: 'dbsquat',  name: 'DB Goblet Squat',      sets: 3, reps: 12, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 16,   note: 'Hold DB at chest — sit deep, knees out' },
+    { id: 'dbbench',  name: 'DB Bench Press',        sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 16,   note: 'Full range — touch chest, lock out top' },
+    { id: 'dbrdl',    name: 'DB Romanian Deadlift',  sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 16,   note: 'Hinge at hips — feel hamstring stretch' },
+    { id: 'pulldown', name: 'Lat Pulldown',          sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 47.5, note: 'Full stretch top, squeeze bottom' },
+    { id: 'dbohp',    name: 'DB Overhead Press',     sets: 2, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 12,   note: 'Seated or standing — control negative' },
+    { id: 'legcurl',  name: 'Leg Curl',              sets: 2, reps: 15, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 40,   note: 'Hips FLAT on pad — slow controlled reps' },
+    { id: 'plank',    name: 'Plank',                 sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s — stop if lower back sags', isPlank: true }
+  ]
+};
+
+const DUMBBELL_4X = {
+  id: 'dumbbell_4x',
+  name: 'Dumbbell 4×/week',
+  description: 'Higher frequency dumbbell program for intermediate lifters without barbell access.',
+  sessionsPerWeek: 4,
+  targetGoals: ['muscle', 'strength', 'recomp'],
+  targetLevels: ['intermediate', 'advanced'],
+  targetEquipment: ['dumbbells'],
+  phases: SHARED_PHASES,
+  exercises: [
+    { id: 'dbsquat',  name: 'DB Goblet Squat',      sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 20,   note: 'Hold DB at chest — sit deep, knees out' },
+    { id: 'dbbench',  name: 'DB Bench Press',        sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 20,   note: 'Full range — touch chest, lock out top' },
+    { id: 'dbrdl',    name: 'DB Romanian Deadlift',  sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 20,   note: 'Hinge at hips — feel hamstring stretch' },
+    { id: 'pulldown', name: 'Lat Pulldown',          sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 55,   note: 'Full stretch top, squeeze bottom' },
+    { id: 'dbohp',    name: 'DB Overhead Press',     sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 15,   note: 'Seated or standing — control negative' },
+    { id: 'legcurl',  name: 'Leg Curl',              sets: 3, reps: 15, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 45,   note: 'Hips FLAT on pad — slow controlled reps' },
+    { id: 'plank',    name: 'Plank',                 sets: 3, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s — stop if lower back sags', isPlank: true }
+  ]
+};
+
+export const PROGRAMS = [FULLBODY_3X, FULLBODY_2X, FULLBODY_4X, DUMBBELL_ONLY_3X, DUMBBELL_3X, DUMBBELL_4X, BODYWEIGHT_3X];
 
 export function getProgramById(id) {
   return PROGRAMS.find(p => p.id === id) ?? FULLBODY_3X;
@@ -108,9 +168,17 @@ export function selectProgram(assessment) {
   const { equipment, daysPerWeek, level } = assessment;
 
   if (equipment === 'bodyweight') return 'bodyweight_3x';
+
+  if (equipment === 'dumbbells_only') return 'dumbbell_only_3x';
+
+  if (equipment === 'dumbbells') {
+    return daysPerWeek >= 4 && level !== 'beginner' ? 'dumbbell_4x' : 'dumbbell_3x';
+  }
+
+  // full_gym or barbell_home
   if (daysPerWeek <= 2) return 'fullbody_2x';
   if (daysPerWeek >= 4 && level !== 'beginner') return 'fullbody_4x';
-  return 'fullbody_3x'; // default: 3x/week full body
+  return 'fullbody_3x';
 }
 
 /**

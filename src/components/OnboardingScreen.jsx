@@ -90,6 +90,30 @@ function StepHeader({ step, total, title }) {
   );
 }
 
+function NumInput({ label, value, onChange, placeholder, unit, isText }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{
+        fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+        color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
+      }}>{label}{unit && <span style={{ color: 'var(--text3)', marginLeft: 4 }}>({unit})</span>}</div>
+      <input
+        type={isText ? 'text' : 'number'} inputMode={isText ? 'text' : 'decimal'} value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={isText ? 30 : undefined}
+        style={{
+          width: '100%', padding: '11px 14px', borderRadius: 10,
+          border: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.05)',
+          color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+          outline: 'none', boxSizing: 'border-box',
+        }}
+      />
+    </div>
+  );
+}
+
 function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, step }) {
   return (
     <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
@@ -119,6 +143,7 @@ function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, 
 export default function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState({
+    name: '',
     parqAnswers: Array(7).fill(false),
     parqFlagged: false,
     goal: null,
@@ -317,10 +342,11 @@ export default function OnboardingScreen({ onComplete }) {
   // ── Step 5: Equipment ──
   if (step === 5) {
     const eqs = [
-      { id: 'full_gym',      label: 'Full Gym',           sub: 'Barbells, machines, dumbbells — everything' },
-      { id: 'dumbbells',     label: 'Dumbbells + Machines', sub: 'No barbell, but have machines' },
-      { id: 'barbell_home',  label: 'Barbell at Home',    sub: 'Home gym with barbell setup' },
-      { id: 'bodyweight',    label: 'Bodyweight Only',    sub: 'No equipment — home or outdoors' },
+      { id: 'full_gym',       label: 'Full Gym',              sub: 'Barbells, machines, dumbbells — everything' },
+      { id: 'dumbbells',      label: 'Dumbbells + Machines',  sub: 'No barbell, but have cable/machine access' },
+      { id: 'dumbbells_only', label: 'Dumbbells Only',        sub: 'Home gym — dumbbells, no machines or barbell' },
+      { id: 'barbell_home',   label: 'Barbell + Dumbbells',   sub: 'Home gym with barbell and dumbbells' },
+      { id: 'bodyweight',     label: 'Bodyweight Only',       sub: 'No equipment — home or outdoors' },
     ];
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
@@ -343,29 +369,7 @@ export default function OnboardingScreen({ onComplete }) {
 
   // ── Step 6: Body Stats ──
   if (step === 6) {
-    const bodyValid = data.age && data.sex && data.weightKg && data.heightCm;
-    function NumInput({ label, value, onChange, placeholder, unit }) {
-      return (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
-            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
-          }}>{label}{unit && <span style={{ color: 'var(--text3)', marginLeft: 4 }}>({unit})</span>}</div>
-          <input
-            type="number" inputMode="decimal" value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
-            style={{
-              width: '100%', padding: '11px 14px', borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.05)',
-              color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
-              outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-        </div>
-      );
-    }
+    const bodyValid = data.name?.trim() && data.age && data.sex && data.weightKg && data.heightCm;
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>
@@ -373,6 +377,8 @@ export default function OnboardingScreen({ onComplete }) {
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
             Used to calculate your personalized calorie targets using the Mifflin-St Jeor formula.
           </div>
+          <NumInput label="YOUR NAME" value={data.name} onChange={v => set('name', v)}
+            placeholder="e.g. Alex" unit={null} isText />
           <NumInput label="AGE" value={data.age} onChange={v => set('age', v)} placeholder="25" unit="years" />
           <div style={{ marginBottom: 14 }}>
             <div style={{

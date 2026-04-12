@@ -3,6 +3,10 @@
     {
       "path": "/api/ping",
       "schedule": "0 9 */3 * *"
+    },
+    {
+      "path": "/api/agent-weekly",
+      "schedule": "0 6 * * *"
     }
   ]
 }

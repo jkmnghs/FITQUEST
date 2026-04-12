@@ -3,6 +3,11 @@ import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
 
+// Helper: get the user's active exercise list, falling back to the default barbell set
+function getExercises(state) {
+  return state.activeExercises?.length ? state.activeExercises : EXERCISES;
+}
+
 const COACH_MODES = [
   { id: 'pep',      icon: '⚡', label: 'Pre-Workout',    color: 'var(--fire2)',   bg: 'rgba(255,109,0,0.08)',   border: 'rgba(255,109,0,0.2)' },
   { id: 'analysis', icon: '📊', label: 'Post-Session',   color: 'var(--cyan)',    bg: 'var(--cyan-glow)',       border: 'rgba(0,229,255,0.2)' },
@@ -18,27 +23,30 @@ const ONE_SHOT_MODES = ['pep', 'analysis', 'overload', 'form'];
 function buildSystemPrompt(state, mode) {
   const phase = getPhase(state.currentWeek);
   const unit = state.unit;
-  const name = state.name;
+  const name = state.name || 'Athlete';
   const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
 
   const base = `You are Coach AI for FitQuest — a hyper-personalized fitness coach for ${name}'s 12-week body recomposition program.
-COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.`;
+COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.
+EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest the best available alternative based on their equipment. Common swaps: Bench Press → DB Bench Press or Push-ups; Barbell Squat → DB Goblet Squat or Bodyweight Squat; Lat Pulldown → DB Bent-Over Row or Inverted Row; Leg Curl → DB Romanian Deadlift or Nordic Curl. Always match the muscle group. If they have no replacement, give a bodyweight option.`;
 
   if (mode === 'form') {
+    const exercises = getExercises(state);
     // Form mode only needs exercise context, not full lift data
     return `${base}
-PROGRAM: 3×/week full body — Squat, Bench Press, RDL, Lat Pulldown, OHP, Leg Curl, Plank.
+PROGRAM: ${exercises.map(e => e.name).join(', ')}
 PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
   }
 
   const sug = state.overloadSuggestions || {};
-  const liftSummary = EXERCISES.filter(e => !e.isPlank).map(ex => {
+  const exercises = getExercises(state);
+  const liftSummary = exercises.filter(e => !e.isPlank).map(ex => {
     const wt = convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg, unit);
     const s = sug[ex.id];
     return `  ${ex.name}: ${wt}${unit}${s ? ` [${s === 'increase' ? '↑ ready' : s === 'repeat' ? '= repeat' : '↓ deload'}]` : ''}`;
   }).join('\n');
 
-  const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/3`;
+  const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
 
   if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
     return `${base}
@@ -71,28 +79,31 @@ function buildUserPrompt(mode, state, userMessage) {
     case 'pep': {
       const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
       const increases = Object.entries(sug).filter(([,v]) => v === 'increase').map(([k]) => {
-        const ex = EXERCISES.find(e => e.id === k);
+        const exercises = getExercises(state);
+        const ex = exercises.find(e => e.id === k);
         const wt = convertWeight((state.liftWeights?.[k] ?? 0) + 2.5, unit);
         return ex ? `${ex.name} → ${wt}${unit}` : k;
       });
-      return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/3. Streak: ${state.streak} days.
+      const userName = state.name || 'Athlete';
+      return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/${state.sessionsPerWeek || 3}. Streak: ${state.streak} days.
 ${increases.length > 0 ? `Weight increases today: ${increases.join(', ')}` : 'Maintaining current weights.'}
-${userMessage ? `Jake's note: "${userMessage}"` : ''}
+${userMessage ? `${userName}'s note: "${userMessage}"` : ''}
 Be specific and energetic.`;
     }
 
     case 'analysis': {
       if (todayDone.length === 0) {
-        return `Jake hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
+        return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
       }
       const summary = todayDone.map(id => {
-        const ex = EXERCISES.find(e => e.id === id);
+        const exercises = getExercises(state);
+        const ex = exercises.find(e => e.id === id);
         const det = details[id];
         if (!det || !ex) return `  ${id}: done`;
         const compliance = det.setsCompleted >= det.setsPrescribed ? 'completed as programmed' : `only ${det.setsCompleted} of ${det.setsPrescribed} prescribed sets`;
         return `  ${ex.name}: ${compliance}${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}`;
       }).join('\n');
-      const missed = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);
+      const missed = getExercises(state).filter(e => !todayDone.includes(e.id)).map(e => e.name);
       return `Post-session analysis Week ${state.currentWeek}:
 Note: set counts vary per exercise by program design (compounds are 3 sets, accessories are 2 sets — this is intentional).
 ${summary}
@@ -106,7 +117,7 @@ What went well, what to watch, what it means for next session. Do not reference 
         return `Week ${state.currentWeek}, ${phase.name}: ${phase.desc}. Explain progressive overload approach and RPE targets for this phase.`;
       }
       const fmt = (arr) => arr.map(([k]) => {
-        const ex = EXERCISES.find(e => e.id === k);
+        const ex = getExercises(state).find(e => e.id === k);
         const cur = convertWeight(state.liftWeights?.[k] ?? 0, unit);
         const next = convertWeight((state.liftWeights?.[k] ?? 0) + 2.5, unit);
         return ex ? `  ${ex.name}: ${cur} → ${next}${unit}` : k;
@@ -116,22 +127,23 @@ What went well, what to watch, what it means for next session. Do not reference 
       const deloads = Object.entries(sug).filter(([,v]) => v === 'deload');
       return `Overload plan Week ${state.currentWeek}, ${phase.name}:
 Increase: ${increases.length ? '\n' + fmt(increases) : 'none'}
-Repeat: ${repeats.length ? repeats.map(([k]) => EXERCISES.find(e=>e.id===k)?.name||k).join(', ') : 'none'}
-Deload: ${deloads.length ? deloads.map(([k]) => EXERCISES.find(e=>e.id===k)?.name||k).join(', ') : 'none'}
+Repeat: ${repeats.length ? repeats.map(([k]) => getExercises(state).find(e=>e.id===k)?.name||k).join(', ') : 'none'}
+Deload: ${deloads.length ? deloads.map(([k]) => getExercises(state).find(e=>e.id===k)?.name||k).join(', ') : 'none'}
 ${userMessage ? `Question: "${userMessage}"` : ''}
 Explain the strategy concisely.`;
     }
 
     case 'form': {
+      const exercises = getExercises(state);
       const exId = userMessage?.toLowerCase();
-      const matched = EXERCISES.find(e =>
+      const matched = exercises.find(e =>
         e.name.toLowerCase().includes(exId || '') || e.id === exId
       );
       if (matched) {
         return `Form coaching for ${matched.name}. My weight: ${convertWeight(state.liftWeights?.[matched.id] ?? matched.startKg, unit)}${unit}. Target: RPE ${matched.rpe}, ${matched.reps} reps × ${matched.sets} sets.
 Cover: setup, key cues, most common mistakes, one immediate improvement.`;
       }
-      return `Jake wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
+      return `${state.name || 'Athlete'} wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${getExercises(state).map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
     }
 
     case 'checkin': {
@@ -169,8 +181,77 @@ function setCached(key, text) {
   try { sessionStorage.setItem(key, JSON.stringify({ text, ts: Date.now() })); } catch {}
 }
 
-export default function AICoachTab({ state, onSaveHistory }) {
+// ── Agent Inbox ──────────────────────────────────────────────────────────────
+function AgentInbox({ messages, onMarkAllRead }) {
+  if (!messages || messages.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text3)' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
+        <div style={{ fontFamily: 'Orbitron', fontSize: 11, letterSpacing: 1 }}>NO MESSAGES YET</div>
+        <div style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+          Quest will message you automatically after workouts, milestones, and on Mondays.
+        </div>
+      </div>
+    );
+  }
+
+  const sorted = [...messages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  return (
+    <div>
+      {sorted.some(m => !m.read) && (
+        <button onClick={onMarkAllRead} style={{
+          width: '100%', padding: '8px', borderRadius: 10, border: 'none',
+          background: 'rgba(0,229,255,0.06)', color: 'var(--cyan)',
+          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+          cursor: 'pointer', marginBottom: 12,
+        }}>MARK ALL READ</button>
+      )}
+      {sorted.map(msg => {
+        const escaped = (msg.message || '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const formatted = escaped
+          .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        return (
+          <div key={msg.id} style={{
+            display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-start',
+            opacity: msg.read ? 0.6 : 1, transition: 'opacity 0.3s',
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: msg.read ? 'rgba(255,255,255,0.04)' : 'rgba(0,229,255,0.08)',
+              border: msg.read ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,229,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+            }}>{msg.emoji || '🤖'}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{
+                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
+                  color: msg.read ? 'var(--text3)' : 'var(--cyan)', letterSpacing: 1,
+                  textTransform: 'uppercase',
+                }}>{msg.trigger?.replace(/_/g, ' ') || 'QUEST'}{!msg.read && <span style={{ marginLeft: 6, color: 'var(--cyan)' }}>● NEW</span>}</div>
+                <div style={{ fontSize: 9, color: 'var(--text3)' }}>
+                  {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                </div>
+              </div>
+              <div style={{
+                padding: '10px 12px', borderRadius: '4px 12px 12px 12px',
+                background: 'var(--card)', border: '1px solid var(--card-border)',
+                fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
+                backdropFilter: 'blur(20px)',
+              }} dangerouslySetInnerHTML={{ __html: formatted.replace(/\n/g, '<br/>') }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages }) {
   const [activeMode, setActiveMode] = useState('pep');
+  const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
   const [messages, setMessages] = useState(() => state.aiCoachHistory || []);
   const [loading, setLoading] = useState(false);
@@ -203,8 +284,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
 
   // Warn on mount if API key is not configured
   useEffect(() => {
-    // Check coach is reachable (will 500 if server env var not set)
-    fetch('/api/coach', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    fetch('/api/coach', { method: 'GET' })
       .then(r => { if (r.status === 500) setApiKeyMissing(true); })
       .catch(() => {});
   }, []);
@@ -328,6 +408,36 @@ export default function AICoachTab({ state, onSaveHistory }) {
             </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* Inbox toggle */}
+            <button
+              onClick={() => {
+                const opening = !showInbox;
+                setShowInbox(opening);
+                if (opening) {
+                  // Poll first so messages load immediately
+                  if (onOpenInbox) onOpenInbox();
+                  // Mark as read after poll has had time to populate the list
+                  if (onMarkAgentRead) setTimeout(onMarkAgentRead, 1000);
+                }
+              }}
+              title="Quest inbox — proactive messages from your agent"
+              style={{
+                position: 'relative', padding: '4px 10px', borderRadius: 8,
+                border: showInbox ? '1px solid rgba(179,136,255,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                background: showInbox ? 'rgba(179,136,255,0.1)' : 'rgba(255,255,255,0.04)',
+                color: showInbox ? 'var(--purple)' : 'var(--text3)',
+                fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+                transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+              📬 INBOX
+              {unreadAgentCount > 0 && (
+                <span style={{
+                  background: 'var(--red)', color: '#fff', borderRadius: '50%',
+                  width: 16, height: 16, fontSize: 9, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
+              )}
+            </button>
             <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
               padding: '4px 10px', borderRadius: 8,
               border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
@@ -377,6 +487,16 @@ export default function AICoachTab({ state, onSaveHistory }) {
         </div>
       )}
 
+      {/* Agent Inbox */}
+      {showInbox && (
+        <AgentInbox
+          messages={agentMessages || []}
+          onMarkAllRead={onMarkAgentRead}
+        />
+      )}
+
+      {/* Chat view (hidden when inbox is open) */}
+      {!showInbox && (<>
       {/* Messages */}
       <div style={{ flex: 1, marginBottom: 14 }}>
         {modeMessages.length === 0 && (
@@ -455,6 +575,7 @@ export default function AICoachTab({ state, onSaveHistory }) {
           ))}
         </div>
       </div>
+      </>)}
     </div>
   );
 }

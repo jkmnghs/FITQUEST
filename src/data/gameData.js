@@ -159,5 +159,8 @@ export const DEFAULT_STATE = {
     weightKg: null,
     heightCm: null,
     waistCm: null,             // for Asian central obesity screening
-  }
+  },
+  // Quest Agent
+  agentMessages: [],           // proactive messages from the AI agent
+  agentDeloadSuggested: false, // agent has recommended a deload
 };

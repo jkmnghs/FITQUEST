@@ -8,6 +8,7 @@ import LoginScreen from './components/LoginScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 import { useAuth } from './hooks/useAuth';
 import { useGameState } from './hooks/useGameState';
+import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 import { EXERCISES } from './data/gameData';
 
@@ -102,24 +103,23 @@ export default function App() {
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installDismissed, setInstallDismissed] = useState(false);
 
   const {
     state, cloudLoading, toast, showToast,
     completeExercise, finishSession,
-    submitCheckin, updateSetting,
+    submitCheckin, updateSetting, setState,
     resetAll, resetToday, startSession, backfillWeek,
     addAIHistory, logMeal, deleteMeal, importData,
-    completeAssessment,
-  } = useGameState(user?.id);
+    completeAssessment, changeProgram, swapExercise, deleteExercise,
+  } = useGameState(user);
 
-  // Auth / onboarding gates — render before anything else
-  if (authLoading) return <><BgFx /><FullScreenLoader label="LOADING..." /></>;
-  if (!user) return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
-  if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
-  if (!state.assessment?.completed) return <><BgFx /><OnboardingScreen onComplete={completeAssessment} /></>;
-
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [installDismissed, setInstallDismissed] = useState(false);
+  const { unreadCount: unreadAgentCount, markAllRead: markAgentRead, fireOnboarding, pollMessages: pollAgentMessages, messages: agentMessages } = useAgentMessages(
+    user?.id,
+    state,
+    setState,
+  );
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -131,6 +131,12 @@ export default function App() {
   useEffect(() => {
     registerSW();
   }, []);
+
+  // Auth / onboarding gates — render before anything else
+  if (authLoading) return <><BgFx /><FullScreenLoader label="LOADING..." /></>;
+  if (!user) return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
+  if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
+  if (!state.assessment?.completed) return <><BgFx /><OnboardingScreen onComplete={(a) => completeAssessment(a, fireOnboarding)} /></>;
 
   async function handleRequestNotif() {
     const result = await requestNotificationPermission();
@@ -282,12 +288,19 @@ export default function App() {
               onFinishSession={finishSession}
               onStartSession={startSession}
               onModalChange={setModalOpen}
+              onChangeProgram={changeProgram}
+              onSwapExercise={swapExercise}
+              onDeleteExercise={deleteExercise}
             />
           </div>
           <div style={{ display: activeTab === 'coach' ? 'block' : 'none' }}>
             <AICoachTab
               state={state}
               onSaveHistory={addAIHistory}
+              unreadAgentCount={unreadAgentCount}
+              onMarkAgentRead={markAgentRead}
+              onOpenInbox={pollAgentMessages}
+              agentMessages={agentMessages}
             />
           </div>
           {activeTab === 'nutrition' && (
@@ -371,7 +384,19 @@ export default function App() {
                     filter: isActive ? 'drop-shadow(0 0 6px var(--cyan))' : 'none',
                     transition: 'filter 0.2s',
                     transform: isActive ? 'translateY(-1px)' : 'none',
-                  }}>{tab.icon}</span>
+                    position: 'relative',
+                  }}>
+                    {tab.icon}
+                    {tab.id === 'coach' && unreadAgentCount > 0 && (
+                      <span style={{
+                        position: 'absolute', top: -4, right: -6,
+                        background: 'var(--red)', color: '#fff',
+                        borderRadius: '50%', width: 14, height: 14,
+                        fontSize: 8, fontWeight: 700, fontFamily: 'Orbitron',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
+                    )}
+                  </span>
                   <span style={{
                     fontFamily: 'Rajdhani', fontSize: 11, fontWeight: 600,
                     color: isActive ? 'var(--cyan)' : 'var(--text3)',

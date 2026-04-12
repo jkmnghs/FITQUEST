@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 export default function LoginScreen({ authError, onSignIn, onSignUp }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,13 +13,14 @@ export default function LoginScreen({ authError, onSignIn, onSignUp }) {
     e.preventDefault();
     setLocalError(null);
     if (!email || !password) { setLocalError('Please enter your email and password.'); return; }
+    if (mode === 'signup' && !name.trim()) { setLocalError('Please enter your name.'); return; }
     setLoading(true);
 
     if (mode === 'signin') {
       const ok = await onSignIn(email, password);
       if (!ok) setLoading(false);
     } else {
-      const ok = await onSignUp(email, password);
+      const ok = await onSignUp(email, password, name.trim());
       if (ok) {
         setSignUpDone(true);
       } else {
@@ -106,6 +108,30 @@ export default function LoginScreen({ authError, onSignIn, onSignUp }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
+            {mode === 'signup' && (
+              <label style={{ display: 'block', marginBottom: 16 }}>
+                <div style={{
+                  fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                  color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
+                }}>YOUR NAME</div>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  autoComplete="name"
+                  maxLength={30}
+                  style={{
+                    width: '100%', padding: '12px 14px', borderRadius: 10,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                    outline: 'none', boxSizing: 'border-box',
+                    WebkitTextFillColor: 'var(--text)',
+                  }}
+                />
+              </label>
+            )}
             <label style={{ display: 'block', marginBottom: 16 }}>
               <div style={{
                 fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
