@@ -315,7 +315,8 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
 
         return (
           <div key={ex.id} style={{ position: 'relative', marginBottom: 10 }}>
-            {/* Action buttons — always at right, revealed when card slides left */}
+            {/* Action buttons — only rendered for non-done cards, revealed when card slides left */}
+            {!isDone && (
             <div style={{
               position: 'absolute', top: 0, right: 0, bottom: 0,
               display: 'flex', alignItems: 'stretch', zIndex: 2, borderRadius: 16,
@@ -345,14 +346,17 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
                 }}
               ><span style={{ fontSize: 18 }}>🗑️</span>DELETE</button>
             </div>
+            )}
 
             {/* Swipeable card — zIndex above buttons so it slides away to reveal them */}
             <div
               onTouchStart={e => {
+                if (isDone) return;
                 touchStartX.current = e.touches[0].clientX;
                 touchStartY.current = e.touches[0].clientY;
               }}
               onTouchEnd={e => {
+                if (isDone) return;
                 const dx = e.changedTouches[0].clientX - touchStartX.current;
                 const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
                 if (dy > 30) return;
@@ -365,13 +369,15 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
                 setActiveExId(ex.id);
               }}
               style={{
-                background: 'var(--card)', border: `1px solid ${isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--card-border)'}`,
+                background: isDone ? 'rgba(0,230,118,0.04)' : 'var(--card)',
+                border: `1px solid ${isDone ? 'rgba(0,230,118,0.15)' : isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--card-border)'}`,
                 borderRadius: 16, padding: '14px 16px',
                 cursor: isCurrentWeek && !todaySessionFinished ? 'pointer' : 'default',
-                opacity: isDone ? 0.55 : 1, position: 'relative', overflow: 'hidden',
+                filter: isDone ? 'brightness(0.7)' : 'none',
+                position: 'relative', overflow: 'hidden',
                 backdropFilter: 'blur(20px)', zIndex: 3,
                 transform: isSwiped ? 'translateX(-144px)' : 'translateX(0)',
-                transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.3s, border-color 0.2s',
+                transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), filter 0.3s, border-color 0.2s',
               }}
             >
             {/* Top line on hover */}
