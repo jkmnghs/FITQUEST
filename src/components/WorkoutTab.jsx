@@ -385,18 +385,28 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: 'Exo 2, sans-serif', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {isDone ? '✅ ' : ''}{ex.name}
-                  {sug === 'increase' && <Badge color="var(--green)" bg="rgba(0,230,118,0.12)" border="rgba(0,230,118,0.2)">↑ +2.5</Badge>}
-                  {sug === 'repeat' && <Badge color="var(--gold)" bg="rgba(255,214,0,0.1)" border="rgba(255,214,0,0.2)">= SAME</Badge>}
-                  {sug === 'deload' && <Badge color="var(--red)" bg="rgba(255,23,68,0.1)" border="rgba(255,23,68,0.2)">↓ DELOAD</Badge>}
+                  {!isDone && sug === 'increase' && <Badge color="var(--green)" bg="rgba(0,230,118,0.12)" border="rgba(0,230,118,0.2)">↑ +2.5</Badge>}
+                  {!isDone && sug === 'repeat' && <Badge color="var(--gold)" bg="rgba(255,214,0,0.1)" border="rgba(255,214,0,0.2)">= SAME</Badge>}
+                  {!isDone && sug === 'deload' && <Badge color="var(--red)" bg="rgba(255,23,68,0.1)" border="rgba(255,23,68,0.2)">↓ DELOAD</Badge>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{ex.note}</div>
               </div>
-              <div style={{
-                fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--fire2)',
-                background: 'var(--fire-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8
-              }}>
-                +{isDeload ? 10 : ex.sets * 5 + 10} XP max
-              </div>
+              {isDone ? (
+                <div style={{
+                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--green)',
+                  background: 'var(--green-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8,
+                  border: '1px solid rgba(0,230,118,0.25)'
+                }}>
+                  ✓ DONE
+                </div>
+              ) : (
+                <div style={{
+                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--fire2)',
+                  background: 'var(--fire-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8
+                }}>
+                  +{isDeload ? 10 : ex.sets * 5 + 10} XP max
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>

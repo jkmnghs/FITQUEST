@@ -308,7 +308,14 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
 
     const text = (overrideMessage ?? userMessage).trim();
     const systemPrompt = buildSystemPrompt(state, activeMode);
-    const userPrompt = buildUserPrompt(activeMode, state, text);
+
+    // Detect follow-up: one-shot mode where the user already has an AI response and is typing a reply
+    const priorModeAIResponses = messages.filter(m => m.mode === activeMode && m.role === 'assistant');
+    const isFollowUp = ONE_SHOT_MODES.includes(activeMode) && priorModeAIResponses.length > 0 && text.length > 0;
+
+    // For follow-ups in one-shot modes use raw text so Claude answers the actual question,
+    // not a freshly-reconstructed analysis prompt
+    const userPrompt = isFollowUp ? text : buildUserPrompt(activeMode, state, text);
 
     // Dedup: block same prompt within 5 seconds
     if (userPrompt === lastSendRef.current.prompt && Date.now() - lastSendRef.current.ts < 5000) {
@@ -316,19 +323,21 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
     }
     lastSendRef.current = { prompt: userPrompt, ts: Date.now() };
 
-    // Cache check (session-scoped, 30-min TTL)
+    // Cache check — only for initial (non-follow-up) requests
     const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${text ? text.slice(0, 80) : userPrompt.slice(0, 80)}`;
-    const cached = getCached(cacheKey);
-    if (cached) {
-      const newMessages = [
-        ...messages,
-        { role: 'user', content: userPrompt, mode: activeMode, displayText: text || mode.label, ts: Date.now() },
-        { role: 'assistant', content: cached, mode: activeMode, ts: Date.now() }
-      ];
-      setMessages(newMessages);
-      setUserMessage('');
-      onSaveHistory(newMessages.slice(-20));
-      return;
+    if (!isFollowUp) {
+      const cached = getCached(cacheKey);
+      if (cached) {
+        const newMessages = [
+          ...messages,
+          { role: 'user', content: userPrompt, mode: activeMode, displayText: text || mode.label, ts: Date.now() },
+          { role: 'assistant', content: cached, mode: activeMode, ts: Date.now() }
+        ];
+        setMessages(newMessages);
+        setUserMessage('');
+        onSaveHistory(newMessages.slice(-20));
+        return;
+      }
     }
 
     const newMessages = [
@@ -340,9 +349,10 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
     setLoading(true);
     setError(null);
 
-    // One-shot modes: send only the current message (no history = big token savings)
-    // Checkin: send last 6 messages for conversational context
-    const modeHistory = ONE_SHOT_MODES.includes(activeMode)
+    // One-shot modes: send only the current message (no history = token savings) for initial calls.
+    // For follow-ups in one-shot modes, include conversation history so Claude can answer in context.
+    // Checkin: always send last 6 messages for conversational continuity.
+    const modeHistory = (ONE_SHOT_MODES.includes(activeMode) && !isFollowUp)
       ? [{ role: 'user', content: userPrompt }]
       : newMessages
           .filter(m => m.mode === activeMode && (m.role === 'user' || m.role === 'assistant'))
