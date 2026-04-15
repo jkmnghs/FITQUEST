@@ -56,7 +56,14 @@ export function formatForCoach(state) {
       } else {
         const wt = convertWeight(d.maxWeight || (state.liftWeights?.[ex.id] ?? ex.startKg), unit);
         const rpeStr = d.maxRPE > 0 ? ` @ RPE ${d.maxRPE}` : '';
-        lines.push(`  ${ex.name}: ${wt}${unit} × ${d.setsCompleted}/${d.setsPrescribed} sets${rpeStr}`);
+        let repsStr = '';
+        if (d.repsPerSet && d.repsPerSet.length > 0) {
+          const allSame = d.repsPerSet.every(r => r === d.repsPerSet[0]);
+          repsStr = allSame
+            ? ` × ${d.repsPerSet[0]} reps`
+            : ` × [${d.repsPerSet.join('/')} reps]`;
+        }
+        lines.push(`  ${ex.name}: ${wt}${unit} × ${d.setsCompleted}/${d.setsPrescribed} sets${repsStr}${rpeStr}`);
       }
     }
     const skipped = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);

@@ -151,10 +151,12 @@ export function useGameState() {
       const isDeload = prev.currentWeek === 9;
       let vol = 0, maxRPE = 0, setsCompleted = 0;
       let maxWeightUsed = 0;
+      const repsPerSet = [];
 
       sets.forEach(s => {
         if (s.done) {
           setsCompleted++;
+          repsPerSet.push(Number(s.reps) || 0);
           if (!isDeload) {
             const wt = s.weightKg || 0;
             const rp = s.reps || 0;
@@ -207,7 +209,7 @@ export function useGameState() {
       const todayExDone = [...new Set([...(prev.todayExDone || []), exId])];
       const todayExDetails = {
         ...prev.todayExDetails,
-        [exId]: { setsCompleted, setsPrescribed: baseSets, extraSets, volume: vol, maxRPE, maxWeight: maxWeightUsed }
+        [exId]: { setsCompleted, setsPrescribed: baseSets, extraSets, volume: vol, maxRPE, maxWeight: maxWeightUsed, repsPerSet }
       };
 
       const sessionStartTime = prev.sessionStartTime || Date.now();
