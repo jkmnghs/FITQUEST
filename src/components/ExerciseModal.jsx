@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { X, Lightbulb, Check } from 'lucide-react';
 import { FORM_TIPS } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay } from '../utils/gameLogic';
 import RestTimer from './RestTimer';
@@ -89,12 +90,15 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
       }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div style={{
           width: '100%', maxWidth: 430, maxHeight: '92vh',
-          background: 'var(--bg2)',
+          background: 'rgba(15,21,40,0.92)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
           borderRadius: '22px 22px 0 0',
-          border: '1px solid var(--card-border)', borderBottom: 'none',
+          border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
           overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           animation: 'slideUp 0.35s cubic-bezier(0.16,1,0.3,1)',
-          paddingBottom: 'calc(16px + var(--safe-bottom))'
+          paddingBottom: 'calc(16px + var(--safe-bottom))',
+          boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
         }}>
           {/* Handle */}
           <div style={{ width: 34, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 4, margin: '10px auto 0' }} />
@@ -102,11 +106,12 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
           {/* Header */}
           <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700 }}>{ex.name}</h2>
-            <button onClick={onClose} style={{
-              width: 30, height: 30, borderRadius: 9, border: 'none',
-              background: 'rgba(255,255,255,0.06)', color: 'var(--text2)', fontSize: 16,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>✕</button>
+            <button onClick={onClose} aria-label="Close" style={{
+              width: 32, height: 32, borderRadius: 8, border: 'none',
+              background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-tertiary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', minWidth: 32,
+            }}><X size={15} /></button>
           </div>
 
           <div style={{ padding: '0 18px 18px' }}>
@@ -115,19 +120,19 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
               {ex.note} • Target: RPE {isDeload ? '5-6' : ex.rpe} • Rest: {ex.rest}
             </div>
 
-            {/* Form tip */}
+            {/* Form tip — persistent banner, rotates per tip index */}
             {formTips.length > 0 && (
-              <div onClick={cycleTip} style={{
-                padding: '10px 12px', borderRadius: 10, marginBottom: 14,
-                background: 'rgba(179,136,255,0.06)',
-                border: '1px solid rgba(179,136,255,0.15)',
-                cursor: 'pointer', userSelect: 'none'
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: 'var(--space-3) var(--space-4)',
+                marginBottom: 14,
+                background: 'rgba(179,136,255,0.08)',
+                borderLeft: '3px solid var(--color-accent-purple)',
+                borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
               }}>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--purple)', letterSpacing: 1, marginBottom: 4 }}>
-                  💡 FORM TIP (tap for next)
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
-                  {formTips[tipIdx]}
+                <Lightbulb size={16} color="var(--color-accent-purple)" style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  {formTips[tipIdx % formTips.length]}
                 </div>
               </div>
             )}
@@ -173,13 +178,14 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
 
                 {/* Complete button */}
                 <button onClick={() => setShowConfirm(true)} style={{
-                  width: '100%', padding: 14, border: 'none', borderRadius: 13,
-                  background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-                  fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
-                  color: 'var(--bg)', letterSpacing: 0.8,
-                  boxShadow: '0 4px 18px var(--cyan-glow)'
+                  width: '100%', padding: 14, border: 'none', borderRadius: 'var(--radius-lg)',
+                  background: 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))',
+                  fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
+                  color: 'var(--color-bg-primary)', letterSpacing: 0.8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 4px 18px rgba(0,229,255,0.12)'
                 }}>
-                  COMPLETE EXERCISE ⚔️
+                  <Check size={16} /> COMPLETE EXERCISE
                 </button>
               </>
             )}
@@ -372,18 +378,19 @@ function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConf
 }
 
 const inputStyle = {
-  width: '100%', height: 38, borderRadius: 9,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.04)',
-  color: 'var(--text)', fontFamily: 'Rajdhani, sans-serif',
-  fontSize: 14, fontWeight: 600, textAlign: 'center', padding: '0 4px'
+  width: '100%', height: 48, borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-border-medium)',
+  background: 'var(--color-surface-1)',
+  color: 'var(--color-text-primary)', fontFamily: 'var(--font-primary)',
+  fontSize: 20, fontWeight: 600, textAlign: 'center', padding: '0 4px',
+  transition: 'border-color var(--transition-normal)',
 };
 
 const selectStyle = {
-  width: '100%', height: 38, borderRadius: 9,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.04)',
-  color: 'var(--text)', fontFamily: 'Rajdhani, sans-serif',
-  fontSize: 14, fontWeight: 600, textAlign: 'center',
+  width: '100%', height: 48, borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-border-medium)',
+  background: 'var(--color-surface-1)',
+  color: 'var(--color-text-primary)', fontFamily: 'var(--font-primary)',
+  fontSize: 16, fontWeight: 600, textAlign: 'center',
   WebkitAppearance: 'none', appearance: 'none', padding: '0 4px'
 };

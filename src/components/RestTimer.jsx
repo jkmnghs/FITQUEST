@@ -78,17 +78,17 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)',
+      background: 'rgba(10,14,26,0.85)', backdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexDirection: 'column', gap: 0
     }}>
       <div style={{
-        fontFamily: 'Exo 2, sans-serif', fontSize: 18, fontWeight: 700,
-        color: 'var(--text)', marginBottom: 6, textAlign: 'center', padding: '0 20px'
+        fontFamily: 'var(--font-primary)', fontSize: 'var(--text-md)', fontWeight: 600,
+        color: 'var(--color-text-primary)', marginBottom: 6, textAlign: 'center', padding: '0 20px'
       }}>
         {exName}
       </div>
-      <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 28 }}>{setInfo}</div>
+      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 28 }}>{setInfo}</div>
 
       <div style={{ width: 220, height: 220, position: 'relative', marginBottom: 28 }}>
         <svg width="220" height="220" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
@@ -108,17 +108,24 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
           alignItems: 'center', justifyContent: 'center'
         }}>
           <div style={{
-            fontFamily: 'Orbitron, sans-serif', fontSize: 48, fontWeight: 900,
-            color: ringColor, transition: 'color 0.3s', lineHeight: 1
+            fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900,
+            color: ringColor, transition: 'color 0.3s', lineHeight: 1,
+            animation: !isDone ? 'timerGlow 2s ease-in-out infinite' : 'none',
           }}>
             {isDone ? '✓' : timeStr}
           </div>
           <div style={{
-            fontFamily: 'Orbitron, sans-serif', fontSize: 11, fontWeight: 600,
-            color: 'var(--text2)', letterSpacing: 1.5, marginTop: 4
+            fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)', fontWeight: 500,
+            color: 'var(--color-text-secondary)', letterSpacing: '0.04em', marginTop: 4
           }}>
             {isDone ? 'GO!' : 'REST'}
           </div>
+          {!isDone && (
+            <div style={{
+              fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)',
+              color: 'var(--color-text-tertiary)', marginTop: 8
+            }}>Tap to skip</div>
+          )}
         </div>
       </div>
 

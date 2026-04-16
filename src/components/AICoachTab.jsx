@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { X as XIcon } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
@@ -249,7 +250,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
   );
 }
 
-export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages }) {
+export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose }) {
   const [activeMode, setActiveMode] = useState('pep');
   const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
@@ -399,8 +400,8 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
 
   const modeMessages = messages.filter(m => m.mode === activeMode);
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '70vh' }}>
+  const innerContent = (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: isOpen ? '100%' : '70vh' }}>
       {/* Header */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
@@ -588,6 +589,66 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
       </>)}
     </div>
   );
+
+  // Modal overlay mode (when triggered from TrainTab)
+  if (isOpen && onClose) {
+    return (
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 500,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            height: '92%',
+            background: 'rgba(15,21,40,0.92)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '20px 20px 0 0',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both',
+          }}
+        >
+          {/* Drag handle + close button */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px 0',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              width: 36, height: 4, borderRadius: 2,
+              background: 'rgba(255,255,255,0.15)',
+            }} />
+            <button
+              onClick={onClose}
+              aria-label="Close AI Coach"
+              style={{
+                width: 32, height: 32, borderRadius: 8, border: 'none',
+                background: 'rgba(255,255,255,0.08)',
+                color: 'var(--color-text-tertiary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
+          {/* Scrollable coach content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+            {innerContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return innerContent;
 }
 
 function ModePrompt({ mode, state }) {

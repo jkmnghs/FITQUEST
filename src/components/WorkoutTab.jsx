@@ -129,6 +129,7 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
   const [inProgressSets, setInProgressSets] = useState({});
   // Swipe state: tracks which card is swiped open
   const [swipedId, setSwipedId] = useState(null);
+
   // Swap picker: which exercise is being swapped
   const [swapTargetId, setSwapTargetId] = useState(null);
   // Program switcher panel
@@ -136,9 +137,10 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
   // Picker filter state
   const [pickerCategory, setPickerCategory] = useState('All');
   const [pickerSearch, setPickerSearch] = useState('');
-  // Touch tracking refs
+  // Touch/mouse tracking refs
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const mouseStartX = useRef(null);
 
   // Keep viewingWeek in sync when the program advances to a new week
   useEffect(() => {
@@ -315,7 +317,7 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
 
         return (
           <div key={ex.id} style={{ position: 'relative', marginBottom: 10 }}>
-            {/* Action buttons — only rendered for non-done cards, revealed when card slides left */}
+            {/* Action buttons — revealed when card slides left (swipe or mouse-drag) */}
             {!isDone && (
             <div style={{
               position: 'absolute', top: 0, right: 0, bottom: 0,
@@ -363,6 +365,18 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
                 if (dx < -40) setSwipedId(ex.id);
                 else if (dx > 20) setSwipedId(null);
               }}
+              onMouseDown={e => {
+                if (isDone || e.button !== 0) return;
+                mouseStartX.current = e.clientX;
+              }}
+              onMouseUp={e => {
+                if (isDone || mouseStartX.current === null) return;
+                const dx = e.clientX - mouseStartX.current;
+                mouseStartX.current = null;
+                if (dx < -40) setSwipedId(ex.id);
+                else if (dx > 20) setSwipedId(null);
+              }}
+              onMouseLeave={() => { mouseStartX.current = null; }}
               onClick={() => {
                 if (isSwiped) { setSwipedId(null); return; }
                 if (!isCurrentWeek || todaySessionFinished) return;

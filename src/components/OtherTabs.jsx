@@ -556,7 +556,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 reader.onload = ev => {
                   try {
                     const data = JSON.parse(ev.target.result);
-                    if (data && typeof data === 'object' && data.level !== undefined) {
+                    if (data && typeof data === 'object' && typeof data.level === 'number' && typeof data.currentWeek === 'number' && Array.isArray(data.log)) {
                       if (window.confirm('Replace all current progress with this backup?')) {
                         onImport(data);
                       }
