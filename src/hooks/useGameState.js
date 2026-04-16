@@ -7,6 +7,19 @@ import { selectProgram, getProgramById, buildInitialWeights } from '../data/prog
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
 import { validateState, repairState } from '../utils/stateSchema';
 import { migrateState } from '../utils/stateMigrations';
+import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerciseSubstitutions';
+
+/**
+ * Build a personalized exercise list from a program base by applying
+ * the user's movement-competency swaps first, then pain-region swaps.
+ */
+function buildPersonalizedExercises(exercises, assessment) {
+  if (!exercises) return exercises;
+  let result = [...exercises];
+  result = applyCompetencySubstitutions(result, assessment?.movementCompetency);
+  result = applySubstitutions(result, assessment?.painRegions);
+  return result;
+}
 
 // Module-level guard — lives completely outside React, reset only on page reload.
 // Initialized from localStorage so page reloads are also covered.
@@ -278,7 +291,7 @@ export function useGameState(user) {
         assessment: { ...assessment, completed: true, programId },
         programId,
         sessionsPerWeek: program.sessionsPerWeek,
-        activeExercises: program.exercises,
+        activeExercises: buildPersonalizedExercises(program.exercises, assessment),
         trainingDays: assessment.trainingDays,
         liftWeights,
         liftHistory,
@@ -332,7 +345,7 @@ export function useGameState(user) {
       const newState = {
         ...prev,
         programId: program.id,
-        activeExercises: program.exercises,
+        activeExercises: buildPersonalizedExercises(program.exercises, prev.assessment),
         sessionsPerWeek: program.sessionsPerWeek,
         liftWeights: mergedWeights,
         liftHistory: mergedHistory,

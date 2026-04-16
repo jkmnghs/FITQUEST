@@ -282,6 +282,9 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastSendRef = useRef({ prompt: '', ts: 0 });
+  // Refs for modal-mode scroll management
+  const modalScrollRef = useRef(null);
+  const modalMsgCountRef = useRef(messages.length);
 
   // Warn on mount if API key is not configured
   useEffect(() => {
@@ -297,9 +300,29 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
     return () => clearTimeout(t);
   }, [cooldownLeft]);
 
+  // When the modal opens, scroll to the top so mode selectors are visible,
+  // and reset the message counter so the arrival-scroll doesn't fire immediately.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (isOpen && modalScrollRef.current) {
+      modalScrollRef.current.scrollTop = 0;
+      modalMsgCountRef.current = messages.length;
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll on new messages.
+  // In modal mode: scroll the modal container directly (prevents outer page scroll).
+  // In standalone tab mode: use scrollIntoView as before.
+  useEffect(() => {
+    if (isOpen && onClose && modalScrollRef.current) {
+      if (messages.length > modalMsgCountRef.current) {
+        modalMsgCountRef.current = messages.length;
+        const el = modalScrollRef.current;
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mode = COACH_MODES.find(m => m.id === activeMode);
 
@@ -640,7 +663,7 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
             </button>
           </div>
           {/* Scrollable coach content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+          <div ref={modalScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
             {innerContent}
           </div>
         </div>

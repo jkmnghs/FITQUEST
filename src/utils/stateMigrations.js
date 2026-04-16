@@ -5,11 +5,35 @@
  * Migrations add missing fields with sensible defaults — never break existing data.
  */
 
+import { selectProgram, getProgramById } from '../data/programs';
+import { applySubstitutions, applyCompetencySubstitutions } from './exerciseSubstitutions';
+
 const CURRENT_VERSION = 2;
 
 const migrations = {
-  1: (state) => ({
+  1: (state) => {
+    // Backfill activeExercises for existing users who never had it set
+    let activeExercises = state.activeExercises;
+    let programId = state.programId;
+    if (!activeExercises && state.assessment?.completed) {
+      try {
+        programId = selectProgram(state.assessment);
+        const program = getProgramById(programId);
+        if (program) {
+          let exs = [...program.exercises];
+          exs = applyCompetencySubstitutions(exs, state.assessment?.movementCompetency);
+          exs = applySubstitutions(exs, state.assessment?.painRegions);
+          activeExercises = exs;
+        }
+      } catch (e) {
+        console.warn('[stateMigrations] Could not backfill activeExercises:', e);
+      }
+    }
+
+    return ({
     ...state,
+    activeExercises,
+    programId: programId || state.programId,
     stateVersion: 2,
     // Lifestyle defaults
     lifestyle: {
@@ -53,7 +77,8 @@ const migrations = {
       supplementsTaken: false,
       ...state.dailyHabits,
     },
-  }),
+  });
+  },
 };
 
 /**
