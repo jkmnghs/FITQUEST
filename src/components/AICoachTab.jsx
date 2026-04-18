@@ -423,193 +423,161 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
 
   const modeMessages = messages.filter(m => m.mode === activeMode);
 
-  const innerContent = (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
-        border: '1px solid rgba(0,229,255,0.12)',
-        borderRadius: 14, padding: '14px 16px', marginBottom: 14
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <span style={{ fontSize: 22 }}>🤖</span>
-          <div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
-              AI COACH
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-              Powered by Claude · Knows your data
-            </div>
+  const headerSection = (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
+      border: '1px solid rgba(0,229,255,0.12)',
+      borderRadius: 14, padding: '14px 16px', marginBottom: 14
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 22 }}>🤖</span>
+        <div>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
+            AI COACH
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-            {/* Inbox toggle */}
-            <button
-              onClick={() => {
-                const opening = !showInbox;
-                setShowInbox(opening);
-                if (opening) {
-                  // Poll first so messages load immediately
-                  if (onOpenInbox) onOpenInbox();
-                  // Mark as read after poll has had time to populate the list
-                  if (onMarkAgentRead) setTimeout(onMarkAgentRead, 1000);
-                }
-              }}
-              title="Quest inbox — proactive messages from your agent"
-              style={{
-                position: 'relative', padding: '4px 10px', borderRadius: 8,
-                border: showInbox ? '1px solid rgba(179,136,255,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                background: showInbox ? 'rgba(179,136,255,0.1)' : 'rgba(255,255,255,0.04)',
-                color: showInbox ? 'var(--purple)' : 'var(--text3)',
-                fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
-                transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
-              }}>
-              📬 INBOX
-              {unreadAgentCount > 0 && (
-                <span style={{
-                  background: 'var(--red)', color: '#fff', borderRadius: '50%',
-                  width: 16, height: 16, fontSize: 9, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
-              )}
-            </button>
-            <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
-              padding: '4px 10px', borderRadius: 8,
-              border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
-              background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
-              color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
-              fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}>{copyLabel}</button>
-            {messages.length > 0 && (
-              <button onClick={clearHistory} style={{
-                padding: '4px 10px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
-                fontWeight: 700, cursor: 'pointer'
-              }}>CLEAR</button>
-            )}
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Powered by Claude · Knows your data
           </div>
         </div>
-
-        {/* Mode selector */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          {COACH_MODES.map(m => (
-            <button key={m.id} onClick={() => setActiveMode(m.id)} style={{
-              padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
-              background: activeMode === m.id ? m.bg : 'transparent',
-              color: activeMode === m.id ? m.color : 'var(--text3)',
-              fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-              letterSpacing: 0.3, transition: 'all 0.2s',
-              display: 'flex', alignItems: 'center', gap: 5
-            }}>
-              <span>{m.icon}</span> {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* API key missing warning */}
-      {apiKeyMissing && (
-        <div style={{
-          padding: '10px 14px', borderRadius: 12, marginBottom: 14,
-          background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
-          fontSize: 12, color: 'var(--gold)', lineHeight: 1.6
-        }}>
-          <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
-        </div>
-      )}
-
-      {/* Agent Inbox */}
-      {showInbox && (
-        <AgentInbox
-          messages={agentMessages || []}
-          onMarkAllRead={onMarkAgentRead}
-        />
-      )}
-
-      {/* Chat view (hidden when inbox is open) */}
-      {!showInbox && (<>
-      {/* Messages */}
-      <div style={{ marginBottom: 14 }}>
-        {modeMessages.length === 0 && (
-          <ModePrompt mode={COACH_MODES.find(m => m.id === activeMode)} state={state} />
-        )}
-
-        {modeMessages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} />
-        ))}
-
-        {loading && <ThinkingBubble />}
-        {error && (
-          <div style={{
-            padding: '10px 14px', borderRadius: 12, marginBottom: 10,
-            background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.2)',
-            fontSize: 12, color: 'var(--red)'
-          }}>
-            Error: {error}. Make sure your API key is configured.
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 14, padding: 14, backdropFilter: 'blur(20px)'
-      }}>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
-          {getInputHint(activeMode)}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            ref={inputRef}
-            value={userMessage}
-            onChange={e => setUserMessage(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder={getPlaceholder(activeMode)}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              const opening = !showInbox;
+              setShowInbox(opening);
+              if (opening) {
+                if (onOpenInbox) onOpenInbox();
+                if (onMarkAgentRead) setTimeout(onMarkAgentRead, 1000);
+              }
+            }}
+            title="Quest inbox — proactive messages from your agent"
             style={{
-              flex: 1, height: 42, borderRadius: 10,
+              position: 'relative', padding: '4px 10px', borderRadius: 8,
+              border: showInbox ? '1px solid rgba(179,136,255,0.4)' : '1px solid rgba(255,255,255,0.1)',
+              background: showInbox ? 'rgba(179,136,255,0.1)' : 'rgba(255,255,255,0.04)',
+              color: showInbox ? 'var(--purple)' : 'var(--text3)',
+              fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+            📬 INBOX
+            {unreadAgentCount > 0 && (
+              <span style={{
+                background: 'var(--red)', color: '#fff', borderRadius: '50%',
+                width: 16, height: 16, fontSize: 9, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
+            )}
+          </button>
+          <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
+            padding: '4px 10px', borderRadius: 8,
+            border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
+            background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
+            color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
+            fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}>{copyLabel}</button>
+          {messages.length > 0 && (
+            <button onClick={clearHistory} style={{
+              padding: '4px 10px', borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.1)',
               background: 'rgba(255,255,255,0.04)',
-              color: 'var(--text)', fontFamily: 'Rajdhani',
-              fontSize: 14, fontWeight: 600, padding: '0 12px'
-            }}
-          />
-          <button
-            onClick={() => sendMessage()}
-            disabled={loading || cooldownLeft > 0}
-            style={{
-              width: 42, height: 42, borderRadius: 10, border: 'none',
-              background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
-              color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
-              fontSize: cooldownLeft > 0 ? 11 : 18,
-              fontFamily: 'Orbitron', fontWeight: 700,
-              cursor: (loading || cooldownLeft > 0) ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s', flexShrink: 0
-            }}
-          >
-            {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
-          </button>
-        </div>
-
-        {/* Quick fire buttons */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          {getQuickPrompts(activeMode).map((q, i) => (
-            <button key={i} onClick={() => sendMessage(q)} style={{
-              padding: '4px 10px', borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.03)',
               color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
-              fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
-              transition: 'all 0.2s'
-            }}>{q}</button>
-          ))}
+              fontWeight: 700, cursor: 'pointer'
+            }}>CLEAR</button>
+          )}
         </div>
       </div>
-      </>)}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+        {COACH_MODES.map(m => (
+          <button key={m.id} onClick={() => setActiveMode(m.id)} style={{
+            padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
+            border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
+            background: activeMode === m.id ? m.bg : 'transparent',
+            color: activeMode === m.id ? m.color : 'var(--text3)',
+            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+            letterSpacing: 0.3, transition: 'all 0.2s',
+            display: 'flex', alignItems: 'center', gap: 5
+          }}>
+            <span>{m.icon}</span> {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const messagesSection = (
+    <div style={{ marginBottom: 14 }}>
+      {modeMessages.length === 0 && (
+        <ModePrompt mode={COACH_MODES.find(m => m.id === activeMode)} state={state} />
+      )}
+      {modeMessages.map((msg, i) => (
+        <MessageBubble key={i} msg={msg} />
+      ))}
+      {loading && <ThinkingBubble />}
+      {error && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 12, marginBottom: 10,
+          background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.2)',
+          fontSize: 12, color: 'var(--red)'
+        }}>
+          Error: {error}. Make sure your API key is configured.
+        </div>
+      )}
+      <div ref={messagesEndRef} />
+    </div>
+  );
+
+  const inputSection = (
+    <div style={{
+      background: 'var(--card)', border: '1px solid var(--card-border)',
+      borderRadius: 14, padding: 14, backdropFilter: 'blur(20px)'
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
+        {getInputHint(activeMode)}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          ref={inputRef}
+          value={userMessage}
+          onChange={e => setUserMessage(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+          placeholder={getPlaceholder(activeMode)}
+          style={{
+            flex: 1, height: 42, borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.04)',
+            color: 'var(--text)', fontFamily: 'Rajdhani',
+            fontSize: 14, fontWeight: 600, padding: '0 12px'
+          }}
+        />
+        <button
+          onClick={() => sendMessage()}
+          disabled={loading || cooldownLeft > 0}
+          style={{
+            width: 42, height: 42, borderRadius: 10, border: 'none',
+            background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
+            color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
+            fontSize: cooldownLeft > 0 ? 11 : 18,
+            fontFamily: 'Orbitron', fontWeight: 700,
+            cursor: (loading || cooldownLeft > 0) ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.2s', flexShrink: 0
+          }}
+        >
+          {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        {getQuickPrompts(activeMode).map((q, i) => (
+          <button key={i} onClick={() => sendMessage(q)} style={{
+            padding: '4px 10px', borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
+            fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
+            transition: 'all 0.2s'
+          }}>{q}</button>
+        ))}
+      </div>
     </div>
   );
 
@@ -662,16 +630,55 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
               <XIcon size={16} />
             </button>
           </div>
-          {/* Scrollable coach content */}
-          <div ref={modalScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-            {innerContent}
+          {/* Header — fixed, never scrolls */}
+          <div style={{ padding: '12px 16px 0', flexShrink: 0 }}>
+            {headerSection}
+            {apiKeyMissing && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 12, marginBottom: 14,
+                background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
+                fontSize: 12, color: 'var(--gold)', lineHeight: 1.6
+              }}>
+                <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
+              </div>
+            )}
           </div>
+          {/* Scrollable middle: inbox or messages */}
+          <div ref={modalScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+            {showInbox
+              ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
+              : messagesSection
+            }
+          </div>
+          {/* Input — pinned to bottom */}
+          {!showInbox && (
+            <div style={{ padding: '8px 16px 16px', flexShrink: 0 }}>
+              {inputSection}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  return innerContent;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {headerSection}
+      {apiKeyMissing && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
+          fontSize: 12, color: 'var(--gold)', lineHeight: 1.6
+        }}>
+          <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
+        </div>
+      )}
+      {showInbox
+        ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
+        : <>{messagesSection}{inputSection}</>
+      }
+    </div>
+  );
 }
 
 function ModePrompt({ mode, state }) {
