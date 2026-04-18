@@ -597,7 +597,7 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
             position: 'fixed',
             bottom: 0,
             left: 0, right: 0,
-            height: '90dvh',
+            height: Math.floor(window.innerHeight * 0.9) + 'px',
             background: 'rgba(15,21,40,0.92)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
