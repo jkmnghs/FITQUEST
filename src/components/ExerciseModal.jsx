@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Lightbulb, Check } from 'lucide-react';
 import { FORM_TIPS } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay } from '../utils/gameLogic';
@@ -81,10 +82,10 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
 
   const doneCount = sets.filter(s => s.done).length;
 
-  return (
+  return createPortal(
     <>
       <div style={{
-        position: 'fixed', inset: 0, zIndex: 100,
+        position: 'fixed', inset: 0, zIndex: 9990,
         background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
       }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -337,15 +338,16 @@ function PlankSets({ sets, onToggle, onUpdate }) {
           </div>
         );
       })}
-    </>
+    </>,
+    document.body
   );
 }
 
 function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConfirm }) {
   const missed = Math.max(0, baseSets - doneCount);
-  return (
+  return createPortal(
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9998,
+      position: 'fixed', inset: 0, zIndex: 9995,
       background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center'
     }}>
@@ -373,7 +375,8 @@ function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConf
           }}>COMPLETE</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -1,12 +1,13 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 export default function Toast({ message }) {
   if (!message) return null;
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', top: 70, left: '50%',
       transform: 'translateX(-50%)',
-      zIndex: 200,
+      zIndex: 10000,
       background: 'linear-gradient(135deg, rgba(0,230,118,0.12), rgba(0,229,255,0.12))',
       border: '1px solid rgba(0,230,118,0.25)',
       borderRadius: 13,
@@ -22,6 +23,7 @@ export default function Toast({ message }) {
       pointerEvents: 'none'
     }}>
       {message}
-    </div>
+    </div>,
+    document.body
   );
 }

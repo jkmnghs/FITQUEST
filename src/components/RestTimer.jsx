@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 const CIRCUMFERENCE = 2 * Math.PI * 108; // ~678.58
 
@@ -75,7 +76,7 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
 
   if (!visible) return null;
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       background: 'rgba(10,14,26,0.85)', backdropFilter: 'blur(12px)',
@@ -159,6 +160,7 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
           }}>NEXT SET →</button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
