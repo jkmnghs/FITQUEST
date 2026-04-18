@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X as XIcon } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
@@ -583,11 +584,11 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
 
   // Modal overlay mode (when triggered from TrainTab)
   if (isOpen && onClose) {
-    return (
+    return createPortal(
       <div
         onClick={onClose}
         style={{
-          position: 'fixed', inset: 0, zIndex: 500,
+          position: 'fixed', inset: 0, zIndex: 9999,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
         }}
       >
@@ -666,7 +667,8 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
             )}
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
