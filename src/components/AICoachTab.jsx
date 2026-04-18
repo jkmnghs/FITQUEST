@@ -594,8 +594,10 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            height: '92%',
+            position: 'absolute',
+            bottom: 'calc(var(--nav-height) + var(--safe-area-bottom))',
+            left: 0, right: 0,
+            height: 'calc(92% - var(--nav-height) - var(--safe-area-bottom))',
             background: 'rgba(15,21,40,0.92)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
