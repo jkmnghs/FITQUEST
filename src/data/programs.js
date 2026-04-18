@@ -234,7 +234,7 @@ const UPPER_LOWER_3X = {
         { id: 'squat',   name: 'Barbell Squat',      sets: 3, reps: 10, rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 55,   note: 'Prioritize depth — break parallel' },
         { id: 'rdl',     name: 'Romanian Deadlift',  sets: 3, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 65,   note: 'Hinge at hips — feel hamstring stretch' },
         { id: 'legcurl', name: 'Leg Curl',           sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 42.5, note: 'Hips FLAT on pad — slow controlled reps' },
-        { id: 'ohp',     name: 'DB Overhead Press',  sets: 2, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 15,   note: 'Shoulder accessory on leg day' },
+        { id: 'dblunge', name: 'DB Reverse Lunge',   sets: 3, reps: 10, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 12,   note: '10 reps each leg — knee stays above ankle' },
         { id: 'plank',   name: 'Plank',              sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
       ],
     },
@@ -266,14 +266,15 @@ const PPL_3X = {
       exercises: [
         { id: 'pulldown', name: 'Lat Pulldown',      sets: 4, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 52.5, note: 'Full stretch at top, squeeze lats at bottom' },
         { id: 'dbrow',    name: 'DB Bent-Over Row',  sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 24,   note: 'Pull to hip — chest parallel to floor' },
-        { id: 'rdl',      name: 'Romanian Deadlift', sets: 3, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 65,   note: 'Hinge hips back — feel hamstring stretch' },
+        { id: 'dbcurl',   name: 'DB Bicep Curl',     sets: 3, reps: 12, rest: '60 sec',  restSec: 60,  rpe: 7,   startKg: 10,   note: 'Strict form — no swinging, supinate at top' },
         { id: 'plank',    name: 'Plank',             sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
       ],
     },
     {
-      id: 'legs', name: 'Legs — Quads & Hamstrings',
+      id: 'legs', name: 'Legs — Quads, Hamstrings & Glutes',
       exercises: [
         { id: 'squat',   name: 'Barbell Squat',      sets: 4, reps: 8,  rest: '3 min',   restSec: 180, rpe: 8,   startKg: 62.5, note: 'Break parallel — drive knees out' },
+        { id: 'rdl',     name: 'Romanian Deadlift',  sets: 3, reps: 10, rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 65,   note: 'Hinge hips back — feel hamstring stretch' },
         { id: 'legcurl', name: 'Leg Curl',           sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 8,   startKg: 45,   note: 'Hips FLAT on pad — slow reps' },
         { id: 'dbsquat', name: 'DB Goblet Squat',    sets: 3, reps: 15, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 20,   note: 'Hold DB at chest — sit deep, knees out' },
         { id: 'plank',   name: 'Plank',              sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
@@ -329,12 +330,23 @@ export function selectProgram(assessment) {
   const freqCandidates = candidates.filter(p => p.sessionsPerWeek === daysPerWeek);
   if (freqCandidates.length > 0) candidates = freqCandidates;
 
-  // Step 3: Filter by split preference (if provided)
+  // Step 3: Honor split preference as a hard constraint
   if (splitPreference && splitPreference !== 'no_preference') {
     const splitMap = { full_body: 'fullbody', upper_lower: 'upper_lower', ppl: 'ppl' };
     const splitKey = splitMap[splitPreference];
     if (splitKey) {
-      const splitCandidates = candidates.filter(p => p.id.includes(splitKey));
+      // Try exact match first (current equipment+frequency candidates)
+      let splitCandidates = candidates.filter(p => p.id.includes(splitKey));
+      // Relax equipment — search all programs with matching split + frequency
+      if (splitCandidates.length === 0) {
+        splitCandidates = PROGRAMS.filter(p =>
+          p.id.includes(splitKey) && p.sessionsPerWeek === daysPerWeek
+        );
+      }
+      // Relax frequency too — closest available split
+      if (splitCandidates.length === 0) {
+        splitCandidates = PROGRAMS.filter(p => p.id.includes(splitKey));
+      }
       if (splitCandidates.length > 0) candidates = splitCandidates;
     }
   }
@@ -370,7 +382,22 @@ export function buildInitialWeights(program, assessment) {
 
   const estimatedMaxes = assessment?.estimatedMaxes || {};
 
-  for (const ex of program.exercises) {
+  // Collect unique exercises across all templates (template programs have exercises per day)
+  const seen = new Set();
+  const allExercises = [];
+  if (program.templates) {
+    for (const t of program.templates) {
+      for (const ex of (t.exercises || [])) {
+        if (!seen.has(ex.id)) { seen.add(ex.id); allExercises.push(ex); }
+      }
+    }
+  } else {
+    for (const ex of (program.exercises || [])) {
+      if (!seen.has(ex.id)) { seen.add(ex.id); allExercises.push(ex); }
+    }
+  }
+
+  for (const ex of allExercises) {
     let startWeight = ex.startKg;
 
     // Check if we have an estimated max for this exercise
