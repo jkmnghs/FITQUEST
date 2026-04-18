@@ -156,7 +156,134 @@ const DUMBBELL_4X = {
   ]
 };
 
-export const PROGRAMS = [FULLBODY_3X, FULLBODY_2X, FULLBODY_4X, DUMBBELL_ONLY_3X, DUMBBELL_3X, DUMBBELL_4X, BODYWEIGHT_3X];
+const UPPER_LOWER_4X = {
+  id: 'upper_lower_4x',
+  name: 'Upper / Lower Split — 4x/Week',
+  description: 'Alternate upper and lower body days for balanced strength and hypertrophy.',
+  sessionsPerWeek: 4,
+  targetGoals: ['recomp', 'muscle', 'strength'],
+  targetLevels: ['intermediate', 'advanced'],
+  targetEquipment: ['full_gym', 'barbell_home'],
+  phases: SHARED_PHASES,
+  templates: [
+    {
+      id: 'upper_a', name: 'Upper A — Strength',
+      exercises: [
+        { id: 'bench',    name: 'Bench Press',       sets: 4, reps: 6,  rest: '3 min',   restSec: 180, rpe: 8,   startKg: 55,   note: 'Control descent — 2s down, drive up' },
+        { id: 'pulldown', name: 'Lat Pulldown',      sets: 4, reps: 6,  rest: '3 min',   restSec: 180, rpe: 8,   startKg: 57.5, note: 'Full stretch at top, squeeze at bottom' },
+        { id: 'ohp',      name: 'DB Overhead Press', sets: 3, reps: 8,  rest: '2 min',   restSec: 120, rpe: 8,   startKg: 20,   note: 'Seated or standing — brace core' },
+        { id: 'dbrow',    name: 'DB Bent-Over Row',  sets: 3, reps: 8,  rest: '2 min',   restSec: 120, rpe: 8,   startKg: 24,   note: 'Pull to hip, not chest — chest parallel to floor' },
+        { id: 'plank',    name: 'Plank',             sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s — stop if lower back sags', isPlank: true },
+      ],
+    },
+    {
+      id: 'lower_a', name: 'Lower A — Strength',
+      exercises: [
+        { id: 'squat',   name: 'Barbell Squat',      sets: 4, reps: 6,  rest: '3 min',   restSec: 180, rpe: 8,   startKg: 65,   note: 'Prioritize depth — break parallel' },
+        { id: 'rdl',     name: 'Romanian Deadlift',  sets: 4, reps: 6,  rest: '3 min',   restSec: 180, rpe: 8,   startKg: 75,   note: 'Hinge at hips — feel hamstring stretch' },
+        { id: 'legcurl', name: 'Leg Curl',           sets: 3, reps: 10, rest: '90 sec',  restSec: 90,  rpe: 8,   startKg: 45,   note: 'Hips FLAT on pad — slow controlled reps' },
+        { id: 'plank',   name: 'Plank',              sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+    {
+      id: 'upper_b', name: 'Upper B — Volume',
+      exercises: [
+        { id: 'bench',    name: 'Bench Press',       sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 7.5, startKg: 47.5, note: 'Controlled reps — feel the chest work' },
+        { id: 'pulldown', name: 'Lat Pulldown',      sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 7.5, startKg: 50,   note: 'Full stretch at top, squeeze at bottom' },
+        { id: 'ohp',      name: 'DB Overhead Press', sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 17.5, note: 'Seated or standing — control negative' },
+        { id: 'dbrow',    name: 'DB Bent-Over Row',  sets: 3, reps: 12, rest: '2 min',   restSec: 120, rpe: 7.5, startKg: 22,   note: 'Pull to hip — squeeze at top' },
+        { id: 'plank',    name: 'Plank',             sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+    {
+      id: 'lower_b', name: 'Lower B — Volume',
+      exercises: [
+        { id: 'squat',   name: 'Barbell Squat',      sets: 4, reps: 10, rest: '2.5 min', restSec: 150, rpe: 7.5, startKg: 57.5, note: 'Controlled descent — sit back slightly' },
+        { id: 'rdl',     name: 'Romanian Deadlift',  sets: 4, reps: 10, rest: '2.5 min', restSec: 150, rpe: 7.5, startKg: 65,   note: 'Hinge at hips — feel hamstring stretch' },
+        { id: 'legcurl', name: 'Leg Curl',           sets: 3, reps: 15, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 40,   note: 'Hips FLAT on pad — slow controlled reps' },
+        { id: 'plank',   name: 'Plank',              sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+  ],
+};
+UPPER_LOWER_4X.exercises = UPPER_LOWER_4X.templates[0].exercises;
+
+const UPPER_LOWER_3X = {
+  id: 'upper_lower_3x',
+  name: 'Upper / Lower Split — 3x/Week',
+  description: 'Alternate upper and lower body each session for full-body coverage at 3 days/week.',
+  sessionsPerWeek: 3,
+  targetGoals: ['recomp', 'muscle', 'strength'],
+  targetLevels: ['beginner', 'intermediate'],
+  targetEquipment: ['full_gym', 'barbell_home'],
+  phases: SHARED_PHASES,
+  templates: [
+    {
+      id: 'upper', name: 'Upper Body',
+      exercises: [
+        { id: 'bench',    name: 'Bench Press',       sets: 3, reps: 10, rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 47.5, note: 'Control descent — chest to touch' },
+        { id: 'pulldown', name: 'Lat Pulldown',      sets: 3, reps: 10, rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 50,   note: 'Full stretch at top, squeeze at bottom' },
+        { id: 'ohp',      name: 'DB Overhead Press', sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 17.5, note: 'Seated or standing — control negative' },
+        { id: 'dbrow',    name: 'DB Bent-Over Row',  sets: 3, reps: 12, rest: '2 min',   restSec: 120, rpe: 7.5, startKg: 22,   note: 'Pull to hip, not chest' },
+        { id: 'plank',    name: 'Plank',             sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+    {
+      id: 'lower', name: 'Lower Body',
+      exercises: [
+        { id: 'squat',   name: 'Barbell Squat',      sets: 3, reps: 10, rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 55,   note: 'Prioritize depth — break parallel' },
+        { id: 'rdl',     name: 'Romanian Deadlift',  sets: 3, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 65,   note: 'Hinge at hips — feel hamstring stretch' },
+        { id: 'legcurl', name: 'Leg Curl',           sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 42.5, note: 'Hips FLAT on pad — slow controlled reps' },
+        { id: 'ohp',     name: 'DB Overhead Press',  sets: 2, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 15,   note: 'Shoulder accessory on leg day' },
+        { id: 'plank',   name: 'Plank',              sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+  ],
+};
+UPPER_LOWER_3X.exercises = UPPER_LOWER_3X.templates[0].exercises;
+
+const PPL_3X = {
+  id: 'ppl_3x',
+  name: 'Push / Pull / Legs — 3x/Week',
+  description: 'Rotate Push, Pull, and Legs each session. Best for intermediate lifters wanting muscle.',
+  sessionsPerWeek: 3,
+  targetGoals: ['muscle', 'recomp', 'strength'],
+  targetLevels: ['intermediate', 'advanced'],
+  targetEquipment: ['full_gym', 'barbell_home'],
+  phases: SHARED_PHASES,
+  templates: [
+    {
+      id: 'push', name: 'Push — Chest & Shoulders',
+      exercises: [
+        { id: 'bench',    name: 'Bench Press',       sets: 4, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 52.5, note: 'Control descent — drive up explosively' },
+        { id: 'ohp',      name: 'DB Overhead Press', sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 18,   note: 'Seated or standing — full extension at top' },
+        { id: 'dbbench',  name: 'DB Bench Press',    sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7.5, startKg: 18,   note: 'Flare elbows 45° — stretch at bottom' },
+        { id: 'plank',    name: 'Plank',             sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+    {
+      id: 'pull', name: 'Pull — Back & Biceps',
+      exercises: [
+        { id: 'pulldown', name: 'Lat Pulldown',      sets: 4, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 52.5, note: 'Full stretch at top, squeeze lats at bottom' },
+        { id: 'dbrow',    name: 'DB Bent-Over Row',  sets: 4, reps: 10, rest: '2 min',   restSec: 120, rpe: 8,   startKg: 24,   note: 'Pull to hip — chest parallel to floor' },
+        { id: 'rdl',      name: 'Romanian Deadlift', sets: 3, reps: 8,  rest: '2.5 min', restSec: 150, rpe: 8,   startKg: 65,   note: 'Hinge hips back — feel hamstring stretch' },
+        { id: 'plank',    name: 'Plank',             sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+    {
+      id: 'legs', name: 'Legs — Quads & Hamstrings',
+      exercises: [
+        { id: 'squat',   name: 'Barbell Squat',      sets: 4, reps: 8,  rest: '3 min',   restSec: 180, rpe: 8,   startKg: 62.5, note: 'Break parallel — drive knees out' },
+        { id: 'legcurl', name: 'Leg Curl',           sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 8,   startKg: 45,   note: 'Hips FLAT on pad — slow reps' },
+        { id: 'dbsquat', name: 'DB Goblet Squat',    sets: 3, reps: 15, rest: '90 sec',  restSec: 90,  rpe: 7,   startKg: 20,   note: 'Hold DB at chest — sit deep, knees out' },
+        { id: 'plank',   name: 'Plank',              sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0,   startKg: 0,    note: 'Hold 45-60s', isPlank: true },
+      ],
+    },
+  ],
+};
+PPL_3X.exercises = PPL_3X.templates[0].exercises;
+
+export const PROGRAMS = [FULLBODY_3X, FULLBODY_2X, FULLBODY_4X, UPPER_LOWER_3X, UPPER_LOWER_4X, PPL_3X, DUMBBELL_ONLY_3X, DUMBBELL_3X, DUMBBELL_4X, BODYWEIGHT_3X];
 
 export function getProgramById(id) {
   return PROGRAMS.find(p => p.id === id) ?? FULLBODY_3X;

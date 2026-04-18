@@ -63,7 +63,7 @@ function SessionHistory({ log }) {
 }
 
 export default function TrainTab({
-  state, exercises,
+  state, exercises, currentDayName,
   onCompleteExercise, onFinishSession, onStartSession,
   onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise,
   unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, onSaveHistory,
@@ -93,7 +93,7 @@ export default function TrainTab({
           <div style={{
             fontFamily: 'var(--font-display)', fontSize: 'var(--text-xs)', fontWeight: 700,
             color: 'var(--color-accent-purple)', letterSpacing: '0.04em',
-          }}>{phase.name}</div>
+          }}>{phase.name}{currentDayName ? ` · ${currentDayName}` : ''}</div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{phase.desc}</div>
         </div>
       </div>

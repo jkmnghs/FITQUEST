@@ -292,6 +292,10 @@ export function useGameState(user) {
         programId,
         sessionsPerWeek: program.sessionsPerWeek,
         activeExercises: buildPersonalizedExercises(program.exercises, assessment),
+        activeTemplates: program.templates
+          ? program.templates.map(t => ({ ...t, exercises: buildPersonalizedExercises(t.exercises, assessment) }))
+          : null,
+        currentDayIndex: 0,
         trainingDays: assessment.trainingDays,
         liftWeights,
         liftHistory,
@@ -603,9 +607,17 @@ export function useGameState(user) {
         dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       };
 
+      const nextDayIndex = prev.activeTemplates
+        ? (prev.currentDayIndex + 1) % prev.activeTemplates.length
+        : 0;
+
       return {
         ...updatedWithStreak,
         todaySessionFinished: true,
+        currentDayIndex: nextDayIndex,
+        activeExercises: prev.activeTemplates
+          ? prev.activeTemplates[nextDayIndex].exercises
+          : prev.activeExercises,
         totalSessions: prev.totalSessions + 1,
         totalMinutes: prev.totalMinutes + 50,
         perfectWeeks: (wp.count >= sessionsNeeded && !prev.weekProgress[w]?.completed) ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,

@@ -156,9 +156,11 @@ export default function App() {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }
 
+  const currentDayTemplate = state.activeTemplates?.[state.currentDayIndex ?? 0];
   const sharedTrainProps = {
     state,
-    exercises: state.activeExercises || EXERCISES,
+    exercises: currentDayTemplate?.exercises ?? state.activeExercises ?? EXERCISES,
+    currentDayName: currentDayTemplate?.name ?? null,
     onCompleteExercise: completeExercise,
     onFinishSession: finishSession,
     onStartSession: startSession,
