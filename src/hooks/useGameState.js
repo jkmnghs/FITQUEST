@@ -13,11 +13,30 @@ import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerc
  * Build a personalized exercise list from a program base by applying
  * the user's movement-competency swaps first, then pain-region swaps.
  */
+function applyDurationTrim(exercises, sessionLength) {
+  const mins = Number(sessionLength);
+  if (!mins) return exercises;
+  if (mins <= 30) {
+    // ~30 min: 5 exercises × 2 sets
+    return exercises.slice(0, 5).map(ex => ({ ...ex, sets: Math.min(ex.sets, 2) }));
+  }
+  if (mins <= 45) {
+    // ~45 min: 6 exercises × 2 sets
+    return exercises.slice(0, 6).map(ex => ({ ...ex, sets: Math.min(ex.sets, 2) }));
+  }
+  if (mins >= 90) {
+    // ~90 min: full list + 1 extra set per exercise (capped at 5)
+    return exercises.map(ex => ({ ...ex, sets: Math.min(ex.sets + 1, 5) }));
+  }
+  return exercises; // 60 min: use program defaults
+}
+
 function buildPersonalizedExercises(exercises, assessment) {
   if (!exercises) return exercises;
   let result = [...exercises];
   result = applyCompetencySubstitutions(result, assessment?.movementCompetency);
   result = applySubstitutions(result, assessment?.painRegions);
+  result = applyDurationTrim(result, assessment?.sessionLength);
   return result;
 }
 
