@@ -215,7 +215,8 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
           onConfirm={() => { setShowConfirm(false); handleComplete(); }}
         />
       )}
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -338,8 +339,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
           </div>
         );
       })}
-    </>,
-    document.body
+    </>
   );
 }
 
