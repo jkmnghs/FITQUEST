@@ -595,10 +595,9 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
           onClick={e => e.stopPropagation()}
           style={{
             position: 'fixed',
-            bottom: 0,
-            left: 0, right: 0,
-            height: Math.floor(window.innerHeight * 0.9) + 'px',
-            background: 'rgba(15,21,40,0.92)',
+            bottom: 0, left: 0, right: 0,
+            maxHeight: '90vh',
+            background: 'rgba(15,21,40,0.96)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
             border: '1px solid rgba(255,255,255,0.06)',
@@ -608,16 +607,12 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
             animation: 'slideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both',
           }}
         >
-          {/* Drag handle + close button */}
+          {/* Drag handle + close — never scrolls */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px 0',
-            flexShrink: 0,
+            padding: '12px 16px 0', flexShrink: 0,
           }}>
-            <div style={{
-              width: 36, height: 4, borderRadius: 2,
-              background: 'rgba(255,255,255,0.15)',
-            }} />
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} />
             <button
               onClick={onClose}
               aria-label="Close AI Coach"
@@ -632,32 +627,44 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
               <XIcon size={16} />
             </button>
           </div>
-          {/* Header — fixed, never scrolls */}
-          <div style={{ padding: '12px 16px 0', flexShrink: 0 }}>
-            {headerSection}
-            {apiKeyMissing && (
+
+          {/* Single scrollable area: header + messages + sticky input */}
+          <div
+            ref={modalScrollRef}
+            style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}
+          >
+            <div style={{ padding: '12px 16px 0' }}>
+              {headerSection}
+              {apiKeyMissing && (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 12, marginBottom: 14,
+                  background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
+                  fontSize: 12, color: 'var(--gold)', lineHeight: 1.6,
+                }}>
+                  <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '0 16px' }}>
+              {showInbox
+                ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
+                : messagesSection
+              }
+            </div>
+
+            {/* Input — sticky to bottom of scroll container */}
+            {!showInbox && (
               <div style={{
-                padding: '10px 14px', borderRadius: 12, marginBottom: 14,
-                background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
-                fontSize: 12, color: 'var(--gold)', lineHeight: 1.6
+                position: 'sticky', bottom: 0,
+                padding: '8px 16px',
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+                background: 'rgba(15,21,40,0.96)',
               }}>
-                <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
+                {inputSection}
               </div>
             )}
           </div>
-          {/* Scrollable middle: inbox or messages */}
-          <div ref={modalScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
-            {showInbox
-              ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
-              : messagesSection
-            }
-          </div>
-          {/* Input — pinned to bottom */}
-          {!showInbox && (
-            <div style={{ padding: '8px 16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', flexShrink: 0 }}>
-              {inputSection}
-            </div>
-          )}
         </div>
       </div>
     );
