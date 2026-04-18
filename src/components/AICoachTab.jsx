@@ -424,7 +424,7 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
   const modeMessages = messages.filter(m => m.mode === activeMode);
 
   const innerContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: isOpen ? '100%' : '70vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
@@ -532,7 +532,7 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
       {/* Chat view (hidden when inbox is open) */}
       {!showInbox && (<>
       {/* Messages */}
-      <div style={{ flex: 1, marginBottom: 14 }}>
+      <div style={{ marginBottom: 14 }}>
         {modeMessages.length === 0 && (
           <ModePrompt mode={COACH_MODES.find(m => m.id === activeMode)} state={state} />
         )}
