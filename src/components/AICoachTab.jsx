@@ -594,10 +594,10 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            position: 'absolute',
-            bottom: 'calc(var(--nav-height) + var(--safe-area-bottom))',
+            position: 'fixed',
+            bottom: 0,
             left: 0, right: 0,
-            height: 'calc(92% - var(--nav-height) - var(--safe-area-bottom))',
+            height: '90dvh',
             background: 'rgba(15,21,40,0.92)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
@@ -654,7 +654,7 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
           </div>
           {/* Input — pinned to bottom */}
           {!showInbox && (
-            <div style={{ padding: '8px 16px 16px', flexShrink: 0 }}>
+            <div style={{ padding: '8px 16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', flexShrink: 0 }}>
               {inputSection}
             </div>
           )}
