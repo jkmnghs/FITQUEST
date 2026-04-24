@@ -487,7 +487,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Nutrition Goals</div>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
-          Set your daily targets (recommended by your AI coach).
+          Auto-calculated from your profile (height, weight, goal, activity). Edit to override.
         </div>
         {[
           { key: 'calories', label: 'Calories (kcal)', placeholder: '2000' },

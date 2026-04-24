@@ -1,8 +1,145 @@
 import React, { useState } from 'react';
-import { TrendingUp, ClipboardCheck, Calendar } from 'lucide-react';
+import { TrendingUp, ClipboardCheck, Calendar, Activity } from 'lucide-react';
 import StatsTab from './StatsTab';
 import CheckinTab from './CheckinTab';
 import { SummaryTab } from './OtherTabs';
+
+function bmiColor(category) {
+  if (category === 'Normal')      return 'var(--color-success)';
+  if (category === 'Underweight') return 'var(--color-action)';
+  if (category === 'Overweight')  return '#FFA726';
+  return 'var(--color-destructive)'; // Obese
+}
+
+function whrColor(ratio) {
+  return ratio >= 0.5 ? '#FFA726' : 'var(--color-success)';
+}
+
+function MetricBox({ label, value, tag, color, note }) {
+  return (
+    <div style={{
+      background: 'var(--color-surface-1)',
+      border: '1px solid var(--color-border-subtle)',
+      borderRadius: 'var(--radius-md)',
+      padding: 'var(--space-3)',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <span style={{
+        fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)',
+        color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>{label}</span>
+      <span style={{
+        fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 900,
+        color, lineHeight: 1,
+      }}>{value}</span>
+      {tag && (
+        <span style={{
+          display: 'inline-block', alignSelf: 'flex-start',
+          fontFamily: 'var(--font-primary)', fontSize: 10, fontWeight: 700,
+          color, background: `${color}18`,
+          padding: '2px 7px', borderRadius: 20,
+        }}>{tag}</span>
+      )}
+      {note && (
+        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{note}</span>
+      )}
+    </div>
+  );
+}
+
+function BodyStatsCard({ state }) {
+  const { bmi, bmiCategory, waistToHeightRatio, assessment } = state;
+  if (!bmi || !assessment) return null;
+
+  const latestCheckin = [...(state.weeklyCheckins || [])].sort((a, b) => b.week - a.week)[0];
+  const currentWeight = latestCheckin?.weight ?? assessment.weightKg;
+  const weightDelta = latestCheckin?.weight && assessment.weightKg
+    ? (latestCheckin.weight - assessment.weightKg).toFixed(1)
+    : null;
+
+  return (
+    <div style={{
+      background: 'var(--color-surface-1)',
+      border: '1px solid var(--color-border-subtle)',
+      borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+    }}>
+      {/* Headline stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: waistToHeightRatio ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10, marginBottom: 'var(--space-3)' }}>
+        <MetricBox
+          label="BMI"
+          value={bmi}
+          tag={bmiCategory}
+          color={bmiColor(bmiCategory)}
+          note="Asian-adjusted cutoffs"
+        />
+        <MetricBox
+          label="Weight"
+          value={`${currentWeight} kg`}
+          tag={weightDelta !== null ? `${weightDelta > 0 ? '+' : ''}${weightDelta} kg` : 'Starting'}
+          color={weightDelta !== null && Number(weightDelta) !== 0 ? (
+            assessment.goal === 'fat_loss' && Number(weightDelta) < 0 ? 'var(--color-success)' :
+            assessment.goal === 'muscle'   && Number(weightDelta) > 0 ? 'var(--color-success)' :
+            'var(--color-text-secondary)'
+          ) : 'var(--color-text-secondary)'}
+        />
+        {waistToHeightRatio && (
+          <MetricBox
+            label="Waist/Ht"
+            value={waistToHeightRatio}
+            tag={waistToHeightRatio >= 0.5 ? 'Elevated' : 'Healthy'}
+            color={whrColor(waistToHeightRatio)}
+            note="< 0.5 = low risk"
+          />
+        )}
+      </div>
+
+      {/* Baseline row */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '6px 16px',
+        padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)',
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid var(--color-border-subtle)',
+      }}>
+        {[
+          { label: 'Height', val: `${assessment.heightCm} cm` },
+          { label: 'Age',    val: `${assessment.age} yrs` },
+          { label: 'Sex',    val: assessment.sex === 'male' ? 'Male' : 'Female' },
+          { label: 'Goal',   val: { fat_loss: 'Fat Loss', muscle: 'Build Muscle', recomp: 'Recomp', strength: 'Strength' }[assessment.goal] ?? assessment.goal },
+        ].map(({ label, val }) => (
+          <span key={label} style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{label}</span> {val}
+          </span>
+        ))}
+      </div>
+
+      {/* BMI scale bar */}
+      <div style={{ marginTop: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>UNDERWEIGHT</span>
+          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>NORMAL</span>
+          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>OVERWEIGHT</span>
+          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>OBESE</span>
+        </div>
+        <div style={{ position: 'relative', height: 6, borderRadius: 3, overflow: 'hidden',
+          background: 'linear-gradient(to right, var(--color-action) 0%, var(--color-success) 25%, var(--color-success) 55%, #FFA726 75%, var(--color-destructive) 100%)' }}>
+          {/* Marker — clamp BMI 14-40 to 0-100% */}
+          <div style={{
+            position: 'absolute', top: -2, width: 10, height: 10,
+            borderRadius: '50%', background: '#fff',
+            border: `2px solid ${bmiColor(bmiCategory)}`,
+            left: `calc(${Math.min(100, Math.max(0, ((bmi - 14) / 26) * 100))}% - 5px)`,
+            transition: 'left 0.5s',
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+          {['18.5', '23', '27.5'].map(v => (
+            <span key={v} style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{v}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SectionHeader({ icon: Icon, title }) {
   return (
@@ -73,6 +210,16 @@ export default function ProgressTab({ state, onSubmitCheckin }) {
           <SummaryTab state={state} />
         </div>
       </div>
+
+      {/* Body Stats */}
+      {state.bmi && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SectionHeader icon={Activity} title="Body Metrics" />
+          <div style={{ padding: '0 var(--space-4)' }}>
+            <BodyStatsCard state={state} />
+          </div>
+        </div>
+      )}
 
       {/* Check-in */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
