@@ -3,6 +3,7 @@ import { TrendingUp, ClipboardCheck, Calendar, Activity } from 'lucide-react';
 import StatsTab from './StatsTab';
 import CheckinTab from './CheckinTab';
 import { SummaryTab } from './OtherTabs';
+import { calcWaistToHeight } from '../utils/nutrition';
 
 function bmiColor(category) {
   if (category === 'Normal')      return 'var(--color-success)';
@@ -57,15 +58,20 @@ function deriveBmiCategory(bmi) {
 }
 
 function BodyStatsCard({ state }) {
-  const { bmi, waistToHeightRatio, assessment } = state;
+  const { bmi, assessment } = state;
   if (!bmi || !assessment) return null;
 
   const bmiCategory = deriveBmiCategory(bmi);
-  const latestCheckin = [...(state.weeklyCheckins || [])].sort((a, b) => b.week - a.week)[0];
+  const checkins = [...(state.weeklyCheckins || [])].sort((a, b) => b.week - a.week);
+  const latestCheckin = checkins[0];
   const currentWeight = latestCheckin?.weight ?? assessment.weightKg;
   const weightDelta = latestCheckin?.weight && assessment.weightKg
     ? (latestCheckin.weight - assessment.weightKg).toFixed(1)
     : null;
+
+  // Prefer most recent check-in waist; fall back to onboarding waist
+  const latestWaist = checkins.find(c => c.waist > 0)?.waist ?? assessment.waistCm;
+  const waistToHeightRatio = calcWaistToHeight(latestWaist, assessment.heightCm);
 
   return (
     <div style={{

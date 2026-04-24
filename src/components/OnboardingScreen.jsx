@@ -635,7 +635,7 @@ export default function OnboardingScreen({ onComplete }) {
           <NumInput label="WAIST CIRCUMFERENCE (optional)" value={data.waistCm}
             onChange={v => set('waistCm', v)} placeholder="85" unit="cm" />
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4, lineHeight: 1.5 }}>
-            Waist measurement enables Asian-adjusted health risk screening.
+            Measure around your navel in <strong>centimetres</strong> (e.g. 85–110 cm). Used to calculate health risk ratio.
           </div>
           <NavButtons step={step} onBack={handleBack} onNext={handleNext} nextDisabled={!bodyValid} />
         </Card>
