@@ -188,8 +188,10 @@ function validateBodyStats(data) {
 
   if (data.waistCm) {
     const wc = Number(data.waistCm);
-    if (!Number.isFinite(wc) || wc < 40 || wc > 250)
-      e.waistCm = 'Enter 40–250 cm, or leave blank. (Tip: measure in cm, not inches or pant size.)';
+    const ht = Number(data.heightCm) || 170;
+    const minWaist = Math.max(55, Math.round(ht * 0.30)); // < 30% of height is physiologically impossible
+    if (!Number.isFinite(wc) || wc < minWaist || wc > 250)
+      e.waistCm = `Enter ${minWaist}–250 cm, or leave blank. Measure in centimetres around your navel — not inches or pant size.`;
   }
   return e;
 }

@@ -105,11 +105,13 @@ export function calcBMI(weightKg, heightCm) {
 
 /**
  * Waist-to-height ratio — ≥0.5 = elevated cardiometabolic risk.
- * Returns null if waist is missing or physiologically implausible (< 40 cm).
+ * Returns null if waist is missing or physiologically implausible.
+ * Minimum: 55 cm or 30% of height, whichever is greater.
  */
 export function calcWaistToHeight(waistCm, heightCm) {
   if (!waistCm || !heightCm) return null;
-  if (waistCm < 40) return null; // clearly bad entry (e.g. inches entered as cm)
+  const minWaist = Math.max(55, heightCm * 0.30);
+  if (waistCm < minWaist) return null;
   return Math.round((waistCm / heightCm) * 100) / 100;
 }
 
