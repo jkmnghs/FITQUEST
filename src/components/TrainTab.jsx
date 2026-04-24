@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, History, Dumbbell, Play } from 'lucide-react';
+import { Bot, History, Dumbbell, Play, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import WorkoutTab from './WorkoutTab';
 import AICoachTab from './AICoachTab';
 import { getPhase } from '../utils/gameLogic';
@@ -58,6 +58,80 @@ function SessionHistory({ log }) {
           }}>+{s.xp}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function NextWorkoutCard({ state }) {
+  const [open, setOpen] = useState(false);
+  const templates = state.activeTemplates;
+  if (!templates || templates.length < 2) return null;
+
+  const nextIdx = ((state.currentDayIndex ?? 0) + 1) % templates.length;
+  const next = templates[nextIdx];
+  if (!next?.exercises?.length) return null;
+
+  return (
+    <div style={{ marginTop: 'var(--space-4)' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+          padding: 'var(--space-3) var(--space-4)',
+          background: 'var(--color-surface-1)',
+          border: '1px solid var(--color-border-subtle)',
+          borderRadius: open ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)',
+          cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <Calendar size={15} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+        <span style={{
+          flex: 1, fontFamily: 'var(--font-primary)', fontSize: 'var(--text-sm)',
+          fontWeight: 600, color: 'var(--color-text-secondary)',
+        }}>
+          Next workout: <span style={{ color: 'var(--color-text-primary)' }}>{next.name}</span>
+        </span>
+        {open
+          ? <ChevronUp size={15} color="var(--color-text-tertiary)" />
+          : <ChevronDown size={15} color="var(--color-text-tertiary)" />}
+      </button>
+
+      {open && (
+        <div style={{
+          background: 'var(--color-surface-1)',
+          border: '1px solid var(--color-border-subtle)',
+          borderTop: 'none',
+          borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+          overflow: 'hidden',
+        }}>
+          {next.exercises.map((ex, i) => (
+            <div key={ex.id} style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+              padding: '10px var(--space-4)',
+              borderTop: i === 0 ? 'none' : '1px solid var(--color-border-subtle)',
+            }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                background: 'rgba(179,136,255,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Dumbbell size={11} color="var(--color-accent-purple)" />
+              </div>
+              <span style={{
+                flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
+              }}>{ex.name}</span>
+              <span style={{
+                fontFamily: 'var(--font-display)', fontSize: 'var(--text-xs)', fontWeight: 700,
+                color: 'var(--color-text-tertiary)',
+              }}>
+                {ex.isPlank
+                  ? `${ex.sets} × ${ex.duration ?? '30s'}`
+                  : `${ex.sets} × ${ex.reps}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -157,6 +231,9 @@ export default function TrainTab({
         onSwapExercise={onSwapExercise}
         onDeleteExercise={onDeleteExercise}
       />
+
+      {/* Next workout preview */}
+      <NextWorkoutCard state={state} />
 
       {/* Session history */}
       <div style={{ marginTop: 'var(--space-8)' }}>
