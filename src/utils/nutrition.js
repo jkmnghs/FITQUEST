@@ -50,7 +50,9 @@ export function calcNutritionGoals(assessment) {
   const tdee = calcTDEE(bmr, daysPerWeek || 3, dailyActivity);
 
   const proteinPerKg = { recomp: 2.0, fat_loss: 2.5, muscle: 1.8, strength: 1.8 };
-  let calAdj = { recomp: 0, fat_loss: -400, muscle: +250, strength: +100 };
+  // Recomp: -100 kcal accounts for the ~5-10% overestimation bias in TDEE formulas.
+  // True recomp needs genuine maintenance; eating at formula-TDEE usually means a slight surplus.
+  let calAdj = { recomp: -100, fat_loss: -400, muscle: +250, strength: +100 };
 
   // Phase 3.4c: High stress + fat_loss → reduce deficit
   if ((stressLevel === 'high' || stressLevel === 'very_high') && goal === 'fat_loss') {

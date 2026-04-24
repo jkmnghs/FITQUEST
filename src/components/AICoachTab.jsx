@@ -567,14 +567,21 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
           {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
         </button>
       </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex', gap: 6, marginTop: 8,
+        overflowX: 'auto', flexWrap: 'nowrap',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none', msOverflowStyle: 'none',
+        paddingBottom: 2,
+      }}>
         {getQuickPrompts(activeMode).map((q, i) => (
           <button key={i} onClick={() => sendMessage(q)} style={{
-            padding: '4px 10px', borderRadius: 8,
+            padding: '4px 10px', borderRadius: 8, flexShrink: 0,
             border: '1px solid rgba(255,255,255,0.08)',
             background: 'rgba(255,255,255,0.03)',
             color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
             fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
+            whiteSpace: 'nowrap',
             transition: 'all 0.2s'
           }}>{q}</button>
         ))}
