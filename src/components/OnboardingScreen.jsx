@@ -136,28 +136,62 @@ function StepHeader({ step, total, title }) {
   );
 }
 
-function NumInput({ label, value, onChange, placeholder, unit, isText }) {
+function NumInput({ label, value, onChange, placeholder, unit, isText, error }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{
         fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
-        color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
-      }}>{label}{unit && <span style={{ color: 'var(--text3)', marginLeft: 4 }}>({unit})</span>}</div>
+        color: error ? 'var(--fire2)' : 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
+      }}>{label}{unit && <span style={{ marginLeft: 4 }}>({unit})</span>}</div>
       <input
         type={isText ? 'text' : 'number'} inputMode={isText ? 'text' : 'decimal'} value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        maxLength={isText ? 30 : undefined}
+        maxLength={isText ? 50 : undefined}
         style={{
           width: '100%', padding: '11px 14px', borderRadius: 10,
-          border: '1px solid rgba(255,255,255,0.1)',
-          background: 'rgba(255,255,255,0.05)',
+          border: error ? '1.5px solid var(--fire2)' : '1px solid rgba(255,255,255,0.1)',
+          background: error ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.05)',
           color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
           outline: 'none', boxSizing: 'border-box',
+          transition: 'border-color 0.2s',
         }}
       />
+      {error && (
+        <div style={{ fontSize: 11, color: 'var(--fire2)', marginTop: 5, lineHeight: 1.4 }}>
+          ⚠ {error}
+        </div>
+      )}
     </div>
   );
+}
+
+function validateBodyStats(data) {
+  const e = {};
+  const name = data.name?.trim() ?? '';
+  if (!name) e.name = 'Name is required.';
+  else if (name.length < 2) e.name = 'Name must be at least 2 characters.';
+
+  const age = Number(data.age);
+  if (!data.age) e.age = 'Age is required.';
+  else if (!Number.isFinite(age) || age < 13 || age > 100) e.age = 'Enter an age between 13 and 100.';
+
+  if (!data.sex) e.sex = 'Please select your biological sex.';
+
+  const wt = Number(data.weightKg);
+  if (!data.weightKg) e.weightKg = 'Weight is required.';
+  else if (!Number.isFinite(wt) || wt < 20 || wt > 400) e.weightKg = 'Enter a realistic weight (20–400 kg).';
+
+  const ht = Number(data.heightCm);
+  if (!data.heightCm) e.heightCm = 'Height is required.';
+  else if (!Number.isFinite(ht) || ht < 100 || ht > 250) e.heightCm = 'Enter a realistic height (100–250 cm).';
+
+  if (data.waistCm) {
+    const wc = Number(data.waistCm);
+    if (!Number.isFinite(wc) || wc < 40 || wc > 250)
+      e.waistCm = 'Enter 40–250 cm, or leave blank. (Tip: measure in cm, not inches or pant size.)';
+  }
+  return e;
 }
 
 function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, step }) {
@@ -207,6 +241,7 @@ const TOTAL_STEPS = 14;
 
 export default function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(1);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [data, setData] = useState({
     name: '',
     parqAnswers: Array(7).fill(false),
@@ -241,7 +276,10 @@ export default function OnboardingScreen({ onComplete }) {
     previousQuitReason: null,
   });
 
-  const set = (key, val) => setData(d => ({ ...d, [key]: val }));
+  const set = (key, val) => {
+    setData(d => ({ ...d, [key]: val }));
+    setFieldErrors(e => { const n = { ...e }; delete n[key]; return n; });
+  };
   const isAdvanced = data.level === 'intermediate' || data.level === 'advanced';
 
   function handleNext() {
@@ -600,44 +638,61 @@ export default function OnboardingScreen({ onComplete }) {
 
   // ── Step 10: Body Stats ──
   if (step === 10) {
-    const bodyValid = data.name?.trim() && data.age && data.sex && data.weightKg && data.heightCm;
+    const fe = fieldErrors;
+    const hasErrors = Object.keys(fe).length > 0;
+
+    function handleBodyNext() {
+      const errors = validateBodyStats(data);
+      if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
+      setFieldErrors({});
+      handleNext();
+    }
+
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={10} total={TOTAL_STEPS} title="Your Body Stats" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
             Used to calculate your personalized calorie targets using the Mifflin-St Jeor formula.
           </div>
+
           <NumInput label="YOUR NAME" value={data.name} onChange={v => set('name', v)}
-            placeholder="e.g. Alex" unit={null} isText />
-          <NumInput label="AGE" value={data.age} onChange={v => set('age', v)} placeholder="25" unit="years" />
-          <div style={{ marginBottom: 14 }}>
+            placeholder="e.g. Alex" unit={null} isText error={fe.name} />
+          <NumInput label="AGE" value={data.age} onChange={v => set('age', v)}
+            placeholder="25" unit="years" error={fe.age} />
+
+          <div style={{ marginBottom: fe.sex ? 6 : 14 }}>
             <div style={{
               fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
-              color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
+              color: fe.sex ? 'var(--fire2)' : 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
             }}>BIOLOGICAL SEX</div>
             <div style={{ display: 'flex', gap: 8 }}>
               {[['male', 'Male'], ['female', 'Female']].map(([val, label]) => (
                 <button key={val} onClick={() => set('sex', val)} style={{
-                  flex: 1, padding: '12px',
-                  borderRadius: 10,
+                  flex: 1, padding: '12px', borderRadius: 10,
                   border: data.sex === val ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
                   background: data.sex === val ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
                   color: data.sex === val ? 'var(--cyan)' : 'var(--text)',
-                  fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600,
-                  cursor: 'pointer',
+                  fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                 }}>{label}</button>
               ))}
             </div>
+            {fe.sex && <div style={{ fontSize: 11, color: 'var(--fire2)', marginTop: 5 }}>⚠ {fe.sex}</div>}
           </div>
-          <NumInput label="WEIGHT" value={data.weightKg} onChange={v => set('weightKg', v)} placeholder="70" unit="kg" />
-          <NumInput label="HEIGHT" value={data.heightCm} onChange={v => set('heightCm', v)} placeholder="170" unit="cm" />
+
+          <NumInput label="WEIGHT" value={data.weightKg} onChange={v => set('weightKg', v)}
+            placeholder="70" unit="kg" error={fe.weightKg} />
+          <NumInput label="HEIGHT" value={data.heightCm} onChange={v => set('heightCm', v)}
+            placeholder="170" unit="cm" error={fe.heightCm} />
           <NumInput label="WAIST CIRCUMFERENCE (optional)" value={data.waistCm}
-            onChange={v => set('waistCm', v)} placeholder="85" unit="cm" />
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4, lineHeight: 1.5 }}>
-            Measure around your navel in <strong>centimetres</strong> (e.g. 85–110 cm). Used to calculate health risk ratio.
-          </div>
-          <NavButtons step={step} onBack={handleBack} onNext={handleNext} nextDisabled={!bodyValid} />
+            onChange={v => set('waistCm', v)} placeholder="85" unit="cm" error={fe.waistCm} />
+          {!fe.waistCm && (
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: -6, marginBottom: 14, lineHeight: 1.5 }}>
+              Measure around your navel in <strong>centimetres</strong> (e.g. 85–110 cm).
+            </div>
+          )}
+
+          <NavButtons step={step} onBack={handleBack} onNext={handleBodyNext} nextDisabled={false} />
         </Card>
       </div>
     );
