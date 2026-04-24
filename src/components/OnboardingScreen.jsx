@@ -688,11 +688,9 @@ export default function OnboardingScreen({ onComplete }) {
             placeholder="170" unit="cm" error={fe.heightCm} />
           <NumInput label="WAIST CIRCUMFERENCE (optional)" value={data.waistCm}
             onChange={v => set('waistCm', v)} placeholder="85" unit="cm" error={fe.waistCm} />
-          {!fe.waistCm && (
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: -6, marginBottom: 14, lineHeight: 1.5 }}>
-              Measure around your navel in <strong>centimetres</strong> (e.g. 85–110 cm).
-            </div>
-          )}
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: -6, marginBottom: 14, lineHeight: 1.5 }}>
+            Measure around your navel in <strong>centimetres</strong> — not inches or pant size. Typical range: 60–130 cm.
+          </div>
 
           <NavButtons step={step} onBack={handleBack} onNext={handleBodyNext} nextDisabled={false} />
         </Card>
