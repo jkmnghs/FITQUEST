@@ -48,13 +48,22 @@ export function calcNutritionGoals(assessment) {
 
   const bmr  = calcBMR({ weightKg, heightCm, age, sex });
   const tdee = calcTDEE(bmr, daysPerWeek || 3, dailyActivity);
+  const bmi  = heightCm ? weightKg / Math.pow(heightCm / 100, 2) : 0;
 
-  const proteinPerKg = { recomp: 2.0, fat_loss: 2.5, muscle: 1.8, strength: 1.8 };
-  // Recomp: -100 kcal accounts for the ~5-10% overestimation bias in TDEE formulas.
-  // True recomp needs genuine maintenance; eating at formula-TDEE usually means a slight surplus.
-  let calAdj = { recomp: -100, fat_loss: -400, muscle: +250, strength: +100 };
+  // Protein: fat_loss uses 2.0g/kg (evidence-based for muscle retention during deficit;
+  // 2.5g/kg was excessive for heavier individuals and left too few carbs for training energy).
+  const proteinPerKg = { recomp: 2.0, fat_loss: 2.0, muscle: 1.8, strength: 1.8 };
 
-  // Phase 3.4c: High stress + fat_loss → reduce deficit
+  // Recomp: -100 kcal corrects for TDEE formula overestimation bias (~5-10%).
+  // Fat loss: obese users (BMI ≥ 30) safely tolerate a larger deficit and lose faster at -500.
+  let calAdj = {
+    recomp: -100,
+    fat_loss: bmi >= 30 ? -500 : -400,
+    muscle: +250,
+    strength: +100,
+  };
+
+  // High stress + fat_loss → reduce deficit
   if ((stressLevel === 'high' || stressLevel === 'very_high') && goal === 'fat_loss') {
     calAdj.fat_loss = -250;
     warnings.push('Caloric deficit reduced to 250 kcal due to high stress levels. Aggressive deficits under stress can increase cortisol and promote binge cycles.');
