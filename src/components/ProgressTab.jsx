@@ -47,10 +47,20 @@ function MetricBox({ label, value, tag, color, note }) {
   );
 }
 
+// Derive category live from the bmi number so stale stored categories don't mislead
+function deriveBmiCategory(bmi) {
+  if (!bmi) return null;
+  if (bmi < 18.5) return 'Underweight';
+  if (bmi < 25)   return 'Normal';
+  if (bmi < 30)   return 'Overweight';
+  return 'Obese';
+}
+
 function BodyStatsCard({ state }) {
-  const { bmi, bmiCategory, waistToHeightRatio, assessment } = state;
+  const { bmi, waistToHeightRatio, assessment } = state;
   if (!bmi || !assessment) return null;
 
+  const bmiCategory = deriveBmiCategory(bmi);
   const latestCheckin = [...(state.weeklyCheckins || [])].sort((a, b) => b.week - a.week)[0];
   const currentWeight = latestCheckin?.weight ?? assessment.weightKg;
   const weightDelta = latestCheckin?.weight && assessment.weightKg
