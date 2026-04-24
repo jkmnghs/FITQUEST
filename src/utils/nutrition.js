@@ -12,34 +12,54 @@ export function calcBMR({ weightKg, heightCm, age, sex }) {
   return sex === 'male' ? base + 5 : base - 161;
 }
 
-/**
- * Activity level multipliers (Phase 3.4a — corrected TDEE calculation)
- */
 const ACTIVITY_MULTIPLIERS = {
-  sedentary: 1.2,
-  lightly_active: 1.375,
+  sedentary:        1.2,
+  lightly_active:   1.375,
   moderately_active: 1.55,
-  very_active: 1.725,
+  very_active:      1.725,
 };
 
-/**
- * Total Daily Energy Expenditure — uses daily activity level as base + training days as adjustment.
- * Phase 3.4a: A construction worker training 3x/week needs more calories than a desk worker at 3x/week.
- */
-export function calcTDEE(bmr, daysPerWeek, dailyActivity) {
-  const baseMultiplier = ACTIVITY_MULTIPLIERS[dailyActivity] || ACTIVITY_MULTIPLIERS.sedentary;
-  const trainingBoost = (daysPerWeek || 3) * 0.03;
-  const multiplier = baseMultiplier + trainingBoost;
+// Previously wrong: flat kcal deltas (–400/+250) ignored TDEE magnitude, so a
+// 1 800 kcal/day person and a 3 000 kcal/day person got the same absolute swing.
+// Percentage multipliers scale correctly with body size and activity level.
+const GOAL_MULTIPLIERS = {
+  fat_loss: 0.80, // 20% deficit
+  muscle:   1.10, // 10% surplus
+  strength: 1.05, // 5% surplus
+  recomp:   1.00, // maintenance
+};
+
+// Previously wrong: fat_loss was 2.0g/kg (under), strength 1.8g/kg (under),
+// recomp 2.0g/kg (under). Using evidence-based targets per goal.
+const PROTEIN_PER_KG = {
+  fat_loss: 2.2,
+  muscle:   1.8,
+  strength: 2.0,
+  recomp:   2.4,
+};
+
+// Previously wrong: fat was a flat 25% of calories regardless of goal.
+// Goal-specific g/kg ensures hormonal adequacy and correct satiety signalling.
+const FAT_PER_KG = {
+  fat_loss: 0.9,
+  muscle:   1.0,
+  strength: 1.2,
+  recomp:   0.9,
+};
+
+// Previously wrong: added daysPerWeek × 0.03 on top of the activity multiplier,
+// double-counting training days (the multiplier already encodes exercise frequency).
+export function calcTDEE(bmr, dailyActivity) {
+  const multiplier = ACTIVITY_MULTIPLIERS[dailyActivity] || ACTIVITY_MULTIPLIERS.sedentary;
   return Math.round(bmr * multiplier);
 }
 
 /**
  * Full nutrition goal calc. Returns { calories, protein, carbs, fat, warnings }.
  * Enforces minimum safe caloric floors (1200 kcal women / 1500 kcal men).
- * Phase 4.3: Additional safeguards for max deficit, under-18, stress adjustment.
  */
 export function calcNutritionGoals(assessment) {
-  const { weightKg, heightCm, age, sex, daysPerWeek, goal, dailyActivity, stressLevel } = assessment;
+  const { weightKg, heightCm, age, sex, goal, dailyActivity, stressLevel } = assessment;
   const warnings = [];
 
   if (!weightKg || !heightCm || !age || !sex) {
@@ -47,54 +67,51 @@ export function calcNutritionGoals(assessment) {
   }
 
   const bmr  = calcBMR({ weightKg, heightCm, age, sex });
-  const tdee = calcTDEE(bmr, daysPerWeek || 3, dailyActivity);
-  const bmi  = heightCm ? weightKg / Math.pow(heightCm / 100, 2) : 0;
+  const tdee = calcTDEE(bmr, dailyActivity);
 
-  // Protein: fat_loss uses 2.0g/kg (evidence-based for muscle retention during deficit;
-  // 2.5g/kg was excessive for heavier individuals and left too few carbs for training energy).
-  const proteinPerKg = { recomp: 2.0, fat_loss: 2.0, muscle: 1.8, strength: 1.8 };
+  let goalMultiplier = GOAL_MULTIPLIERS[goal] ?? 1.00;
 
-  // Recomp: -100 kcal corrects for TDEE formula overestimation bias (~5-10%).
-  // Fat loss: obese users (BMI ≥ 30) safely tolerate a larger deficit and lose faster at -500.
-  let calAdj = {
-    recomp: -100,
-    fat_loss: bmi >= 30 ? -500 : -400,
-    muscle: +250,
-    strength: +100,
-  };
-
-  // High stress + fat_loss → reduce deficit
+  // High stress + fat_loss → reduce deficit from 20% to 10% to avoid cortisol spike
   if ((stressLevel === 'high' || stressLevel === 'very_high') && goal === 'fat_loss') {
-    calAdj.fat_loss = -250;
-    warnings.push('Caloric deficit reduced to 250 kcal due to high stress levels. Aggressive deficits under stress can increase cortisol and promote binge cycles.');
+    goalMultiplier = 0.90;
+    warnings.push('Caloric deficit reduced to 10% due to high stress levels. Aggressive deficits under stress can increase cortisol and promote binge cycles.');
   }
 
-  // Phase 4.3: Cap max deficit at 500 kcal
-  let deficit = calAdj[goal] ?? 0;
-  if (deficit < -500) {
-    deficit = -500;
-    warnings.push('Caloric deficit capped at 500 kcal/day. For larger deficits, we recommend consulting a nutrition professional.');
-  }
-
-  // Determine safe floor
   let safeFloor = sex === 'female' ? 1200 : 1500;
 
-  // Phase 4.3: Under-18 gets higher floors
   if (age < 18) {
     safeFloor = sex === 'female' ? 1600 : 1800;
     warnings.push('Adolescent caloric floors applied (minimum ' + safeFloor + ' kcal). Growing bodies need adequate nutrition. Please consult a healthcare provider about your dietary goals.');
   }
 
-  let calories = Math.round(tdee + deficit);
+  let calories = Math.round(tdee * goalMultiplier);
 
   if (calories < safeFloor) {
     warnings.push(`Calculated calories (${calories}) are below the safe minimum of ${safeFloor} kcal. This floor exists to prevent metabolic adaptation, hormonal disruption, and muscle loss.`);
     calories = safeFloor;
   }
 
-  const protein = Math.round(weightKg * (proteinPerKg[goal] ?? 2.0));
-  const fat     = Math.round((calories * 0.25) / 9);
-  const carbs   = Math.round((calories - protein * 4 - fat * 9) / 4);
+  // Protein — capped at 3g/kg (above this, excess is oxidised for energy, not anabolism)
+  let protein = Math.round(weightKg * (PROTEIN_PER_KG[goal] ?? 2.0));
+  if (protein > weightKg * 3) {
+    protein = Math.round(weightKg * 3);
+    warnings.push('Protein capped at 3g/kg. Higher intakes provide no additional muscle-building benefit and may displace other macros.');
+  }
+
+  // Fat — floored at 0.5g/kg (minimum for steroid hormone synthesis)
+  let fat = Math.round(weightKg * (FAT_PER_KG[goal] ?? 0.9));
+  const fatFloor = Math.round(weightKg * 0.5);
+  if (fat < fatFloor) {
+    fat = fatFloor;
+    warnings.push('Fat intake raised to minimum 0.5g/kg to support hormone production.');
+  }
+
+  // Carbs fill the remaining calories — never go negative
+  let carbs = Math.round((calories - protein * 4 - fat * 9) / 4);
+  if (carbs < 0) {
+    carbs = 0;
+    warnings.push('Carbohydrates adjusted to zero — consider increasing calorie target or reducing fat/protein slightly.');
+  }
 
   return { calories, protein, carbs, fat, warnings };
 }
