@@ -70,7 +70,7 @@ function BodyStatsCard({ state }) {
           value={bmi}
           tag={bmiCategory}
           color={bmiColor(bmiCategory)}
-          note="Asian-adjusted cutoffs"
+          note="WHO standard cutoffs"
         />
         <MetricBox
           label="Weight"
@@ -112,15 +112,16 @@ function BodyStatsCard({ state }) {
         ))}
       </div>
 
-      {/* BMI scale bar — proportional to actual cutoffs within range 14–40 */}
+      {/* BMI scale bar — standard WHO cutoffs, range 14–40 (26 units)
+          18.5 → 17.3%   25 → 42.3%   30 → 61.5% */}
       <div style={{ marginTop: 'var(--space-3)' }}>
-        {/* Zone labels at proportional positions */}
+        {/* Zone labels centred within each colour band */}
         <div style={{ position: 'relative', height: 14, marginBottom: 2 }}>
           {[
-            { label: 'UNDER', pct: 8.7 },
-            { label: 'NORMAL', pct: 26 },
-            { label: 'OVER', pct: 43.3 },
-            { label: 'OBESE', pct: 76 },
+            { label: 'UNDER',  pct: 8.7  },
+            { label: 'NORMAL', pct: 29.8 },
+            { label: 'OVER',   pct: 51.9 },
+            { label: 'OBESE',  pct: 80.8 },
           ].map(({ label, pct }) => (
             <span key={label} style={{
               position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',
@@ -130,16 +131,11 @@ function BodyStatsCard({ state }) {
           ))}
         </div>
 
-        {/* Bar with sharp stops at correct proportional cutoffs */}
-        <div style={{ position: 'relative', height: 6, borderRadius: 3, overflow: 'visible',
-          background: `linear-gradient(to right,
-            var(--color-action) 0%, var(--color-action) 17.3%,
-            var(--color-success) 17.3%, var(--color-success) 34.6%,
-            #FFA726 34.6%, #FFA726 51.9%,
-            var(--color-destructive) 51.9%, var(--color-destructive) 100%)`,
-          borderRadius: 3,
+        {/* Smooth ombre bar */}
+        <div style={{
+          position: 'relative', height: 6, borderRadius: 3,
+          background: 'linear-gradient(to right, var(--color-action) 0%, var(--color-success) 17.3%, #8BC34A 30%, #FFA726 42.3%, var(--color-destructive) 61.5%, #C62828 100%)',
         }}>
-          {/* Marker dot */}
           <div style={{
             position: 'absolute', top: -2, width: 10, height: 10,
             borderRadius: '50%', background: '#fff',
@@ -150,12 +146,12 @@ function BodyStatsCard({ state }) {
           }} />
         </div>
 
-        {/* Cutoff labels at exact proportional positions */}
+        {/* Cutoff values at exact proportional positions */}
         <div style={{ position: 'relative', height: 14, marginTop: 2 }}>
           {[
             { val: '18.5', pct: 17.3 },
-            { val: '23',   pct: 34.6 },
-            { val: '27.5', pct: 51.9 },
+            { val: '25',   pct: 42.3 },
+            { val: '30',   pct: 61.5 },
           ].map(({ val, pct }) => (
             <span key={val} style={{
               position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',

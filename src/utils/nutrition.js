@@ -91,14 +91,14 @@ export function calcNutritionGoals(assessment) {
 }
 
 /**
- * BMI with Asian-adjusted WHO 2004 cutoffs (Filipino users).
+ * BMI with standard WHO cutoffs (18.5 / 25 / 30).
  */
 export function calcBMI(weightKg, heightCm) {
   if (!weightKg || !heightCm) return { bmi: null, category: null };
   const bmi = weightKg / Math.pow(heightCm / 100, 2);
   const category = bmi < 18.5 ? 'Underweight'
-    : bmi < 23   ? 'Normal'
-    : bmi < 27.5 ? 'Overweight'
+    : bmi < 25  ? 'Normal'
+    : bmi < 30  ? 'Overweight'
     : 'Obese';
   return { bmi: Math.round(bmi * 10) / 10, category };
 }
