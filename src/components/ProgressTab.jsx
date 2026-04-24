@@ -112,28 +112,55 @@ function BodyStatsCard({ state }) {
         ))}
       </div>
 
-      {/* BMI scale bar */}
+      {/* BMI scale bar — proportional to actual cutoffs within range 14–40 */}
       <div style={{ marginTop: 'var(--space-3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>UNDERWEIGHT</span>
-          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>NORMAL</span>
-          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>OVERWEIGHT</span>
-          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>OBESE</span>
+        {/* Zone labels at proportional positions */}
+        <div style={{ position: 'relative', height: 14, marginBottom: 2 }}>
+          {[
+            { label: 'UNDER', pct: 8.7 },
+            { label: 'NORMAL', pct: 26 },
+            { label: 'OVER', pct: 43.3 },
+            { label: 'OBESE', pct: 76 },
+          ].map(({ label, pct }) => (
+            <span key={label} style={{
+              position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',
+              fontSize: 8, fontWeight: 700, color: 'var(--color-text-tertiary)',
+              whiteSpace: 'nowrap',
+            }}>{label}</span>
+          ))}
         </div>
-        <div style={{ position: 'relative', height: 6, borderRadius: 3, overflow: 'hidden',
-          background: 'linear-gradient(to right, var(--color-action) 0%, var(--color-success) 25%, var(--color-success) 55%, #FFA726 75%, var(--color-destructive) 100%)' }}>
-          {/* Marker — clamp BMI 14-40 to 0-100% */}
+
+        {/* Bar with sharp stops at correct proportional cutoffs */}
+        <div style={{ position: 'relative', height: 6, borderRadius: 3, overflow: 'visible',
+          background: `linear-gradient(to right,
+            var(--color-action) 0%, var(--color-action) 17.3%,
+            var(--color-success) 17.3%, var(--color-success) 34.6%,
+            #FFA726 34.6%, #FFA726 51.9%,
+            var(--color-destructive) 51.9%, var(--color-destructive) 100%)`,
+          borderRadius: 3,
+        }}>
+          {/* Marker dot */}
           <div style={{
             position: 'absolute', top: -2, width: 10, height: 10,
             borderRadius: '50%', background: '#fff',
             border: `2px solid ${bmiColor(bmiCategory)}`,
-            left: `calc(${Math.min(100, Math.max(0, ((bmi - 14) / 26) * 100))}% - 5px)`,
+            left: `calc(${Math.min(98, Math.max(2, ((bmi - 14) / 26) * 100))}% - 5px)`,
             transition: 'left 0.5s',
+            zIndex: 1,
           }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-          {['18.5', '23', '27.5'].map(v => (
-            <span key={v} style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{v}</span>
+
+        {/* Cutoff labels at exact proportional positions */}
+        <div style={{ position: 'relative', height: 14, marginTop: 2 }}>
+          {[
+            { val: '18.5', pct: 17.3 },
+            { val: '23',   pct: 34.6 },
+            { val: '27.5', pct: 51.9 },
+          ].map(({ val, pct }) => (
+            <span key={val} style={{
+              position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',
+              fontSize: 9, color: 'var(--color-text-tertiary)',
+            }}>{val}</span>
           ))}
         </div>
       </div>
