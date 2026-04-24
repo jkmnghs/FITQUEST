@@ -98,8 +98,14 @@ export function calcNutritionGoals(assessment) {
     warnings.push('Protein capped at 3g/kg. Higher intakes provide no additional muscle-building benefit and may displace other macros.');
   }
 
-  // Fat — floored at 0.5g/kg (minimum for steroid hormone synthesis)
-  let fat = Math.round(weightKg * (FAT_PER_KG[goal] ?? 0.9));
+  // Fat — for fat_loss use whichever is lower: 0.9g/kg or 25% of calories.
+  // This prevents fat eating into the carb budget on lower-calorie cuts.
+  let fat;
+  if (goal === 'fat_loss') {
+    fat = Math.round(Math.min(weightKg * 0.9, (calories * 0.25) / 9));
+  } else {
+    fat = Math.round(weightKg * (FAT_PER_KG[goal] ?? 0.9));
+  }
   const fatFloor = Math.round(weightKg * 0.5);
   if (fat < fatFloor) {
     fat = fatFloor;
