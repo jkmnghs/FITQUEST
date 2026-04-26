@@ -16,6 +16,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [editingGram, setEditingGram] = useState(null); // { idx, value }
+  const [editingMacro, setEditingMacro] = useState(null); // { idx, field, value }
   const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open (mobile)
   const [dotMenuOpenIdx, setDotMenuOpenIdx] = useState(null); // index of ⋯ menu open (desktop)
   const isDesktop = useIsDesktop();
@@ -346,6 +347,24 @@ Guidelines:
 
   function setGrams(idx, grams) {
     setFoods(prev => prev.map((f, i) => i === idx ? { ...f, customGrams: grams } : f));
+  }
+
+  function saveMacroEdit() {
+    if (!editingMacro) return;
+    const { idx, field, value } = editingMacro;
+    const food = foods[idx];
+    const adj = getAdjusted(food);
+    const scale = adj.grams > 0 && food.grams > 0 ? adj.grams / food.grams : 1;
+    const newAdj = Math.max(0, Number(value) || 0);
+    const newBase = Math.round((newAdj / scale) * 10) / 10;
+    setFoods(prev => prev.map((f, i) => {
+      if (i !== idx) return f;
+      const updated = { ...f, [field]: newBase };
+      // Recalculate calories from macros to keep them consistent
+      updated.calories = Math.round(updated.protein * 4 + updated.carbs * 4 + updated.fat * 9);
+      return updated;
+    }));
+    setEditingMacro(null);
   }
 
   function handleLogMeal() {
@@ -769,23 +788,57 @@ Guidelines:
                     </div>
                   </div>
 
-                  {/* Macros */}
+                  {/* Macros — tap any value to correct it */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[
-                      { label: 'Protein', value: adj.protein, color: 'var(--cyan)' },
-                      { label: 'Carbs', value: adj.carbs, color: 'var(--gold)' },
-                      { label: 'Fat', value: adj.fat, color: 'var(--fire2)' },
-                    ].map(m => (
-                      <div key={m.label} style={{
-                        flex: 1, textAlign: 'center', padding: '7px 4px',
-                        background: 'rgba(255,255,255,0.03)', borderRadius: 9,
-                      }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
-                          {m.value}g
+                      { label: 'Protein', field: 'protein', value: adj.protein, color: 'var(--cyan)' },
+                      { label: 'Carbs',   field: 'carbs',   value: adj.carbs,   color: 'var(--gold)' },
+                      { label: 'Fat',     field: 'fat',     value: adj.fat,     color: 'var(--fire2)' },
+                    ].map(m => {
+                      const isEditingThis = editingMacro?.idx === idx && editingMacro?.field === m.field;
+                      return (
+                        <div
+                          key={m.label}
+                          onClick={() => {
+                            if (!isOpen && !isEditingThis) {
+                              setEditingMacro({ idx, field: m.field, value: m.value });
+                              setEditingGram(null);
+                            }
+                          }}
+                          style={{
+                            flex: 1, textAlign: 'center', padding: '7px 4px',
+                            background: isEditingThis ? `${m.color}14` : 'rgba(255,255,255,0.03)',
+                            borderRadius: 9,
+                            border: isEditingThis ? `1px solid ${m.color}` : '1px solid transparent',
+                            cursor: isOpen ? 'default' : 'pointer',
+                          }}
+                        >
+                          {isEditingThis ? (
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={editingMacro.value}
+                              onChange={e => setEditingMacro(prev => ({ ...prev, value: e.target.value }))}
+                              onBlur={saveMacroEdit}
+                              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingMacro(null); }}
+                              autoFocus
+                              style={{
+                                width: '100%', background: 'transparent', border: 'none',
+                                color: m.color, fontSize: 14, fontWeight: 700,
+                                fontFamily: 'Rajdhani', textAlign: 'center', outline: 'none',
+                              }}
+                            />
+                          ) : (
+                            <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
+                              {m.value}g
+                            </div>
+                          )}
+                          <div style={{ fontSize: 10, color: 'var(--text3)' }}>
+                            {m.label}{!isEditingThis && <span style={{ opacity: 0.4, marginLeft: 2 }}>✎</span>}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--text3)' }}>{m.label}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
