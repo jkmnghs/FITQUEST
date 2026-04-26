@@ -299,7 +299,8 @@ function goalAlignmentScore(program, goal) {
 }
 function levelScore(program, level) {
   if (!level) return 0;
-  return (program.targetLevels || []).includes(level) ? 5 : 0;
+  // Penalise level mismatch so ties are broken by fitness level, not array order
+  return (program.targetLevels || []).includes(level) ? 5 : -3;
 }
 function sessionLengthScore(program, sessionLength) {
   if (!sessionLength) return 0;
@@ -315,7 +316,9 @@ function sessionLengthScore(program, sessionLength) {
  * Returns the program id string.
  */
 export function selectProgram(assessment) {
-  const { equipment, daysPerWeek, level, goal, splitPreference, sessionLength } = assessment;
+  const { equipment, level, goal, splitPreference, sessionLength } = assessment;
+  // No program exceeds 4 sessions/week — cap silently rather than falling back to all programs
+  const daysPerWeek = Math.min(assessment.daysPerWeek || 3, 4);
 
   if (equipment === 'bodyweight') return 'bodyweight_3x';
   if (equipment === 'dumbbells_only') return 'dumbbell_only_3x';

@@ -532,7 +532,7 @@ export default function OnboardingScreen({ onComplete }) {
 
   // ── Step 7: Schedule ──
   if (step === 7) {
-    const daysOpts = [2, 3, 4, 5];
+    const daysOpts = [2, 3, 4];
     const lengthOpts = [
       { val: 30, label: '30 min', sub: 'Express session' },
       { val: 45, label: '45 min', sub: 'Efficient' },
