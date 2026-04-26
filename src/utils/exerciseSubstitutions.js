@@ -39,12 +39,15 @@ const SUBSTITUTION_RULES = [
   { region: 'hips', minSeverity: 'moderate', exerciseId: 'squat',    substitute: { id: 'legpress',    name: 'Leg Press',         sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 7, startKg: 70, note: 'Fixed hip angle reduces impingement' } },
   { region: 'hips', minSeverity: 'moderate', exerciseId: 'bwsquat',  substitute: { id: 'legpress',    name: 'Leg Press',         sets: 3, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 50, note: 'Fixed hip angle reduces impingement' } },
 
-  // Neck pain — overhead & cervical-loading exercises are the primary concern
-  { region: 'neck', minSeverity: 'moderate', exerciseId: 'ohp',      substitute: { id: 'dbbench',  name: 'DB Bench Press',      sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 16, note: 'Horizontal press — no cervical extension under load' } },
-  { region: 'neck', minSeverity: 'moderate', exerciseId: 'dbohp',    substitute: { id: 'dbbench',  name: 'DB Bench Press',      sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 14, note: 'Horizontal press — no cervical extension under load' } },
-  { region: 'neck', minSeverity: 'moderate', exerciseId: 'squat',    substitute: { id: 'legpress', name: 'Leg Press',           sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 80, note: 'Removes bar from traps/cervical spine' } },
-  { region: 'neck', minSeverity: 'severe',   exerciseId: 'bench',    substitute: { id: 'floorpress', name: 'DB Floor Press',    sets: 3, reps: 10, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 14, note: 'Neutral neck throughout' } },
-  { region: 'neck', minSeverity: 'severe',   exerciseId: 'hingerow', substitute: { id: 'dbrow',    name: 'DB Single-Arm Row',   sets: 3, reps: 10, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 16, note: 'Supported — avoids neck hyperextension' } },
+  // Neck pain — overhead & cervical-loading exercises are the primary concern.
+  // OHP/DBOHP → Landmine (NOT flat bench): landmine keeps anterior deltoid as primary target,
+  // the diagonal press path eliminates the overhead lockout that forces cervical hyperextension.
+  // Swapping to flat bench would train pecs instead of deltoids — wrong muscle group.
+  { region: 'neck', minSeverity: 'moderate', exerciseId: 'ohp',      substitute: { id: 'landmine',   name: 'Landmine Press',      sets: 2, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 15, note: 'Diagonal press — same shoulder target, no overhead cervical extension' } },
+  { region: 'neck', minSeverity: 'moderate', exerciseId: 'dbohp',    substitute: { id: 'landmine',   name: 'Landmine Press',      sets: 2, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 12, note: 'Diagonal press — same shoulder target, no overhead cervical extension' } },
+  { region: 'neck', minSeverity: 'moderate', exerciseId: 'squat',    substitute: { id: 'legpress',   name: 'Leg Press',           sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 80, note: 'Removes bar from traps/cervical spine — same quad stimulus' } },
+  { region: 'neck', minSeverity: 'severe',   exerciseId: 'bench',    substitute: { id: 'floorpress', name: 'DB Floor Press',      sets: 3, reps: 10, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 14, note: 'Same horizontal push pattern, neutral neck throughout' } },
+  { region: 'neck', minSeverity: 'severe',   exerciseId: 'hingerow', substitute: { id: 'dbrow',      name: 'DB Single-Arm Row',   sets: 3, reps: 10, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 16, note: 'Same lat/rhomboid target — supported position avoids neck hyperextension' } },
 ];
 
 const SEVERITY_RANK = { none: 0, mild: 1, moderate: 2, severe: 3 };
