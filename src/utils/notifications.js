@@ -31,15 +31,30 @@ export function scheduleWorkoutReminders(enabled) {
   localStorage.setItem('fitquest-reminders', enabled ? 'true' : 'false');
 }
 
-// Check if today is a workout day (Mon=1, Wed=3, Fri=5)
-export function isTodayWorkoutDay() {
-  const day = new Date().getDay();
-  return [1, 3, 5].includes(day);
+// Map day abbreviations to JS day numbers (0 = Sunday)
+const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+function getWorkoutDayNumbers(trainingDays) {
+  return (trainingDays || []).map(d => DAY_MAP[d]).filter(n => n !== undefined);
 }
 
-// Check if today is Sunday (check-in day)
-export function isTodayCheckinDay() {
-  return new Date().getDay() === 0;
+// Check if today is a workout day — uses user's training schedule from state.
+// Falls back to Mon/Wed/Fri if no training days are configured yet.
+export function isTodayWorkoutDay(trainingDays) {
+  const day = new Date().getDay();
+  const days = trainingDays?.length ? getWorkoutDayNumbers(trainingDays) : [1, 3, 5];
+  return days.includes(day);
+}
+
+// Check-in day = day after the user's last training day, or Sunday by default.
+export function isTodayCheckinDay(trainingDays) {
+  const day = new Date().getDay();
+  if (!trainingDays?.length) return day === 0; // fallback: Sunday
+  const nums = getWorkoutDayNumbers(trainingDays).sort((a, b) => a - b);
+  // The day after the highest training day (wrapping around to Sunday)
+  const lastTrainingDay = nums[nums.length - 1];
+  const checkinDay = (lastTrainingDay + 1) % 7;
+  return day === checkinDay;
 }
 
 export function getDayName() {
@@ -54,22 +69,23 @@ export function maybeFireOpenNotification(state) {
   const lastNotif = localStorage.getItem('fitquest-last-notif');
   if (lastNotif === t) return; // already fired one today
 
-  const day = new Date().getDay();
+  const trainingDays = state.assessment?.trainingDays;
+  const userName = state.name || 'Champ';
 
   // Overload nudge: if there are increase suggestions and it's a workout day
-  if ([1,3,5].includes(day) && !state.todaySessionFinished) {
+  if (isTodayWorkoutDay(trainingDays) && !state.todaySessionFinished) {
     const increases = Object.entries(state.overloadSuggestions || {})
       .filter(([,v]) => v === 'increase').length;
     const title = increases > 0
       ? `💪 Time to train — ${increases} lift${increases > 1 ? 's' : ''} ready to increase!`
-      : '⚔️ Workout day — let\'s go, Jake!';
+      : `⚔️ Workout day — let's go, ${userName}!`;
     const body = increases > 0
       ? 'Your RPE was ≤8 last session. Progressive overload time!'
-      : 'Mon/Wed/Fri full-body session is waiting. Get after it.';
+      : 'Your full-body session is waiting. Get after it.';
     showLocalNotification(title, body);
     localStorage.setItem('fitquest-last-notif', t);
-  } else if (day === 0 && (state.weeklyCheckins?.length === 0 || state.weeklyCheckins?.[state.weeklyCheckins.length - 1]?.week !== state.currentWeek)) {
-    showLocalNotification('📋 Sunday Check-in', 'Time to log your weight and measurements for Week ' + state.currentWeek);
+  } else if (isTodayCheckinDay(trainingDays) && (state.weeklyCheckins?.length === 0 || state.weeklyCheckins?.[state.weeklyCheckins.length - 1]?.week !== state.currentWeek)) {
+    showLocalNotification('📋 Check-in Time', 'Log your weight and measurements for Week ' + state.currentWeek);
     localStorage.setItem('fitquest-last-notif', t);
   }
 }

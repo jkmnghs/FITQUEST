@@ -1,24 +1,33 @@
-import React, { useState, useEffect, Component, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Component, lazy, Suspense } from 'react';
+import { Dumbbell, Utensils, TrendingUp, User, X, Zap } from 'lucide-react';
 import BgFx from './components/BgFx';
 import Toast from './components/Toast';
 import Header from './components/Header';
-import WorkoutTab from './components/WorkoutTab';
-import AICoachTab from './components/AICoachTab';
+import LoginScreen from './components/LoginScreen';
+import OnboardingScreen from './components/OnboardingScreen';
+import Onboarding from './components/Onboarding';
+import { TrainTabSkeleton, FuelTabSkeleton, ProgressTabSkeleton, ProfileTabSkeleton } from './components/Skeleton';
+import { useAuth } from './hooks/useAuth';
 import { useGameState } from './hooks/useGameState';
+import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
+import { EXERCISES } from './data/gameData';
 
-const StatsTab = lazy(() => import('./components/StatsTab'));
-const RankTab = lazy(() => import('./components/RankTab'));
-const CheckinTab = lazy(() => import('./components/CheckinTab'));
-const NutritionTab = lazy(() => import('./components/NutritionTab'));
-const AchievementsTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.AchievementsTab })));
-const LogTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.LogTab })));
-const SummaryTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.SummaryTab })));
-const SettingsTab = lazy(() => import('./components/OtherTabs').then(m => ({ default: m.SettingsTab })));
+const TrainTab    = lazy(() => import('./components/TrainTab'));
+const FuelTab     = lazy(() => import('./components/NutritionTab'));
+const ProgressTab = lazy(() => import('./components/ProgressTab'));
+const ProfileTab  = lazy(() => import('./components/ProfileTab'));
 
-function LazyTab({ children }) {
+const NAV_TABS = [
+  { id: 'train',    Icon: Dumbbell,   label: 'Train'    },
+  { id: 'fuel',     Icon: Utensils,   label: 'Fuel'     },
+  { id: 'progress', Icon: TrendingUp, label: 'Progress' },
+  { id: 'profile',  Icon: User,       label: 'Profile'  },
+];
+
+function LazyTab({ children, fallback }) {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 11 }}>LOADING...</div>}>
+    <Suspense fallback={fallback || <TrainTabSkeleton />}>
       {children}
     </Suspense>
   );
@@ -31,21 +40,23 @@ class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div style={{
-          minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+          minHeight: '100%', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          padding: 24, textAlign: 'center', background: 'var(--bg)'
+          padding: 24, textAlign: 'center', background: 'var(--color-bg-primary)'
         }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>
-            SOMETHING WENT WRONG
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6, maxWidth: 300 }}>
-            {this.state.error.message}
-          </div>
+          <Zap size={36} color="var(--color-destructive)" style={{ marginBottom: 16 }} />
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
+            color: 'var(--color-destructive)', marginBottom: 8
+          }}>SOMETHING WENT WRONG</div>
+          <div style={{
+            fontSize: 12, color: 'var(--color-text-tertiary)',
+            marginBottom: 20, lineHeight: 1.6, maxWidth: 300
+          }}>{this.state.error.message}</div>
           <button onClick={() => window.location.reload()} style={{
-            padding: '10px 20px', borderRadius: 10, border: 'none',
-            background: 'var(--cyan)', color: 'var(--bg)',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, cursor: 'pointer'
+            padding: '10px 20px', borderRadius: 'var(--radius-md)', border: 'none',
+            background: 'var(--color-action)', color: 'var(--color-bg-primary)',
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, cursor: 'pointer'
           }}>RELOAD APP</button>
         </div>
       );
@@ -54,41 +65,52 @@ class ErrorBoundary extends Component {
   }
 }
 
-const PRIMARY_TABS = [
-  { id: 'workout',   icon: '⚔️',  label: 'Workout'   },
-  { id: 'coach',     icon: '🤖',  label: 'Coach'     },
-  { id: 'nutrition', icon: '🍽️',  label: 'Nutrition' },
-  { id: 'rank',      icon: '⭐',  label: 'Rank'      },
-];
-
-const MORE_TABS = [
-  { id: 'stats',    icon: '📊',  label: 'Stats'    },
-  { id: 'checkin',  icon: '📋',  label: 'Check-in' },
-  { id: 'summary',  icon: '📝',  label: 'Summary'  },
-  { id: 'ach',      icon: '🏆',  label: 'Awards'   },
-  { id: 'log',      icon: '📜',  label: 'Log'      },
-  { id: 'settings', icon: '⚙️',  label: 'Settings' },
-];
-
-const ALL_TABS = [...PRIMARY_TABS, ...MORE_TABS];
+function FullScreenLoader({ label = 'LOADING...' }) {
+  return (
+    <div style={{
+      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'var(--color-bg-primary)', gap: 16,
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
+        color: 'var(--color-action)', letterSpacing: 2,
+        animation: 'rankPulse 1.4s ease-in-out infinite',
+      }}>{label}</div>
+    </div>
+  );
+}
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('workout');
+  const { user, loading: authLoading, authError, signIn, signUp, signOut } = useAuth();
+  const [activeTab, setActiveTab] = useState('train');
   const [modalOpen, setModalOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installDismissed, setInstallDismissed] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const [showTour, setShowTour] = useState(false);
+  const contentRef = useRef(null);
+
+  const {
+    state, cloudLoading, toast, showToast,
+    completeExercise, finishSession,
+    submitCheckin, updateSetting, setState,
+    resetAll, resetToday, startSession, backfillWeek,
+    addAIHistory, logMeal, deleteMeal, importData,
+    completeAssessment, changeProgram, swapExercise, deleteExercise,
+  } = useGameState(user);
+
+  const {
+    unreadCount: unreadAgentCount,
+    markAllRead: markAgentRead,
+    fireOnboarding,
+    pollMessages: pollAgentMessages,
+    messages: agentMessages,
+  } = useAgentMessages(user?.id, state, setState);
+
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
-
-  const {
-    state, toast, showToast,
-    completeExercise, finishSession,
-    submitCheckin, updateSetting,
-    resetAll, resetToday, startSession, backfillWeek, addAIHistory, logMeal, deleteMeal, importData
-  } = useGameState();
-
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [installDismissed, setInstallDismissed] = useState(false);
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -96,10 +118,28 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // Register service worker on mount
+  useEffect(() => { registerSW(); }, []);
+
   useEffect(() => {
-    registerSW();
+    if (!localStorage.getItem('fitquest_onboarding_complete')) {
+      setShowTour(true);
+    }
   }, []);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const onScroll = () => setScrollY(el.scrollTop);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  if (authLoading)  return <><BgFx /><FullScreenLoader label="LOADING..." /></>;
+  if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
+  if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
+  if (!state.assessment?.completed) return (
+    <><BgFx /><OnboardingScreen onComplete={(a) => completeAssessment(a, fireOnboarding)} /></>
+  );
 
   async function handleRequestNotif() {
     const result = await requestNotificationPermission();
@@ -112,101 +152,65 @@ export default function App() {
 
   function handleTabSelect(id) {
     setActiveTab(id);
-    setMoreOpen(false);
+    setScrollY(0);
+    if (contentRef.current) contentRef.current.scrollTop = 0;
   }
 
-  const isMoreTabActive = MORE_TABS.some(t => t.id === activeTab);
+  const currentDayTemplate = state.activeTemplates?.[state.currentDayIndex ?? 0];
+  const sharedTrainProps = {
+    state,
+    exercises: currentDayTemplate?.exercises ?? state.activeExercises ?? EXERCISES,
+    currentDayName: currentDayTemplate?.name ?? null,
+    onCompleteExercise: completeExercise,
+    onFinishSession: finishSession,
+    onStartSession: startSession,
+    onModalChange: setModalOpen,
+    onChangeProgram: changeProgram,
+    onSwapExercise: swapExercise,
+    onDeleteExercise: deleteExercise,
+    unreadAgentCount,
+    onMarkAgentRead: markAgentRead,
+    onOpenInbox: pollAgentMessages,
+    agentMessages,
+    onSaveHistory: addAIHistory,
+  };
 
   return (
     <ErrorBoundary>
       <BgFx />
       <Toast message={toast} />
 
-      {/* "More" sheet overlay */}
-      {moreOpen && (
-        <div
-          onClick={() => setMoreOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 200,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              position: 'absolute', bottom: 0, left: '50%',
-              transform: 'translateX(-50%)',
-              width: '100%', maxWidth: 430,
-              background: 'linear-gradient(180deg, rgba(15,21,40,0.98) 0%, rgba(10,14,26,0.99) 100%)',
-              border: '1px solid rgba(0,229,255,0.1)',
-              borderBottom: 'none',
-              borderRadius: '20px 20px 0 0',
-              padding: '6px 0 calc(70px + env(safe-area-inset-bottom, 0px))',
-              boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
-            }}
-          >
-            {/* Drag handle */}
-            <div style={{
-              width: 36, height: 4, borderRadius: 2,
-              background: 'rgba(255,255,255,0.15)',
-              margin: '8px auto 16px',
-            }} />
-            <div style={{
-              fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-              color: 'var(--text3)', letterSpacing: 1.5,
-              padding: '0 20px 10px',
-            }}>MORE</div>
-            {MORE_TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabSelect(tab.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  width: '100%', padding: '14px 20px',
-                  border: 'none', background: activeTab === tab.id
-                    ? 'rgba(0,229,255,0.08)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--cyan)' : 'var(--text2)',
-                  fontFamily: 'Rajdhani', fontSize: 16, fontWeight: 600,
-                  cursor: 'pointer', textAlign: 'left',
-                  borderLeft: activeTab === tab.id
-                    ? '3px solid var(--cyan)' : '3px solid transparent',
-                  transition: 'all 0.15s',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <span style={{ fontSize: 20, width: 28, textAlign: 'center' }}>{tab.icon}</span>
-                {tab.label}
-                {activeTab === tab.id && (
-                  <span style={{
-                    marginLeft: 'auto', fontSize: 11,
-                    color: 'var(--cyan)', fontFamily: 'Orbitron',
-                  }}>ACTIVE</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Onboarding tour overlay */}
+      {showTour && (
+        <Onboarding onComplete={() => {
+          localStorage.setItem('fitquest_onboarding_complete', 'true');
+          setShowTour(false);
+        }} />
       )}
 
       {/* PWA install banner */}
       {installPrompt && !installDismissed && (
         <div style={{
-          position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px) + 10px)',
+          position: 'fixed',
+          bottom: 'calc(var(--nav-height) + var(--safe-area-bottom) + 10px)',
           left: '50%', transform: 'translateX(-50%)',
           zIndex: 9000, width: 'calc(100% - 40px)', maxWidth: 390,
           background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(179,136,255,0.12))',
           border: '1px solid rgba(0,229,255,0.25)',
-          borderRadius: 14, padding: '12px 14px',
+          borderRadius: 'var(--radius-lg)', padding: '12px 14px',
           display: 'flex', alignItems: 'center', gap: 10,
           backdropFilter: 'blur(20px)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
         }}>
-          <span style={{ fontSize: 24, flexShrink: 0 }}>⚡</span>
+          <Zap size={20} color="var(--color-action)" style={{ flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', marginBottom: 2 }}>
-              ADD TO HOME SCREEN
+            <div style={{
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+              color: 'var(--color-action)', marginBottom: 2
+            }}>ADD TO HOME SCREEN</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+              Install FitQuest for faster access
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Install FitQuest for faster access</div>
           </div>
           <button onClick={async () => {
             installPrompt.prompt();
@@ -214,181 +218,178 @@ export default function App() {
             if (outcome === 'accepted') setInstallPrompt(null);
             else setInstallDismissed(true);
           }} style={{
-            padding: '6px 12px', borderRadius: 8, border: 'none',
-            background: 'var(--cyan)', color: 'var(--bg)',
-            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, cursor: 'pointer'
+            padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: 'none',
+            background: 'var(--color-action)', color: 'var(--color-bg-primary)',
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, cursor: 'pointer'
           }}>INSTALL</button>
-          <button onClick={() => setInstallDismissed(true)} style={{
-            width: 26, height: 26, borderRadius: 6, border: 'none',
-            background: 'rgba(255,255,255,0.08)', color: 'var(--text3)',
-            fontSize: 13, cursor: 'pointer', flexShrink: 0
-          }}>✕</button>
+          <button
+            onClick={() => setInstallDismissed(true)}
+            aria-label="Dismiss install banner"
+            style={{
+              width: 26, height: 26, borderRadius: 'var(--radius-sm)', border: 'none',
+              background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-tertiary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0
+            }}
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      <div style={{
-        position: 'relative', zIndex: 1,
-        maxWidth: 430, margin: '0 auto',
-        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-        paddingTop: 'var(--safe-top)'
-      }}>
-        {/* Header — hidden when modal is open */}
-        <div style={{ display: modalOpen ? 'none' : 'block' }}>
-          <Header state={state} />
+      {/* Desktop wrapper + phone frame */}
+      <div className="desktop-wrapper">
+        {/* Branding panel — visible on desktop only via CSS */}
+        <div className="desktop-branding">
+          <h1 className="desktop-logo">FITQUEST</h1>
+          <p className="desktop-tagline">Your AI-Powered Training Companion</p>
+          <p className="desktop-hint">Best experienced on mobile</p>
         </div>
 
-        {/* Content */}
-        <div style={{
-          flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          padding: '10px 20px',
-          paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
-        }}>
-          <div style={{ display: activeTab === 'workout' ? 'block' : 'none' }}>
-            <WorkoutTab
-              state={state}
-              onCompleteExercise={completeExercise}
-              onFinishSession={finishSession}
-              onStartSession={startSession}
-              onModalChange={setModalOpen}
-            />
-          </div>
-          <div style={{ display: activeTab === 'coach' ? 'block' : 'none' }}>
-            <AICoachTab
-              state={state}
-              onSaveHistory={addAIHistory}
-            />
-          </div>
-          {activeTab === 'nutrition' && (
-            <LazyTab>
-              <NutritionTab
-                state={state}
-                onLogMeal={logMeal}
-                onDeleteMeal={deleteMeal}
-                mealLogs={state.mealLogs || []}
-              />
-            </LazyTab>
-          )}
-          {activeTab === 'stats' && <LazyTab><StatsTab state={state} /></LazyTab>}
-          {activeTab === 'rank' && <LazyTab><RankTab state={state} /></LazyTab>}
-          {activeTab === 'checkin' && (
-            <LazyTab><CheckinTab state={state} onSubmit={submitCheckin} /></LazyTab>
-          )}
-          {activeTab === 'summary' && <LazyTab><SummaryTab state={state} /></LazyTab>}
-          {activeTab === 'ach' && <LazyTab><AchievementsTab state={state} /></LazyTab>}
-          {activeTab === 'log' && <LazyTab><LogTab state={state} /></LazyTab>}
-          {activeTab === 'settings' && (
-            <LazyTab>
-              <SettingsTab
-                state={state}
-                onUpdate={updateSetting}
-                onReset={resetAll}
-                onResetToday={resetToday}
-                onBackfillWeek={backfillWeek}
-                notifStatus={notifStatus}
-                onRequestNotif={handleRequestNotif}
-                onImport={importData}
-              />
-            </LazyTab>
-          )}
-        </div>
-
-        {/* Bottom navigation bar — hidden when modal is open */}
-        {!modalOpen && (
-          <nav style={{
-            position: 'fixed', bottom: 0, left: '50%',
-            transform: 'translateX(-50%)',
-            width: '100%', maxWidth: 430,
-            zIndex: 100,
-            background: 'rgba(10,14,26,0.97)',
-            backdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(0,229,255,0.08)',
-            display: 'flex', alignItems: 'stretch',
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            boxShadow: '0 -4px 24px rgba(0,0,0,0.4)',
+        {/* Phone frame */}
+        <div className="phone-frame" style={{ position: 'relative', background: 'var(--color-bg-primary)' }}>
+          <div style={{
+            position: 'relative', zIndex: 1,
+            width: '100%', height: '100%',
+            display: 'flex', flexDirection: 'column',
+            paddingTop: 'var(--safe-area-top)',
           }}>
-            {PRIMARY_TABS.map(tab => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabSelect(tab.id)}
-                  style={{
-                    flex: 1, display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    gap: 3, padding: '10px 4px 10px',
-                    border: 'none', background: 'transparent',
-                    cursor: 'pointer', position: 'relative',
-                    WebkitTapHighlightColor: 'transparent',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  {/* Active indicator dot */}
-                  {isActive && (
-                    <span style={{
-                      position: 'absolute', top: 0, left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 28, height: 2, borderRadius: 1,
-                      background: 'var(--cyan)',
-                      boxShadow: '0 0 8px var(--cyan)',
-                    }} />
-                  )}
-                  <span style={{
-                    fontSize: 22,
-                    filter: isActive ? 'drop-shadow(0 0 6px var(--cyan))' : 'none',
-                    transition: 'filter 0.2s',
-                    transform: isActive ? 'translateY(-1px)' : 'none',
-                  }}>{tab.icon}</span>
-                  <span style={{
-                    fontFamily: 'Rajdhani', fontSize: 11, fontWeight: 600,
-                    color: isActive ? 'var(--cyan)' : 'var(--text3)',
-                    letterSpacing: 0.3,
-                    transition: 'color 0.2s',
-                  }}>{tab.label}</span>
-                </button>
-              );
-            })}
+            {/* Header — hidden when workout modal is open */}
+            {!modalOpen && (
+              <Header state={state} scrollY={scrollY} />
+            )}
 
-            {/* More button */}
-            <button
-              onClick={() => setMoreOpen(prev => !prev)}
+            {/* Content area */}
+            <div
+              ref={contentRef}
               style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                gap: 3, padding: '10px 4px 10px',
-                border: 'none', background: 'transparent',
-                cursor: 'pointer', position: 'relative',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.2s',
+                flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+                paddingBottom: 'calc(var(--nav-height) + var(--safe-area-bottom) + 16px)',
               }}
             >
-              {/* Active indicator for More tab */}
-              {isMoreTabActive && (
-                <span style={{
-                  position: 'absolute', top: 0, left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 28, height: 2, borderRadius: 1,
-                  background: 'var(--cyan)',
-                  boxShadow: '0 0 8px var(--cyan)',
-                }} />
-              )}
-              <span style={{
-                fontSize: 22,
-                color: (isMoreTabActive || moreOpen) ? 'var(--cyan)' : 'var(--text3)',
-                display: 'inline-block',
-              }}>⋯</span>
-              <span style={{
-                fontFamily: 'Rajdhani', fontSize: 11, fontWeight: 600,
-                color: (isMoreTabActive || moreOpen) ? 'var(--cyan)' : 'var(--text3)',
-                letterSpacing: 0.3,
-                transition: 'color 0.2s',
-              }}>
-                {isMoreTabActive
-                  ? MORE_TABS.find(t => t.id === activeTab)?.label
-                  : 'More'}
-              </span>
-            </button>
-          </nav>
-        )}
+              <div style={{ padding: '8px 0' }}>
+                {activeTab === 'train' && (
+                  <LazyTab fallback={<TrainTabSkeleton />}>
+                    <TrainTab {...sharedTrainProps} />
+                  </LazyTab>
+                )}
+                {activeTab === 'fuel' && (
+                  <LazyTab fallback={<FuelTabSkeleton />}>
+                    <FuelTab
+                      state={state}
+                      onLogMeal={logMeal}
+                      onDeleteMeal={deleteMeal}
+                      mealLogs={state.mealLogs || []}
+                    />
+                  </LazyTab>
+                )}
+                {activeTab === 'progress' && (
+                  <LazyTab fallback={<ProgressTabSkeleton />}>
+                    <ProgressTab state={state} onSubmitCheckin={submitCheckin} />
+                  </LazyTab>
+                )}
+                {activeTab === 'profile' && (
+                  <LazyTab fallback={<ProfileTabSkeleton />}>
+                    <ProfileTab
+                      state={state}
+                      onUpdate={updateSetting}
+                      onReset={resetAll}
+                      onResetToday={resetToday}
+                      onBackfillWeek={backfillWeek}
+                      notifStatus={notifStatus}
+                      onRequestNotif={handleRequestNotif}
+                      onImport={importData}
+                      userEmail={user?.email}
+                      onSignOut={signOut}
+                    />
+                  </LazyTab>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom tab bar — hidden when workout modal is open */}
+            {!modalOpen && (
+              <nav
+                role="tablist"
+                style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  height: 'calc(var(--nav-height) + var(--safe-area-bottom))',
+                  zIndex: 100,
+                  background: 'var(--color-surface-2)',
+                  borderTop: '1px solid var(--color-border-subtle)',
+                  display: 'flex', alignItems: 'stretch',
+                  paddingBottom: 'var(--safe-area-bottom)',
+                  boxShadow: '0 -4px 24px rgba(0,0,0,0.3)',
+                }}
+              >
+                {NAV_TABS.map(({ id, Icon, label }) => {
+                  const isActive = activeTab === id;
+                  const showBadge = id === 'train' && unreadAgentCount > 0;
+                  return (
+                    <button
+                      key={id}
+                      role="tab"
+                      aria-label={label}
+                      aria-selected={isActive}
+                      onClick={() => handleTabSelect(id)}
+                      style={{
+                        flex: 1, display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        gap: 3, padding: '8px 4px',
+                        border: 'none', background: 'transparent',
+                        cursor: 'pointer', position: 'relative',
+                        WebkitTapHighlightColor: 'transparent',
+                        minHeight: 44,
+                      }}
+                    >
+                      {/* Top indicator bar */}
+                      {isActive && (
+                        <span style={{
+                          position: 'absolute', top: 0, left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 24, height: 3, borderRadius: 2,
+                          background: 'var(--color-action)',
+                        }} />
+                      )}
+                      {/* Icon with optional unread badge */}
+                      <span style={{ position: 'relative' }}>
+                        <Icon
+                          size={24}
+                          strokeWidth={isActive ? 2.5 : 1.5}
+                          color={isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)'}
+                          style={{
+                            transition: 'color var(--transition-normal)',
+                            transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                            display: 'block',
+                          }}
+                        />
+                        {showBadge && (
+                          <span style={{
+                            position: 'absolute', top: -4, right: -6,
+                            background: 'var(--color-destructive)', color: '#fff',
+                            borderRadius: '50%', width: 14, height: 14,
+                            fontSize: 8, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {unreadAgentCount > 9 ? '9+' : unreadAgentCount}
+                          </span>
+                        )}
+                      </span>
+                      {/* Label */}
+                      <span style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: 11, fontWeight: isActive ? 600 : 400,
+                        color: isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)',
+                        letterSpacing: '0.02em',
+                        transition: 'color var(--transition-normal)',
+                      }}>{label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
+          </div>
+        </div>
       </div>
     </ErrorBoundary>
   );

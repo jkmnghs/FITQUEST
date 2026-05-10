@@ -223,7 +223,7 @@ export function SummaryTab({ state }) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(1);
@@ -241,11 +241,34 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
       }}>SETTINGS</div>
 
+      {/* Account section */}
+      {userEmail && (
+        <div style={{
+          background: 'var(--card)', border: '1px solid rgba(0,229,255,0.1)',
+          borderRadius: 13, padding: '14px 16px', marginBottom: 8,
+          backdropFilter: 'blur(20px)',
+        }}>
+          <div style={{
+            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
+          }}>ACCOUNT</div>
+          <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 12, wordBreak: 'break-all' }}>
+            {userEmail}
+          </div>
+          <button onClick={onSignOut} style={{
+            padding: '9px 18px', borderRadius: 10, border: 'none',
+            background: 'rgba(255,23,68,0.12)', color: 'var(--red)',
+            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+            cursor: 'pointer', letterSpacing: 0.5,
+          }}>SIGN OUT</button>
+        </div>
+      )}
+
       {/* Name */}
       <SettingRow label="Name">
         <input
           value={state.name} maxLength={20}
-          onChange={e => onUpdate('name', e.target.value || 'Jake')}
+          onChange={e => onUpdate('name', e.target.value)}
           style={inputStyle}
         />
       </SettingRow>
@@ -282,7 +305,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </div>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
-          Mon/Wed/Fri workout reminders, Sunday check-in, overload nudges
+          Scheduled workout day reminders, weekly check-in nudges, overload alerts
         </div>
         {notifStatus !== 'granted' && notifStatus !== 'denied' && (
           <button onClick={onRequestNotif} style={{
@@ -464,7 +487,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Nutrition Goals</div>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
-          Set your daily targets (recommended by your AI coach).
+          Auto-calculated from your profile (height, weight, goal, activity). Edit to override.
         </div>
         {[
           { key: 'calories', label: 'Calories (kcal)', placeholder: '2000' },
@@ -533,7 +556,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 reader.onload = ev => {
                   try {
                     const data = JSON.parse(ev.target.result);
-                    if (data && typeof data === 'object' && data.level !== undefined) {
+                    if (data && typeof data === 'object' && typeof data.level === 'number' && typeof data.currentWeek === 'number' && Array.isArray(data.log)) {
                       if (window.confirm('Replace all current progress with this backup?')) {
                         onImport(data);
                       }

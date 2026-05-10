@@ -3,6 +3,7 @@
   "short_name": "FitQuest",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0a0e1a",
   "theme_color": "#0a0e1a",
   "icons": [

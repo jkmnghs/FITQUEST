@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { searchUSDA, validateUSDAMacros, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
 import DailySummaryBar from './nutrition/DailySummaryBar';
 import TodaysMealHistory from './nutrition/TodaysMealHistory';
+import { useIsDesktop } from '../hooks/useIsDesktop';
 
 const API_URL = '/api/nutrition';
 
@@ -15,12 +16,71 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [editingGram, setEditingGram] = useState(null); // { idx, value }
-  const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open
+  const [editingMacro, setEditingMacro] = useState(null); // { idx, field, value }
+  const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open (mobile)
+  const [dotMenuOpenIdx, setDotMenuOpenIdx] = useState(null); // index of ⋯ menu open (desktop)
+  const isDesktop = useIsDesktop();
   const swipeRef = useRef({}); // { startX, startY, moved, idx, baseX }
   const cardRefs = useRef({});  // idx -> card DOM element
   const trashRefs = useRef({}); // idx -> trash DOM element
+
+  // Close dot-menu when clicking outside
+  useEffect(() => {
+    if (dotMenuOpenIdx == null) return;
+    const close = () => setDotMenuOpenIdx(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [dotMenuOpenIdx]);
   const fileRef = useRef();
   const galleryRef = useRef();
+
+  // ── shared swipe/drag helpers ───────────────────────────────────────────────
+  function startDrag(idx, clientX, clientY) {
+    const TRASH_W = 68;
+    const baseX = swipedIdx === idx ? -TRASH_W : 0;
+    swipeRef.current = { startX: clientX, startY: clientY, moved: false, idx, baseX };
+    const el = cardRefs.current[idx];
+    const tr = trashRefs.current[idx];
+    if (el) el.style.transition = 'none';
+    if (tr) tr.style.transition = 'none';
+  }
+
+  function moveDrag(clientX, clientY, event) {
+    const TRASH_W = 68;
+    const { startX, startY, baseX } = swipeRef.current;
+    if (swipeRef.current.idx == null) return;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    if (!swipeRef.current.moved && Math.abs(dy) > Math.abs(dx)) return;
+    swipeRef.current.moved = true;
+    if (event?.preventDefault) event.preventDefault();
+    const el = cardRefs.current[swipeRef.current.idx];
+    const tr = trashRefs.current[swipeRef.current.idx];
+    if (!el) return;
+    let newX = baseX + dx;
+    if (newX > 0) newX = newX * 0.2;
+    if (newX < -TRASH_W) newX = -TRASH_W + (newX + TRASH_W) * 0.2;
+    el.style.transform = `translateX(${newX}px)`;
+    if (tr) tr.style.opacity = Math.min(1, -newX / TRASH_W).toFixed(2);
+  }
+
+  function endDrag(clientX) {
+    const TRASH_W = 68;
+    const { moved, idx: sIdx, baseX, startX } = swipeRef.current;
+    if (sIdx == null) return;
+    const el = cardRefs.current[sIdx];
+    const tr = trashRefs.current[sIdx];
+    if (el) el.style.transition = 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    if (tr) tr.style.transition = 'opacity 0.28s ease';
+    swipeRef.current = {};
+    if (!moved) return;
+    const dx = clientX - startX;
+    if (baseX === 0 ? dx < -30 : dx < 20) {
+      setSwipedIdx(sIdx);
+    } else {
+      setSwipedIdx(null);
+    }
+  }
 
   function handleImageSelect(e) {
     const file = e.target.files[0];
@@ -289,6 +349,24 @@ Guidelines:
     setFoods(prev => prev.map((f, i) => i === idx ? { ...f, customGrams: grams } : f));
   }
 
+  function saveMacroEdit() {
+    if (!editingMacro) return;
+    const { idx, field, value } = editingMacro;
+    const food = foods[idx];
+    const adj = getAdjusted(food);
+    const scale = adj.grams > 0 && food.grams > 0 ? adj.grams / food.grams : 1;
+    const newAdj = Math.max(0, Number(value) || 0);
+    const newBase = Math.round((newAdj / scale) * 10) / 10;
+    setFoods(prev => prev.map((f, i) => {
+      if (i !== idx) return f;
+      const updated = { ...f, [field]: newBase };
+      // Recalculate calories from macros to keep them consistent
+      updated.calories = Math.round(updated.protein * 4 + updated.carbs * 4 + updated.fat * 9);
+      return updated;
+    }));
+    setEditingMacro(null);
+  }
+
   function handleLogMeal() {
     const totals = sumTotals(foods);
     const meal = {
@@ -554,12 +632,12 @@ Guidelines:
                 style={{
                   position: 'relative',
                   marginBottom: 10,
-                  // clip-path is more reliable than overflow:hidden for clipping
-                  // CSS-transformed children on mobile Safari
-                  clipPath: 'inset(0 round 14px)',
+                  // clipPath clips overflow on mobile for the swipe-reveal; not needed on desktop
+                  ...(isDesktop ? {} : { clipPath: 'inset(0 round 14px)' }),
                 }}
               >
-                {/* Trash — hidden until swiped */}
+                {/* Trash — mobile only, hidden until swiped */}
+                {!isDesktop && (
                 <div
                   ref={el => { trashRefs.current[idx] = el; }}
                   style={{
@@ -582,71 +660,29 @@ Guidelines:
                     }}
                   >🗑️</button>
                 </div>
+                )}
 
-                {/* Swipeable card — slides left to reveal trash */}
+                {/* Card — swipeable on mobile, static on desktop */}
                 <div
                   ref={el => { cardRefs.current[idx] = el; }}
                   style={{
                     background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isOpen ? 'rgba(255,23,68,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                    border: `1px solid ${!isDesktop && isOpen ? 'rgba(255,23,68,0.35)' : 'rgba(255,255,255,0.07)'}`,
                     borderRadius: 14, padding: '14px',
-                    transform: isOpen ? `translateX(-${TRASH_W}px)` : 'translateX(0)',
+                    transform: !isDesktop && isOpen ? `translateX(-${TRASH_W}px)` : 'translateX(0)',
                     transition: 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                     position: 'relative', zIndex: 1,
+                    cursor: isDesktop ? 'default' : 'grab',
+                    userSelect: isDesktop ? 'auto' : 'none',
                   }}
-                  onTouchStart={e => {
-                    const el = cardRefs.current[idx];
-                    // Start from whatever position the card currently is at
-                    const baseX = swipedIdx === idx ? -TRASH_W : 0;
-                    swipeRef.current = {
-                      startX: e.touches[0].clientX,
-                      startY: e.touches[0].clientY,
-                      moved: false,
-                      idx,
-                      baseX,
-                    };
-                    // Disable transitions so card + trash follow finger exactly
-                    if (el) el.style.transition = 'none';
-                    const tr = trashRefs.current[idx];
-                    if (tr) tr.style.transition = 'none';
-                  }}
-                  onTouchMove={e => {
-                    const { startX, startY, baseX } = swipeRef.current;
-                    const dx = e.touches[0].clientX - startX;
-                    const dy = e.touches[0].clientY - startY;
-                    // First movement: ignore if scrolling vertically
-                    if (!swipeRef.current.moved && Math.abs(dy) > Math.abs(dx)) return;
-                    swipeRef.current.moved = true;
-                    e.preventDefault(); // lock scroll once we're swiping horizontally
-                    const el = cardRefs.current[idx];
-                    const tr = trashRefs.current[idx];
-                    if (!el) return;
-                    // Clamp: can't go past fully open (-TRASH_W) or past closed (0)
-                    // Add slight resistance past the limits for a rubber-band feel
-                    let newX = baseX + dx;
-                    if (newX > 0) newX = newX * 0.2;           // resist overdrag right
-                    if (newX < -TRASH_W) newX = -TRASH_W + (newX + TRASH_W) * 0.2; // resist overdrag left
-                    el.style.transform = `translateX(${newX}px)`;
-                    // Drive trash opacity in sync with the drag (0 → 1 as card slides -TRASH_W)
-                    if (tr) tr.style.opacity = Math.min(1, -newX / TRASH_W).toFixed(2);
-                  }}
-                  onTouchEnd={e => {
-                    const { moved, idx: sIdx, baseX, startX } = swipeRef.current;
-                    const el = cardRefs.current[sIdx];
-                    const tr = trashRefs.current[sIdx];
-                    // Re-enable smooth snap transitions
-                    if (el) el.style.transition = 'transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                    if (tr) tr.style.transition = 'opacity 0.28s ease';
-                    if (!moved) return;
-                    const dx = e.changedTouches[0].clientX - startX;
-                    // Snap open if dragged left >30px from closed, or snap closed if dragged right >20px from open
-                    if (baseX === 0 ? dx < -30 : dx < 20) {
-                      setSwipedIdx(sIdx); // snap open → React will apply translateX(-TRASH_W)
-                    } else {
-                      setSwipedIdx(null); // snap closed → React will apply translateX(0)
-                    }
-                  }}
-                  onClick={() => { if (isOpen) setSwipedIdx(null); }}
+                  onTouchStart={e => !isDesktop && startDrag(idx, e.touches[0].clientX, e.touches[0].clientY)}
+                  onTouchMove={e => !isDesktop && moveDrag(e.touches[0].clientX, e.touches[0].clientY, e)}
+                  onTouchEnd={e => !isDesktop && endDrag(e.changedTouches[0].clientX)}
+                  onMouseDown={e => { if (isDesktop || e.button !== 0) return; startDrag(idx, e.clientX, e.clientY); }}
+                  onMouseMove={e => { if (isDesktop || swipeRef.current.idx == null) return; moveDrag(e.clientX, e.clientY, null); }}
+                  onMouseUp={e => { if (isDesktop) return; endDrag(e.clientX); }}
+                  onMouseLeave={e => { if (isDesktop || swipeRef.current.idx == null) return; endDrag(e.clientX); }}
+                  onClick={() => { if (!isDesktop && isOpen) setSwipedIdx(null); }}
                 >
                   {/* Name row + S/M/L */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -687,7 +723,7 @@ Guidelines:
                         <span>&middot; {adj.calories} kcal</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: 5, flexShrink: 0, alignItems: 'center' }}>
                       {['S', 'M', 'L'].map(p => {
                         const previewG = Math.round(food.grams * PORTION_MULT[p]);
                         const isActive = food.customGrams == null && food.portion === p;
@@ -712,26 +748,97 @@ Guidelines:
                           </button>
                         );
                       })}
+                      {/* Desktop 3-dot delete menu */}
+                      {isDesktop && (
+                        <div style={{ position: 'relative', marginLeft: 4 }}>
+                          <button
+                            onClick={e => { e.stopPropagation(); setDotMenuOpenIdx(i => i === idx ? null : idx); }}
+                            style={{
+                              width: 28, height: 28, borderRadius: 7,
+                              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                              color: 'var(--text2)', fontSize: 17, cursor: 'pointer', letterSpacing: -1,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                            }}
+                          >⋯</button>
+                          {dotMenuOpenIdx === idx && (
+                            <div style={{
+                              position: 'absolute', top: 32, right: 0,
+                              background: 'rgba(15,21,40,0.97)', border: '1px solid rgba(255,23,68,0.2)',
+                              borderRadius: 10, overflow: 'hidden',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.5)', minWidth: 130, zIndex: 200,
+                            }}>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setFoods(prev => prev.filter((_, i) => i !== idx));
+                                  setDotMenuOpenIdx(null);
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  width: '100%', padding: '11px 14px', border: 'none',
+                                  background: 'transparent', color: 'var(--red)',
+                                  fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600,
+                                  cursor: 'pointer', textAlign: 'left',
+                                }}
+                              ><span>🗑️</span> Delete</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Macros */}
+                  {/* Macros — tap any value to correct it */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[
-                      { label: 'Protein', value: adj.protein, color: 'var(--cyan)' },
-                      { label: 'Carbs', value: adj.carbs, color: 'var(--gold)' },
-                      { label: 'Fat', value: adj.fat, color: 'var(--fire2)' },
-                    ].map(m => (
-                      <div key={m.label} style={{
-                        flex: 1, textAlign: 'center', padding: '7px 4px',
-                        background: 'rgba(255,255,255,0.03)', borderRadius: 9,
-                      }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
-                          {m.value}g
+                      { label: 'Protein', field: 'protein', value: adj.protein, color: 'var(--cyan)' },
+                      { label: 'Carbs',   field: 'carbs',   value: adj.carbs,   color: 'var(--gold)' },
+                      { label: 'Fat',     field: 'fat',     value: adj.fat,     color: 'var(--fire2)' },
+                    ].map(m => {
+                      const isEditingThis = editingMacro?.idx === idx && editingMacro?.field === m.field;
+                      return (
+                        <div
+                          key={m.label}
+                          onClick={() => {
+                            if (!isOpen && !isEditingThis) {
+                              setEditingMacro({ idx, field: m.field, value: m.value });
+                              setEditingGram(null);
+                            }
+                          }}
+                          style={{
+                            flex: 1, textAlign: 'center', padding: '7px 4px',
+                            background: isEditingThis ? `${m.color}14` : 'rgba(255,255,255,0.03)',
+                            borderRadius: 9,
+                            border: isEditingThis ? `1px solid ${m.color}` : '1px solid transparent',
+                            cursor: isOpen ? 'default' : 'pointer',
+                          }}
+                        >
+                          {isEditingThis ? (
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={editingMacro.value}
+                              onChange={e => setEditingMacro(prev => ({ ...prev, value: e.target.value }))}
+                              onBlur={saveMacroEdit}
+                              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingMacro(null); }}
+                              autoFocus
+                              style={{
+                                width: '100%', background: 'transparent', border: 'none',
+                                color: m.color, fontSize: 14, fontWeight: 700,
+                                fontFamily: 'Rajdhani', textAlign: 'center', outline: 'none',
+                              }}
+                            />
+                          ) : (
+                            <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
+                              {m.value}g
+                            </div>
+                          )}
+                          <div style={{ fontSize: 10, color: 'var(--text3)' }}>
+                            {m.label}{!isEditingThis && <span style={{ opacity: 0.4, marginLeft: 2 }}>✎</span>}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--text3)' }}>{m.label}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

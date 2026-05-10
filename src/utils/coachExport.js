@@ -1,6 +1,10 @@
 import { EXERCISES, ACHIEVEMENTS } from '../data/gameData';
 import { getPhase, convertWeight } from './gameLogic';
 
+function getExercises(state) {
+  return state.activeExercises?.length ? state.activeExercises : EXERCISES;
+}
+
 /**
  * Builds a human-readable training report suitable for pasting into any AI coach.
  * Covers: profile, current weights + overload status, today's session (if any),
@@ -24,7 +28,7 @@ export function formatForCoach(state) {
   lines.push('CURRENT WORKING WEIGHTS & OVERLOAD STATUS');
   lines.push('---');
   const sug = state.overloadSuggestions || {};
-  for (const ex of EXERCISES) {
+  for (const ex of getExercises(state)) {
     if (ex.isPlank) {
       lines.push(`  Plank: target ${ex.sets}×45-60 sec`);
       continue;
@@ -47,7 +51,7 @@ export function formatForCoach(state) {
     const sessionLabel = state.todaySessionFinished ? 'TODAY\'S COMPLETED SESSION' : 'TODAY\'S SESSION (in progress)';
     lines.push(sessionLabel);
     lines.push('---');
-    for (const ex of EXERCISES) {
+    for (const ex of getExercises(state)) {
       if (!todayDone.includes(ex.id)) continue;
       const d = details[ex.id];
       if (!d) continue;
