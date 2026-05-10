@@ -1,7 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X as XIcon } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
+
+// Helper: get the user's active exercise list, falling back to the default barbell set
+function getExercises(state) {
+  return state.activeExercises?.length ? state.activeExercises : EXERCISES;
+}
 
 const COACH_MODES = [
   { id: 'pep',      icon: '⚡', label: 'Pre-Workout',    color: 'var(--fire2)',   bg: 'rgba(255,109,0,0.08)',   border: 'rgba(255,109,0,0.2)' },
@@ -18,27 +25,30 @@ const ONE_SHOT_MODES = ['pep', 'analysis', 'overload', 'form'];
 function buildSystemPrompt(state, mode) {
   const phase = getPhase(state.currentWeek);
   const unit = state.unit;
-  const name = state.name;
+  const name = state.name || 'Athlete';
   const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
 
   const base = `You are Coach AI for FitQuest — a hyper-personalized fitness coach for ${name}'s 12-week body recomposition program.
-COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.`;
+COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.
+EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest the best available alternative based on their equipment. Common swaps: Bench Press → DB Bench Press or Push-ups; Barbell Squat → DB Goblet Squat or Bodyweight Squat; Lat Pulldown → DB Bent-Over Row or Inverted Row; Leg Curl → DB Romanian Deadlift or Nordic Curl. Always match the muscle group. If they have no replacement, give a bodyweight option.`;
 
   if (mode === 'form') {
+    const exercises = getExercises(state);
     // Form mode only needs exercise context, not full lift data
     return `${base}
-PROGRAM: 3×/week full body — Squat, Bench Press, RDL, Lat Pulldown, OHP, Leg Curl, Plank.
+PROGRAM: ${exercises.map(e => e.name).join(', ')}
 PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
   }
 
   const sug = state.overloadSuggestions || {};
-  const liftSummary = EXERCISES.filter(e => !e.isPlank).map(ex => {
+  const exercises = getExercises(state);
+  const liftSummary = exercises.filter(e => !e.isPlank).map(ex => {
     const wt = convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg, unit);
     const s = sug[ex.id];
     return `  ${ex.name}: ${wt}${unit}${s ? ` [${s === 'increase' ? '↑ ready' : s === 'repeat' ? '= repeat' : '↓ deload'}]` : ''}`;
   }).join('\n');
 
-  const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/3`;
+  const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
 
   if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
     return `${base}
@@ -71,28 +81,31 @@ function buildUserPrompt(mode, state, userMessage) {
     case 'pep': {
       const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
       const increases = Object.entries(sug).filter(([,v]) => v === 'increase').map(([k]) => {
-        const ex = EXERCISES.find(e => e.id === k);
+        const exercises = getExercises(state);
+        const ex = exercises.find(e => e.id === k);
         const wt = convertWeight((state.liftWeights?.[k] ?? 0) + 2.5, unit);
         return ex ? `${ex.name} → ${wt}${unit}` : k;
       });
-      return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/3. Streak: ${state.streak} days.
+      const userName = state.name || 'Athlete';
+      return `Pre-workout pep talk for Week ${state.currentWeek}, Session ${weekSessions + 1}/${state.sessionsPerWeek || 3}. Streak: ${state.streak} days.
 ${increases.length > 0 ? `Weight increases today: ${increases.join(', ')}` : 'Maintaining current weights.'}
-${userMessage ? `Jake's note: "${userMessage}"` : ''}
+${userMessage ? `${userName}'s note: "${userMessage}"` : ''}
 Be specific and energetic.`;
     }
 
     case 'analysis': {
       if (todayDone.length === 0) {
-        return `Jake hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
+        return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
       }
       const summary = todayDone.map(id => {
-        const ex = EXERCISES.find(e => e.id === id);
+        const exercises = getExercises(state);
+        const ex = exercises.find(e => e.id === id);
         const det = details[id];
         if (!det || !ex) return `  ${id}: done`;
         const compliance = det.setsCompleted >= det.setsPrescribed ? 'completed as programmed' : `only ${det.setsCompleted} of ${det.setsPrescribed} prescribed sets`;
         return `  ${ex.name}: ${compliance}${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}`;
       }).join('\n');
-      const missed = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);
+      const missed = getExercises(state).filter(e => !todayDone.includes(e.id)).map(e => e.name);
       return `Post-session analysis Week ${state.currentWeek}:
 Note: set counts vary per exercise by program design (compounds are 3 sets, accessories are 2 sets — this is intentional).
 ${summary}
@@ -106,7 +119,7 @@ What went well, what to watch, what it means for next session. Do not reference 
         return `Week ${state.currentWeek}, ${phase.name}: ${phase.desc}. Explain progressive overload approach and RPE targets for this phase.`;
       }
       const fmt = (arr) => arr.map(([k]) => {
-        const ex = EXERCISES.find(e => e.id === k);
+        const ex = getExercises(state).find(e => e.id === k);
         const cur = convertWeight(state.liftWeights?.[k] ?? 0, unit);
         const next = convertWeight((state.liftWeights?.[k] ?? 0) + 2.5, unit);
         return ex ? `  ${ex.name}: ${cur} → ${next}${unit}` : k;
@@ -116,22 +129,23 @@ What went well, what to watch, what it means for next session. Do not reference 
       const deloads = Object.entries(sug).filter(([,v]) => v === 'deload');
       return `Overload plan Week ${state.currentWeek}, ${phase.name}:
 Increase: ${increases.length ? '\n' + fmt(increases) : 'none'}
-Repeat: ${repeats.length ? repeats.map(([k]) => EXERCISES.find(e=>e.id===k)?.name||k).join(', ') : 'none'}
-Deload: ${deloads.length ? deloads.map(([k]) => EXERCISES.find(e=>e.id===k)?.name||k).join(', ') : 'none'}
+Repeat: ${repeats.length ? repeats.map(([k]) => getExercises(state).find(e=>e.id===k)?.name||k).join(', ') : 'none'}
+Deload: ${deloads.length ? deloads.map(([k]) => getExercises(state).find(e=>e.id===k)?.name||k).join(', ') : 'none'}
 ${userMessage ? `Question: "${userMessage}"` : ''}
 Explain the strategy concisely.`;
     }
 
     case 'form': {
+      const exercises = getExercises(state);
       const exId = userMessage?.toLowerCase();
-      const matched = EXERCISES.find(e =>
+      const matched = exercises.find(e =>
         e.name.toLowerCase().includes(exId || '') || e.id === exId
       );
       if (matched) {
         return `Form coaching for ${matched.name}. My weight: ${convertWeight(state.liftWeights?.[matched.id] ?? matched.startKg, unit)}${unit}. Target: RPE ${matched.rpe}, ${matched.reps} reps × ${matched.sets} sets.
 Cover: setup, key cues, most common mistakes, one immediate improvement.`;
       }
-      return `Jake wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${EXERCISES.map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
+      return `${state.name || 'Athlete'} wants form tips${userMessage ? ` on: "${userMessage}"` : ''}. Available: ${getExercises(state).map(e=>e.name).join(', ')}. Ask which exercise, then give coaching.`;
     }
 
     case 'checkin': {
@@ -169,8 +183,77 @@ function setCached(key, text) {
   try { sessionStorage.setItem(key, JSON.stringify({ text, ts: Date.now() })); } catch {}
 }
 
-export default function AICoachTab({ state, onSaveHistory }) {
+// ── Agent Inbox ──────────────────────────────────────────────────────────────
+function AgentInbox({ messages, onMarkAllRead }) {
+  if (!messages || messages.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text3)' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
+        <div style={{ fontFamily: 'Orbitron', fontSize: 11, letterSpacing: 1 }}>NO MESSAGES YET</div>
+        <div style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+          Quest will message you automatically after workouts, milestones, and on Mondays.
+        </div>
+      </div>
+    );
+  }
+
+  const sorted = [...messages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  return (
+    <div>
+      {sorted.some(m => !m.read) && (
+        <button onClick={onMarkAllRead} style={{
+          width: '100%', padding: '8px', borderRadius: 10, border: 'none',
+          background: 'rgba(0,229,255,0.06)', color: 'var(--cyan)',
+          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+          cursor: 'pointer', marginBottom: 12,
+        }}>MARK ALL READ</button>
+      )}
+      {sorted.map(msg => {
+        const escaped = (msg.message || '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const formatted = escaped
+          .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        return (
+          <div key={msg.id} style={{
+            display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-start',
+            opacity: msg.read ? 0.6 : 1, transition: 'opacity 0.3s',
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: msg.read ? 'rgba(255,255,255,0.04)' : 'rgba(0,229,255,0.08)',
+              border: msg.read ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,229,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+            }}>{msg.emoji || '🤖'}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{
+                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
+                  color: msg.read ? 'var(--text3)' : 'var(--cyan)', letterSpacing: 1,
+                  textTransform: 'uppercase',
+                }}>{msg.trigger?.replace(/_/g, ' ') || 'QUEST'}{!msg.read && <span style={{ marginLeft: 6, color: 'var(--cyan)' }}>● NEW</span>}</div>
+                <div style={{ fontSize: 9, color: 'var(--text3)' }}>
+                  {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                </div>
+              </div>
+              <div style={{
+                padding: '10px 12px', borderRadius: '4px 12px 12px 12px',
+                background: 'var(--card)', border: '1px solid var(--card-border)',
+                fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
+                backdropFilter: 'blur(20px)',
+              }} dangerouslySetInnerHTML={{ __html: formatted.replace(/\n/g, '<br/>') }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose }) {
   const [activeMode, setActiveMode] = useState('pep');
+  const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
   const [messages, setMessages] = useState(() => state.aiCoachHistory || []);
   const [loading, setLoading] = useState(false);
@@ -200,11 +283,13 @@ export default function AICoachTab({ state, onSaveHistory }) {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastSendRef = useRef({ prompt: '', ts: 0 });
+  // Refs for modal-mode scroll management
+  const modalScrollRef = useRef(null);
+  const modalMsgCountRef = useRef(messages.length);
 
   // Warn on mount if API key is not configured
   useEffect(() => {
-    // Check coach is reachable (will 500 if server env var not set)
-    fetch('/api/coach', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    fetch('/api/coach', { method: 'GET' })
       .then(r => { if (r.status === 500) setApiKeyMissing(true); })
       .catch(() => {});
   }, []);
@@ -216,9 +301,29 @@ export default function AICoachTab({ state, onSaveHistory }) {
     return () => clearTimeout(t);
   }, [cooldownLeft]);
 
+  // When the modal opens, scroll to the top so mode selectors are visible,
+  // and reset the message counter so the arrival-scroll doesn't fire immediately.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (isOpen && modalScrollRef.current) {
+      modalScrollRef.current.scrollTop = 0;
+      modalMsgCountRef.current = messages.length;
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll on new messages.
+  // In modal mode: scroll the modal container directly (prevents outer page scroll).
+  // In standalone tab mode: use scrollIntoView as before.
+  useEffect(() => {
+    if (isOpen && onClose && modalScrollRef.current) {
+      if (messages.length > modalMsgCountRef.current) {
+        modalMsgCountRef.current = messages.length;
+        const el = modalScrollRef.current;
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mode = COACH_MODES.find(m => m.id === activeMode);
 
@@ -228,7 +333,14 @@ export default function AICoachTab({ state, onSaveHistory }) {
 
     const text = (overrideMessage ?? userMessage).trim();
     const systemPrompt = buildSystemPrompt(state, activeMode);
-    const userPrompt = buildUserPrompt(activeMode, state, text);
+
+    // Detect follow-up: one-shot mode where the user already has an AI response and is typing a reply
+    const priorModeAIResponses = messages.filter(m => m.mode === activeMode && m.role === 'assistant');
+    const isFollowUp = ONE_SHOT_MODES.includes(activeMode) && priorModeAIResponses.length > 0 && text.length > 0;
+
+    // For follow-ups in one-shot modes use raw text so Claude answers the actual question,
+    // not a freshly-reconstructed analysis prompt
+    const userPrompt = isFollowUp ? text : buildUserPrompt(activeMode, state, text);
 
     // Dedup: block same prompt within 5 seconds
     if (userPrompt === lastSendRef.current.prompt && Date.now() - lastSendRef.current.ts < 5000) {
@@ -236,19 +348,21 @@ export default function AICoachTab({ state, onSaveHistory }) {
     }
     lastSendRef.current = { prompt: userPrompt, ts: Date.now() };
 
-    // Cache check (session-scoped, 30-min TTL)
+    // Cache check — only for initial (non-follow-up) requests
     const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${text ? text.slice(0, 80) : userPrompt.slice(0, 80)}`;
-    const cached = getCached(cacheKey);
-    if (cached) {
-      const newMessages = [
-        ...messages,
-        { role: 'user', content: userPrompt, mode: activeMode, displayText: text || mode.label, ts: Date.now() },
-        { role: 'assistant', content: cached, mode: activeMode, ts: Date.now() }
-      ];
-      setMessages(newMessages);
-      setUserMessage('');
-      onSaveHistory(newMessages.slice(-20));
-      return;
+    if (!isFollowUp) {
+      const cached = getCached(cacheKey);
+      if (cached) {
+        const newMessages = [
+          ...messages,
+          { role: 'user', content: userPrompt, mode: activeMode, displayText: text || mode.label, ts: Date.now() },
+          { role: 'assistant', content: cached, mode: activeMode, ts: Date.now() }
+        ];
+        setMessages(newMessages);
+        setUserMessage('');
+        onSaveHistory(newMessages.slice(-20));
+        return;
+      }
     }
 
     const newMessages = [
@@ -260,9 +374,10 @@ export default function AICoachTab({ state, onSaveHistory }) {
     setLoading(true);
     setError(null);
 
-    // One-shot modes: send only the current message (no history = big token savings)
-    // Checkin: send last 6 messages for conversational context
-    const modeHistory = ONE_SHOT_MODES.includes(activeMode)
+    // One-shot modes: send only the current message (no history = token savings) for initial calls.
+    // For follow-ups in one-shot modes, include conversation history so Claude can answer in context.
+    // Checkin: always send last 6 messages for conversational continuity.
+    const modeHistory = (ONE_SHOT_MODES.includes(activeMode) && !isFollowUp)
       ? [{ role: 'user', content: userPrompt }]
       : newMessages
           .filter(m => m.mode === activeMode && (m.role === 'user' || m.role === 'assistant'))
@@ -309,64 +424,264 @@ export default function AICoachTab({ state, onSaveHistory }) {
 
   const modeMessages = messages.filter(m => m.mode === activeMode);
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '70vh' }}>
-      {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
-        border: '1px solid rgba(0,229,255,0.12)',
-        borderRadius: 14, padding: '14px 16px', marginBottom: 14
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <span style={{ fontSize: 22 }}>🤖</span>
-          <div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
-              AI COACH
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-              Powered by Claude · Knows your data
-            </div>
+  const headerSection = (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
+      border: '1px solid rgba(0,229,255,0.12)',
+      borderRadius: 14, padding: '14px 16px', marginBottom: 14
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 22 }}>🤖</span>
+        <div>
+          <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
+            AI COACH
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
-              padding: '4px 10px', borderRadius: 8,
-              border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
-              background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
-              color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Powered by Claude · Knows your data
+          </div>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              const opening = !showInbox;
+              setShowInbox(opening);
+              if (opening) {
+                if (onOpenInbox) onOpenInbox();
+                if (onMarkAgentRead) setTimeout(onMarkAgentRead, 1000);
+              }
+            }}
+            title="Quest inbox — proactive messages from your agent"
+            style={{
+              position: 'relative', padding: '4px 10px', borderRadius: 8,
+              border: showInbox ? '1px solid rgba(179,136,255,0.4)' : '1px solid rgba(255,255,255,0.1)',
+              background: showInbox ? 'rgba(179,136,255,0.1)' : 'rgba(255,255,255,0.04)',
+              color: showInbox ? 'var(--purple)' : 'var(--text3)',
               fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}>{copyLabel}</button>
-            {messages.length > 0 && (
-              <button onClick={clearHistory} style={{
-                padding: '4px 10px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
-                fontWeight: 700, cursor: 'pointer'
-              }}>CLEAR</button>
+              transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+            📬 INBOX
+            {unreadAgentCount > 0 && (
+              <span style={{
+                background: 'var(--red)', color: '#fff', borderRadius: '50%',
+                width: 16, height: 16, fontSize: 9, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
+            )}
+          </button>
+          <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
+            padding: '4px 10px', borderRadius: 8,
+            border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
+            background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
+            color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
+            fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}>{copyLabel}</button>
+          {messages.length > 0 && (
+            <button onClick={clearHistory} style={{
+              padding: '4px 10px', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
+              fontWeight: 700, cursor: 'pointer'
+            }}>CLEAR</button>
+          )}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+        {COACH_MODES.map(m => (
+          <button key={m.id} onClick={() => setActiveMode(m.id)} style={{
+            padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
+            border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
+            background: activeMode === m.id ? m.bg : 'transparent',
+            color: activeMode === m.id ? m.color : 'var(--text3)',
+            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+            letterSpacing: 0.3, transition: 'all 0.2s',
+            display: 'flex', alignItems: 'center', gap: 5
+          }}>
+            <span>{m.icon}</span> {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const messagesSection = (
+    <div style={{ marginBottom: 14 }}>
+      {modeMessages.length === 0 && (
+        <ModePrompt mode={COACH_MODES.find(m => m.id === activeMode)} state={state} />
+      )}
+      {modeMessages.map((msg, i) => (
+        <MessageBubble key={i} msg={msg} />
+      ))}
+      {loading && <ThinkingBubble />}
+      {error && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 12, marginBottom: 10,
+          background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.2)',
+          fontSize: 12, color: 'var(--red)'
+        }}>
+          Error: {error}. Make sure your API key is configured.
+        </div>
+      )}
+      <div ref={messagesEndRef} />
+    </div>
+  );
+
+  const inputSection = (
+    <div style={{
+      background: 'var(--card)', border: '1px solid var(--card-border)',
+      borderRadius: 14, padding: 14, backdropFilter: 'blur(20px)'
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
+        {getInputHint(activeMode)}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          ref={inputRef}
+          value={userMessage}
+          onChange={e => setUserMessage(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+          placeholder={getPlaceholder(activeMode)}
+          style={{
+            flex: 1, height: 42, borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.04)',
+            color: 'var(--text)', fontFamily: 'Rajdhani',
+            fontSize: 14, fontWeight: 600, padding: '0 12px'
+          }}
+        />
+        <button
+          onClick={() => sendMessage()}
+          disabled={loading || cooldownLeft > 0}
+          style={{
+            width: 42, height: 42, borderRadius: 10, border: 'none',
+            background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
+            color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
+            fontSize: cooldownLeft > 0 ? 11 : 18,
+            fontFamily: 'Orbitron', fontWeight: 700,
+            cursor: (loading || cooldownLeft > 0) ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.2s', flexShrink: 0
+          }}
+        >
+          {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
+        </button>
+      </div>
+      <div style={{
+        display: 'flex', gap: 6, marginTop: 8,
+        overflowX: 'auto', flexWrap: 'nowrap',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none', msOverflowStyle: 'none',
+        paddingBottom: 2,
+      }}>
+        {getQuickPrompts(activeMode).map((q, i) => (
+          <button key={i} onClick={() => sendMessage(q)} style={{
+            padding: '4px 10px', borderRadius: 8, flexShrink: 0,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
+            fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s'
+          }}>{q}</button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Modal overlay mode (when triggered from TrainTab)
+  if (isOpen && onClose) {
+    return createPortal(
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            bottom: 0, left: 0, right: 0,
+            maxHeight: '90vh',
+            background: 'rgba(15,21,40,0.96)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '20px 20px 0 0',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both',
+          }}
+        >
+          {/* Drag handle + close — never scrolls */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px 0', flexShrink: 0,
+          }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} />
+            <button
+              onClick={onClose}
+              aria-label="Close AI Coach"
+              style={{
+                width: 32, height: 32, borderRadius: 8, border: 'none',
+                background: 'rgba(255,255,255,0.08)',
+                color: 'var(--color-text-tertiary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
+
+          {/* Single scrollable area: header + messages + sticky input */}
+          <div
+            ref={modalScrollRef}
+            style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}
+          >
+            <div style={{ padding: '12px 16px 0' }}>
+              {headerSection}
+              {apiKeyMissing && (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 12, marginBottom: 14,
+                  background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.25)',
+                  fontSize: 12, color: 'var(--gold)', lineHeight: 1.6,
+                }}>
+                  <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '0 16px' }}>
+              {showInbox
+                ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
+                : messagesSection
+              }
+            </div>
+
+            {/* Input — sticky to bottom of scroll container */}
+            {!showInbox && (
+              <div style={{
+                position: 'sticky', bottom: 0,
+                padding: '8px 16px',
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+                background: 'rgba(15,21,40,0.96)',
+              }}>
+                {inputSection}
+              </div>
             )}
           </div>
         </div>
+      </div>,
+      document.body
+    );
+  }
 
-        {/* Mode selector */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          {COACH_MODES.map(m => (
-            <button key={m.id} onClick={() => setActiveMode(m.id)} style={{
-              padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
-              background: activeMode === m.id ? m.bg : 'transparent',
-              color: activeMode === m.id ? m.color : 'var(--text3)',
-              fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-              letterSpacing: 0.3, transition: 'all 0.2s',
-              display: 'flex', alignItems: 'center', gap: 5
-            }}>
-              <span>{m.icon}</span> {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* API key missing warning */}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {headerSection}
       {apiKeyMissing && (
         <div style={{
           padding: '10px 14px', borderRadius: 12, marginBottom: 14,
@@ -376,85 +691,10 @@ export default function AICoachTab({ state, onSaveHistory }) {
           <strong>API key not configured.</strong> Add <code>ANTHROPIC_API_KEY</code> to your Vercel environment variables and redeploy.
         </div>
       )}
-
-      {/* Messages */}
-      <div style={{ flex: 1, marginBottom: 14 }}>
-        {modeMessages.length === 0 && (
-          <ModePrompt mode={COACH_MODES.find(m => m.id === activeMode)} state={state} />
-        )}
-
-        {modeMessages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} />
-        ))}
-
-        {loading && <ThinkingBubble />}
-        {error && (
-          <div style={{
-            padding: '10px 14px', borderRadius: 12, marginBottom: 10,
-            background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.2)',
-            fontSize: 12, color: 'var(--red)'
-          }}>
-            Error: {error}. Make sure your API key is configured.
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 14, padding: 14, backdropFilter: 'blur(20px)'
-      }}>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
-          {getInputHint(activeMode)}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            ref={inputRef}
-            value={userMessage}
-            onChange={e => setUserMessage(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder={getPlaceholder(activeMode)}
-            style={{
-              flex: 1, height: 42, borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'var(--text)', fontFamily: 'Rajdhani',
-              fontSize: 14, fontWeight: 600, padding: '0 12px'
-            }}
-          />
-          <button
-            onClick={() => sendMessage()}
-            disabled={loading || cooldownLeft > 0}
-            style={{
-              width: 42, height: 42, borderRadius: 10, border: 'none',
-              background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
-              color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
-              fontSize: cooldownLeft > 0 ? 11 : 18,
-              fontFamily: 'Orbitron', fontWeight: 700,
-              cursor: (loading || cooldownLeft > 0) ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s', flexShrink: 0
-            }}
-          >
-            {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
-          </button>
-        </div>
-
-        {/* Quick fire buttons */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          {getQuickPrompts(activeMode).map((q, i) => (
-            <button key={i} onClick={() => sendMessage(q)} style={{
-              padding: '4px 10px', borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.03)',
-              color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
-              fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
-              transition: 'all 0.2s'
-            }}>{q}</button>
-          ))}
-        </div>
-      </div>
+      {showInbox
+        ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
+        : <>{messagesSection}{inputSection}</>
+      }
     </div>
   );
 }
