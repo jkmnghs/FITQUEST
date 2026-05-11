@@ -18,15 +18,12 @@ export function useAuth() {
       return;
     }
 
-    // Recover existing session (Supabase stores it in localStorage automatically)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    // Subscribe to all future auth state changes
+    // onAuthStateChange fires immediately with the current session (including after
+    // PKCE code exchange on confirmation redirect), so we use it as the single
+    // source of truth rather than racing against getSession().
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
