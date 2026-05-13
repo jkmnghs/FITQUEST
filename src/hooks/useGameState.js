@@ -41,10 +41,12 @@ function buildPersonalizedExercises(exercises, assessment) {
 }
 
 // Module-level guard — lives completely outside React, reset only on page reload.
-// Initialized from localStorage so page reloads are also covered.
+// Initialized from backfillLock (not weekProgress) so real sessions don't
+// incorrectly block the guard. weekProgress.count includes real sessions;
+// backfillLock only tracks what backfill has already applied.
 const _initSaved = storageGet();
 const _backfillGuard = Object.fromEntries(
-  Object.entries(_initSaved?.weekProgress ?? {}).map(([w, d]) => [w, d.count ?? 0])
+  Object.entries(_initSaved?.backfillLock ?? {}).map(([w, n]) => [w, n])
 );
 
 function mergeState(saved) {
