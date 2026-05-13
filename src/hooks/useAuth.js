@@ -18,12 +18,17 @@ export function useAuth() {
       return;
     }
 
-    // onAuthStateChange fires immediately with the current session (including after
-    // PKCE code exchange on confirmation redirect), so we use it as the single
-    // source of truth rather than racing against getSession().
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // getSession() reads from localStorage immediately and also waits for any
+    // in-progress PKCE code exchange (detectSessionInUrl is true by default).
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+    });
+
+    // onAuthStateChange handles SIGNED_IN after email confirmation redirect,
+    // TOKEN_REFRESHED, SIGNED_OUT, etc.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
     });
 
     return () => subscription.unsubscribe();
