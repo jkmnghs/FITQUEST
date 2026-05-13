@@ -222,17 +222,34 @@ export function SummaryTab({ state }) {
   );
 }
 
+// Collect all unique exercises from the user's active program.
+// For split programs (Upper/Lower, PPL), union all template days.
+// Falls back to the global EXERCISES list if onboarding isn't done yet.
+function getProgramExercises(state) {
+  if (state.activeTemplates?.length > 0) {
+    const seen = new Map();
+    state.activeTemplates.forEach(t =>
+      (t.exercises || []).forEach(e => { if (!seen.has(e.id)) seen.set(e.id, e); })
+    );
+    if (seen.size > 0) return [...seen.values()];
+  }
+  if (state.activeExercises?.length > 0) return state.activeExercises;
+  return EXERCISES;
+}
+
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut }) {
+  const programExercises = getProgramExercises(state);
+
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(1);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState(() =>
-    Object.fromEntries(EXERCISES.filter(e => !e.isPlank).map(e => [e.id, '']))
+    Object.fromEntries(programExercises.filter(e => !e.isPlank).map(e => [e.id, '']))
   );
   const [backfillSets, setBackfillSets] = useState(() =>
-    Object.fromEntries(EXERCISES.map(e => [e.id, e.isPlank ? 2 : 3]))
+    Object.fromEntries(programExercises.map(e => [e.id, e.isPlank ? 2 : 3]))
   );
   return (
     <div>
@@ -397,7 +414,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Orbitron', fontWeight: 600 }}>{h}</div>
           ))}
         </div>
-        {EXERCISES.map(ex => (
+        {programExercises.map(ex => (
           <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
             <div style={{ fontSize: 12, color: 'var(--text2)' }}>{ex.name}</div>
             {ex.isPlank ? (
@@ -407,7 +424,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 type="number" inputMode="decimal"
                 min={0} max={1000}
                 placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
-                value={backfillWeights[ex.id]}
+                value={backfillWeights[ex.id] ?? ''}
                 onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
                 style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
               />
@@ -415,7 +432,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             <input
               type="number" inputMode="numeric"
               min={0} max={ex.sets + 2}
-              value={backfillSets[ex.id]}
+              value={backfillSets[ex.id] ?? (ex.isPlank ? 2 : 3)}
               onChange={e => setBackfillSets(prev => ({ ...prev, [ex.id]: Number(e.target.value) }))}
               style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
             />
@@ -433,13 +450,13 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         {/* Auto-computed completion */}
         {(() => {
           const done = Object.values(backfillSets).filter(s => s > 0).length;
-          const pct = Math.round(done / EXERCISES.length * 100);
+          const pct = Math.round(done / programExercises.length * 100);
           return (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--text3)' }}>Completion (auto)</div>
               <div style={{ fontSize: 12, fontFamily: 'Orbitron', fontWeight: 700,
                 color: pct >= 95 ? 'var(--green)' : pct >= 70 ? 'var(--cyan)' : 'var(--fire2)' }}>
-                {done}/{EXERCISES.length} &nbsp;{pct}%
+                {done}/{programExercises.length} &nbsp;{pct}%
               </div>
             </div>
           );
@@ -455,9 +472,9 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
               onClick={() => {
                 if (alreadyDone) return;
                 const done = Object.values(backfillSets).filter(s => s > 0).length;
-                const autoPct = Math.round(done / EXERCISES.length * 100);
+                const autoPct = Math.round(done / programExercises.length * 100);
                 const custom = {};
-                EXERCISES.filter(e => !e.isPlank).forEach(ex => {
+                programExercises.filter(e => !e.isPlank).forEach(ex => {
                   const v = parseFloat(backfillWeights[ex.id]);
                   if (!isNaN(v) && v > 0) {
                     const clamped = Math.min(1000, v);
