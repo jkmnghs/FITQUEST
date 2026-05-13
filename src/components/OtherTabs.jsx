@@ -446,7 +446,8 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         })()}
 
         {(() => {
-          const lockedCount = state.backfillLock?.[backfillW] ?? 0;
+          const realCount = state.weekProgress?.[backfillW]?.count ?? 0;
+          const lockedCount = Math.max(state.backfillLock?.[backfillW] ?? 0, realCount);
           const alreadyDone = backfillCount <= lockedCount;
           return (
             <button
@@ -474,7 +475,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 color: alreadyDone ? 'var(--text3)' : '#fff',
                 letterSpacing: 0.5, cursor: alreadyDone ? 'not-allowed' : 'pointer'
               }}
-            >{alreadyDone ? `WEEK ${backfillW} ALREADY AT ${lockedCount}/3` : `APPLY WEEK ${backfillW}`}</button>
+            >{alreadyDone ? `WEEK ${backfillW} ALREADY HAS ${lockedCount} SESSION${lockedCount !== 1 ? 'S' : ''}` : `APPLY WEEK ${backfillW}`}</button>
           );
         })()}
         </>}
