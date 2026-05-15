@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 import { PROGRAMS } from '../data/programs';
@@ -515,23 +516,26 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
       )}
 
       {/* Finish confirm */}
-      {showFinishConfirm && (
+      {showFinishConfirm && createPortal(
         <FinishConfirmModal
           state={state}
           exercises={exercises}
           onCancel={() => setShowFinishConfirm(false)}
           onConfirm={() => {
             setShowFinishConfirm(false);
-            const isLastSession = state.currentWeek === 12 && (state.weekProgress?.[12]?.count || 0) === 2;
+            const sessionsNeeded = state.sessionsPerWeek || 3;
+            const isLastSession = state.currentWeek === 12 && (state.weekProgress?.[12]?.count || 0) >= sessionsNeeded - 1;
             onFinishSession();
             if (isLastSession) setTimeout(() => setShowProgramComplete(true), 2000);
           }}
-        />
+        />,
+        document.body
       )}
 
       {/* Program complete celebration */}
-      {showProgramComplete && (
-        <ProgramCompleteModal onClose={() => setShowProgramComplete(false)} state={state} />
+      {showProgramComplete && createPortal(
+        <ProgramCompleteModal onClose={() => setShowProgramComplete(false)} state={state} />,
+        document.body
       )}
 
       {/* Swap / Add exercise picker */}

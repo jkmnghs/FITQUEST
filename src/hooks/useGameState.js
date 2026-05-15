@@ -618,7 +618,8 @@ export function useGameState(user) {
           nextWeek = w + 1;
           setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1} 🎉`), 1000);
         } else {
-          setTimeout(() => showToast('🏆 12-WEEK PROGRAM COMPLETE!'), 1000);
+          nextWeek = 1; // cycle into a new 12-week program
+          setTimeout(() => showToast('🏆 PROGRAM COMPLETE! New cycle starting — keep lifting! ⚔️'), 1000);
         }
         pendingAdvance = nextWeek;
       }
