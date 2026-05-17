@@ -682,8 +682,12 @@ export function useGameState(user) {
         xp: isUpdate ? 0 : 25, date: today(), type: 'checkin',
         dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       };
+      // Recalculate BMI from the new weight (height stays fixed from assessment)
+      const weightKg = prev.unit === 'lbs' ? weight / 2.205 : weight;
+      const { bmi } = calcBMI(weightKg, prev.assessment?.heightCm);
       return {
         ...prev,
+        bmi: bmi || prev.bmi,
         checkins: isUpdate ? prev.checkins : prev.checkins + 1,
         // Replace any existing entry for this week rather than appending
         weeklyCheckins: [

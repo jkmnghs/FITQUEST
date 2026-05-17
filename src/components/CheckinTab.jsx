@@ -95,7 +95,7 @@ export default function CheckinTab({ state, onSubmit }) {
         ) : (
           <>
             <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
-              placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
+              placeholder={lastCheckin ? String(lastCheckin.weight) : '70.0'} unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
             <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
               placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
             <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
