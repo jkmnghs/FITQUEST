@@ -614,12 +614,12 @@ export function useGameState(user) {
       if (wp.count >= sessionsNeeded && !wp.completed) {
         wp.completed = true;
         if (isDeload) setTimeout(() => showToast('🧘 Deload complete! Great recovery week.'), 500);
-        if (w < 12) {
-          nextWeek = w + 1;
-          setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1} 🎉`), 1000);
+        nextWeek = w + 1;
+        const cycleWeek = ((w - 1) % 12) + 1;
+        if (cycleWeek === 12) {
+          setTimeout(() => showToast('🏆 CYCLE COMPLETE! Week ' + (w + 1) + ' begins — keep lifting! ⚔️'), 1000);
         } else {
-          nextWeek = 1; // cycle into a new 12-week program
-          setTimeout(() => showToast('🏆 PROGRAM COMPLETE! New cycle starting — keep lifting! ⚔️'), 1000);
+          setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1} 🎉`), 1000);
         }
         pendingAdvance = nextWeek;
       }

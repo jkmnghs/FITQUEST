@@ -5,17 +5,19 @@ export function today() {
 }
 
 export function getPhase(week) {
-  if (week <= 3) return PHASES[0];
-  if (week === 4) return PHASES[1]; // Deload
-  if (week <= 7) return PHASES[2];
-  if (week === 8) return PHASES[3]; // Deload
-  if (week <= 11) return PHASES[4];
+  const w = ((week - 1) % 12) + 1; // map any week into the 1-12 cycle
+  if (w <= 3) return PHASES[0];
+  if (w === 4) return PHASES[1]; // Deload
+  if (w <= 7) return PHASES[2];
+  if (w === 8) return PHASES[3]; // Deload
+  if (w <= 11) return PHASES[4];
   return PHASES[5]; // Deload/Review
 }
 
 /** Check if a given week is a deload week */
 export function isDeloadWeek(week) {
-  return week === 4 || week === 8 || week === 12;
+  const w = ((week - 1) % 12) + 1;
+  return w === 4 || w === 8 || w === 12;
 }
 
 export function getRank(level) {

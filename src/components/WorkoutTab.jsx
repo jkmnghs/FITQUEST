@@ -524,7 +524,9 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
           onConfirm={() => {
             setShowFinishConfirm(false);
             const sessionsNeeded = state.sessionsPerWeek || 3;
-            const isLastSession = state.currentWeek === 12 && (state.weekProgress?.[12]?.count || 0) >= sessionsNeeded - 1;
+            const cycleWeek = ((state.currentWeek - 1) % 12) + 1;
+            const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
+            const isLastSession = cycleWeek === 12 && weekSessions >= sessionsNeeded - 1;
             onFinishSession();
             if (isLastSession) setTimeout(() => setShowProgramComplete(true), 2000);
           }}
@@ -761,6 +763,7 @@ function FinishArea({ state, exercises, onFinish }) {
 }
 
 function ProgramCompleteModal({ state, onClose }) {
+  const cycle = Math.floor((state.currentWeek - 1) / 12) + 1;
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9998,
@@ -775,10 +778,10 @@ function ProgramCompleteModal({ state, onClose }) {
       }}>
         <div style={{ fontSize: 52, marginBottom: 12 }}>🏆</div>
         <div style={{ fontFamily: 'Orbitron', fontSize: 18, fontWeight: 900, color: 'var(--cyan)', marginBottom: 8, letterSpacing: 1 }}>
-          PROGRAM COMPLETE
+          CYCLE {cycle} COMPLETE
         </div>
         <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.7 }}>
-          You finished the full 12-week body recomposition program. That's{' '}
+          You finished 12 weeks — Week {state.currentWeek} complete. That's{' '}
           <strong style={{ color: 'var(--text)' }}>{state.totalSessions} sessions</strong>,{' '}
           <strong style={{ color: 'var(--text)' }}>{state.perfectWeeks} perfect weeks</strong>, and{' '}
           <strong style={{ color: 'var(--text)' }}>{state.totalXp} XP</strong> earned.

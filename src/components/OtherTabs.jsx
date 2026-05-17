@@ -370,7 +370,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
             <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
-              {Array.from({ length: 12 }, (_, i) => (
+              {Array.from({ length: state.currentWeek }, (_, i) => (
                 <option key={i + 1} value={i + 1}>Week {i + 1}</option>
               ))}
             </select>
