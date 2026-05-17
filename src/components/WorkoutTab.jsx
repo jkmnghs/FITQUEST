@@ -224,28 +224,33 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
         </div>
       </div>
 
-      {/* Week map (12 pips) */}
-      <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap', padding: '0 10px' }}>
-        {Array.from({ length: 12 }, (_, i) => {
-          const wn = i + 1;
-          const wkp = weekProgress?.[wn];
-          let bg = 'rgba(255,255,255,0.02)', border = 'rgba(255,255,255,0.06)', color = 'var(--text3)';
-          if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--green)'; }
-          if (wkp?.count > 0 && !wkp?.completed) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--gold)'; }
-          if (wn === state.currentWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.3)'; color = 'var(--cyan)'; }
-          const isViewing = wn === viewingWeek && wn !== state.currentWeek;
-          return (
-            <div key={wn} onClick={() => jumpToWeek(wn)} style={{
-              width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
-              background: bg, border: `1px solid ${border}`, color,
-              boxShadow: isViewing ? '0 0 0 2px var(--purple)' : 'none',
-              transition: 'all 0.2s'
-            }}>{wn}</div>
-          );
-        })}
-      </div>
+      {/* Week map — 12 pips for the current cycle */}
+      {(() => {
+        const cycleStart = Math.floor((state.currentWeek - 1) / 12) * 12 + 1;
+        return (
+          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap', padding: '0 10px' }}>
+            {Array.from({ length: 12 }, (_, i) => {
+              const wn = cycleStart + i;
+              const wkp = weekProgress?.[wn];
+              let bg = 'rgba(255,255,255,0.02)', border = 'rgba(255,255,255,0.06)', color = 'var(--text3)';
+              if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--green)'; }
+              if (wkp?.count > 0 && !wkp?.completed) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--gold)'; }
+              if (wn === state.currentWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.3)'; color = 'var(--cyan)'; }
+              const isViewing = wn === viewingWeek && wn !== state.currentWeek;
+              return (
+                <div key={wn} onClick={() => jumpToWeek(wn)} style={{
+                  width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
+                  background: bg, border: `1px solid ${border}`, color,
+                  boxShadow: isViewing ? '0 0 0 2px var(--purple)' : 'none',
+                  transition: 'all 0.2s'
+                }}>{i + 1}</div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Session timer */}
       {state.sessionStartTime && !state.todaySessionFinished && isCurrentWeek && (
