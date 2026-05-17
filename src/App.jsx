@@ -316,7 +316,15 @@ export default function App() {
               <ProgramCompleteModal
                 state={state}
                 onClose={() => setShowCycleComplete(false)}
-                onChangeProgram={(id) => { changeProgram(id); setShowCycleComplete(false); }}
+                onContinue={() => {
+                  updateSetting('currentWeek', state.currentWeek + 1);
+                  setShowCycleComplete(false);
+                }}
+                onChangeProgram={(id) => {
+                  changeProgram(id);
+                  updateSetting('currentWeek', state.currentWeek + 1);
+                  setShowCycleComplete(false);
+                }}
               />,
               document.body
             )}

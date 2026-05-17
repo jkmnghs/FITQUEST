@@ -207,31 +207,6 @@ function CheckinSection({ state, onSubmitCheckin }) {
     marginBottom: 'var(--space-6)',
   };
 
-  if (!isSunday && !thisWeekCheckin) {
-    // Not Sunday, no check-in yet
-    return (
-      <div style={sectionStyle}>
-        <div style={{
-          padding: 'var(--space-4)',
-          background: 'var(--color-surface-1)',
-          border: '1px solid var(--color-border-subtle)',
-          borderRadius: 'var(--radius-lg)',
-          display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-        }}>
-          <Calendar size={24} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-          <div>
-            <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-              Next check-in: Sunday
-            </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 2 }}>
-              {daysUntilSunday === 1 ? 'Tomorrow' : `In ${daysUntilSunday} days`} · Keep training!
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={sectionStyle}>
       <CheckinTab state={state} onSubmit={onSubmitCheckin} />

@@ -676,15 +676,20 @@ export function useGameState(user) {
   const submitCheckin = useCallback((weight, waist, sleep) => {
     setState(prev => {
       const entry = { week: prev.currentWeek, weight, waist: waist || 0, sleep: sleep || 0, date: today() };
+      const isUpdate = prev.weeklyCheckins.some(c => c.week === prev.currentWeek);
       const logEntry = {
         name: `Week ${prev.currentWeek} Check-in: ${weight} ${prev.unit}`,
-        xp: 25, date: today(), type: 'checkin',
+        xp: isUpdate ? 0 : 25, date: today(), type: 'checkin',
         dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       };
       return {
         ...prev,
-        checkins: prev.checkins + 1,
-        weeklyCheckins: [...prev.weeklyCheckins, entry],
+        checkins: isUpdate ? prev.checkins : prev.checkins + 1,
+        // Replace any existing entry for this week rather than appending
+        weeklyCheckins: [
+          ...prev.weeklyCheckins.filter(c => c.week !== prev.currentWeek),
+          entry,
+        ],
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });

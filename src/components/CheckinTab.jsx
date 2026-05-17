@@ -70,82 +70,63 @@ export default function CheckinTab({ state, onSubmit }) {
 
   return (
     <div>
-      <SectionTitle>Weekly Check-in (Sunday)</SectionTitle>
+      <SectionTitle>Weekly Check-in</SectionTitle>
 
-      {/* Check-in form */}
-      {isSunday ? (
+      {/* Check-in form — available any day */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--card-border)',
+        borderRadius: 14, padding: 16, marginBottom: 12, backdropFilter: 'blur(20px)'
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weekly Measurements</div>
         <div style={{
-          background: 'var(--card)', border: '1px solid var(--card-border)',
-          borderRadius: 14, padding: 16, marginBottom: 12, backdropFilter: 'blur(20px)'
+          fontSize: 12, color: isSunday ? 'var(--green)' : 'var(--text3)',
+          marginBottom: 12, fontWeight: 600
         }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weekly Measurements</div>
-          <div style={{
-            fontSize: 12, color: 'var(--green)', marginBottom: 12, fontWeight: 600
-          }}>✓ It's Sunday — check-in day!</div>
-
-          {submitted ? (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>
-                CHECK-IN SAVED! +25 XP
-              </div>
-            </div>
-          ) : (
-            <>
-              <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
-                placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
-              <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
-                placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
-              <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
-                placeholder="Optional" unit="hrs/night" inputMode="decimal" step="0.5" min="0" max="24" />
-              {error && (
-                <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
-                  ⚠ {error}
-                </div>
-              )}
-              {showOverwrite && !error && (
-                <div style={{
-                  fontSize: 12, color: 'var(--gold)', marginTop: 4, marginBottom: 4,
-                  padding: '8px 10px', borderRadius: 8,
-                  background: 'rgba(255,214,0,0.07)', border: '1px solid rgba(255,214,0,0.2)'
-                }}>
-                  ⚠ Already checked in Week {thisWeekCheckin.week} ({thisWeekCheckin.weight} {state.unit}). Tap again to overwrite.
-                </div>
-              )}
-              <button onClick={handleSubmit} style={{
-                width: '100%', padding: 12, border: 'none', borderRadius: 12,
-                background: showOverwrite
-                  ? 'linear-gradient(135deg, var(--fire), var(--fire2))'
-                  : 'linear-gradient(135deg, var(--purple2), var(--purple))',
-                fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
-                color: '#fff', letterSpacing: 0.5, marginTop: 6, cursor: 'pointer'
-              }}>
-                {showOverwrite ? 'OVERWRITE CHECK-IN' : 'SAVE CHECK-IN (+25 XP)'}
-              </button>
-            </>
-          )}
+          {isSunday ? '✓ It\'s Sunday — check-in day!' : `Today is ${dayName} · Sunday is the recommended check-in day`}
         </div>
-      ) : (
-        <div style={{
-          background: 'var(--card)', border: '1px solid var(--card-border)',
-          borderRadius: 14, padding: '24px 16px', marginBottom: 12,
-          textAlign: 'center', backdropFilter: 'blur(20px)'
-        }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>📅</div>
-          <div style={{
-            fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
-            color: 'var(--text)', marginBottom: 6
-          }}>CHECK-IN DAY: SUNDAY</div>
-          <div style={{ fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
-            Today is {dayName}. Come back Sunday morning to log your weight, waist, and sleep.
+
+        {submitted ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>
+              CHECK-IN SAVED! {thisWeekCheckin ? 'UPDATED' : '+25 XP'}
+            </div>
           </div>
-          {lastCheckin && (
-            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text2)' }}>
-              Last check-in: {lastCheckin.weight} {state.unit} (Week {lastCheckin.week})
-            </div>
-          )}
-        </div>
-      )}
+        ) : (
+          <>
+            <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
+              placeholder="70.4" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
+            <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
+              placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
+            <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
+              placeholder="Optional" unit="hrs/night" inputMode="decimal" step="0.5" min="0" max="24" />
+            {error && (
+              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
+                ⚠ {error}
+              </div>
+            )}
+            {showOverwrite && !error && (
+              <div style={{
+                fontSize: 12, color: 'var(--gold)', marginTop: 4, marginBottom: 4,
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(255,214,0,0.07)', border: '1px solid rgba(255,214,0,0.2)'
+              }}>
+                ⚠ Already checked in Week {thisWeekCheckin.week} ({thisWeekCheckin.weight} {state.unit}). Tap again to overwrite.
+              </div>
+            )}
+            <button onClick={handleSubmit} style={{
+              width: '100%', padding: 12, border: 'none', borderRadius: 12,
+              background: showOverwrite
+                ? 'linear-gradient(135deg, var(--fire), var(--fire2))'
+                : 'linear-gradient(135deg, var(--purple2), var(--purple))',
+              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+              color: '#fff', letterSpacing: 0.5, marginTop: 6, cursor: 'pointer'
+            }}>
+              {showOverwrite ? 'OVERWRITE CHECK-IN' : thisWeekCheckin ? 'UPDATE CHECK-IN' : 'SAVE CHECK-IN (+25 XP)'}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Checklist */}
       <SectionTitle>Weekly Success Checklist</SectionTitle>

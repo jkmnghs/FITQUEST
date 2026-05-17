@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { PROGRAMS } from '../data/programs';
 
-export default function ProgramCompleteModal({ state, onClose, onChangeProgram }) {
+// onContinue: called when user picks "continue same program" — lets the caller advance the week.
+// Falls back to onClose if not provided (WorkoutTab already advances week via finishSession).
+export default function ProgramCompleteModal({ state, onClose, onContinue, onChangeProgram }) {
+  const handleContinue = onContinue || onClose;
   const [picking, setPicking] = useState(false);
   const cycle = Math.floor((state.currentWeek - 1) / 12) + 1;
   const currentProgramId = state.programId || state.assessment?.programId;
@@ -46,7 +49,7 @@ export default function ProgramCompleteModal({ state, onClose, onChangeProgram }
             <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
               What do you want for the next 12 weeks?
             </div>
-            <button onClick={onClose} style={{
+            <button onClick={handleContinue} style={{
               width: '100%', padding: 13, border: 'none', borderRadius: 12, marginBottom: 10,
               background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
               fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
