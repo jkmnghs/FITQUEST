@@ -228,6 +228,8 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [editingGram, setEditingGram] = useState(null); // { idx, value }
+  const [editingName, setEditingName] = useState(null); // { idx, value }
+  const [correctingIdx, setCorrectingIdx] = useState(null); // idx being re-queried
   const [editingMacro, setEditingMacro] = useState(null); // { idx, field, value }
   const [swipedIdx, setSwipedIdx] = useState(null); // index of food card swiped open (mobile)
   const [dotMenuOpenIdx, setDotMenuOpenIdx] = useState(null); // index of ⋯ menu open (desktop)
@@ -386,12 +388,13 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
 
       // Sanitize and normalise field names (new format uses weight_g / protein_g / etc.)
       parsed = items.map(f => ({
-        name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : 'Unknown food',
-        grams:    Number(f.weight_g ?? f.grams)   > 0  ? Number(f.weight_g ?? f.grams)   : 100,
-        calories: Number(f.calories)              >= 0 ? Number(f.calories)               : 0,
-        protein:  Number(f.protein_g ?? f.protein) >= 0 ? Number(f.protein_g ?? f.protein) : 0,
-        carbs:    Number(f.carbs_g   ?? f.carbs)   >= 0 ? Number(f.carbs_g   ?? f.carbs)   : 0,
-        fat:      Number(f.fat_g     ?? f.fat)     >= 0 ? Number(f.fat_g     ?? f.fat)     : 0,
+        name:          typeof f.name === 'string' && f.name.trim() ? f.name.trim() : 'Unknown food',
+        cookingMethod: typeof f.cooking_method === 'string' ? f.cooking_method.trim() : '',
+        grams:         Number(f.weight_g ?? f.grams)    > 0  ? Number(f.weight_g ?? f.grams)    : 100,
+        calories:      Number(f.calories)               >= 0 ? Number(f.calories)                : 0,
+        protein:       Number(f.protein_g ?? f.protein) >= 0 ? Number(f.protein_g ?? f.protein)  : 0,
+        carbs:         Number(f.carbs_g   ?? f.carbs)   >= 0 ? Number(f.carbs_g   ?? f.carbs)    : 0,
+        fat:           Number(f.fat_g     ?? f.fat)     >= 0 ? Number(f.fat_g     ?? f.fat)      : 0,
       }));
 
       // Enrich Claude's macro estimates with USDA verified data in parallel
@@ -565,6 +568,68 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
       return updated;
     }));
     setEditingMacro(null);
+  }
+
+  async function correctItem(idx, query) {
+    if (!query.trim()) return;
+    setEditingName(null);
+    setCorrectingIdx(idx);
+    try {
+      const usdaPer100g = await searchUSDA(query);
+      const claudeRes = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 256,
+          messages: [{
+            role: 'user',
+            content: usdaPer100g
+              ? `Estimate a realistic single-serving gram weight for: "${query}". Return ONLY JSON: {"name":"<food name>","grams":<number>}`
+              : `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Be accurate for the described cooking method.`,
+          }],
+        }),
+      });
+      if (!claudeRes.ok) throw new Error();
+      const claudeData = await claudeRes.json();
+      const text = claudeData.content[0].text.trim();
+      let c = {};
+      try { c = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) c = JSON.parse(m[0]); }
+      const grams = Number(c.grams) > 0 ? Number(c.grams) : foods[idx]?.grams ?? 100;
+
+      let result;
+      if (usdaPer100g) {
+        const m = grams / 100;
+        const usdaResult = {
+          calories: Math.round(usdaPer100g.calories * m),
+          protein:  Math.round(usdaPer100g.protein  * m * 10) / 10,
+          carbs:    Math.round(usdaPer100g.carbs     * m * 10) / 10,
+          fat:      Math.round(usdaPer100g.fat       * m * 10) / 10,
+        };
+        result = validateUSDAMacros(usdaResult, grams) ? usdaResult : null;
+      }
+      if (!result) {
+        result = {
+          calories: Math.max(0, Number(c.calories) || 0),
+          protein:  Math.max(0, Number(c.protein)  || 0),
+          carbs:    Math.max(0, Number(c.carbs)     || 0),
+          fat:      Math.max(0, Number(c.fat)       || 0),
+        };
+      }
+      setFoods(prev => prev.map((f, i) => i !== idx ? f : {
+        ...f,
+        name:          c.name || query,
+        cookingMethod: '',
+        grams,
+        ...result,
+        customGrams: null,
+        portion: 'M',
+      }));
+    } catch {
+      // silently keep existing item if re-query fails
+    } finally {
+      setCorrectingIdx(null);
+    }
   }
 
   function handleLogMeal() {
@@ -887,10 +952,72 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
                   {/* Name row + S/M/L */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div style={{ flex: 1, paddingRight: 10 }}>
-                      <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
-                        {food.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {/* Food name — editable on correction */}
+                      {editingName?.idx === idx ? (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input
+                            autoFocus
+                            value={editingName.value}
+                            onChange={e => setEditingName({ idx, value: e.target.value })}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') correctItem(idx, editingName.value);
+                              if (e.key === 'Escape') setEditingName(null);
+                            }}
+                            style={{
+                              flex: 1, background: 'rgba(0,229,255,0.07)',
+                              border: '1px solid var(--cyan)', borderRadius: 7,
+                              color: 'var(--text1)', fontFamily: 'Rajdhani',
+                              fontSize: 14, fontWeight: 600, padding: '4px 8px', outline: 'none',
+                            }}
+                          />
+                          <button
+                            onClick={() => correctItem(idx, editingName.value)}
+                            style={{
+                              padding: '4px 10px', borderRadius: 7, border: 'none',
+                              background: 'var(--cyan)', color: 'var(--bg)',
+                              fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                            }}
+                          >OK</button>
+                          <button
+                            onClick={() => setEditingName(null)}
+                            style={{
+                              padding: '4px 8px', borderRadius: 7, border: 'none',
+                              background: 'rgba(255,255,255,0.08)', color: 'var(--text3)',
+                              fontSize: 13, cursor: 'pointer',
+                            }}
+                          >✕</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
+                            {correctingIdx === idx ? `${food.name}…` : food.name}
+                          </span>
+                          {correctingIdx !== idx && (
+                            <button
+                              onClick={() => setEditingName({ idx, value: food.name })}
+                              title="Correct this item"
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: 'var(--text3)', fontSize: 13, padding: '0 2px', lineHeight: 1,
+                                opacity: 0.6,
+                              }}
+                            >✎</button>
+                          )}
+                        </div>
+                      )}
+                      {/* Cooking method badge */}
+                      {food.cookingMethod && !editingName && correctingIdx !== idx && (
+                        <div style={{
+                          display: 'inline-block', marginTop: 4,
+                          fontSize: 10, color: 'var(--text3)',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: 20, padding: '2px 8px',
+                        }}>
+                          {food.cookingMethod}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                         {editingGram?.idx === idx ? (
                           <input
                             type="number"
@@ -920,8 +1047,13 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
                             }}
                           >{adj.grams}g</span>
                         )}
-                        <span>&middot; {adj.calories} kcal</span>
+                        <span>&middot; {correctingIdx === idx ? '…' : `${adj.calories} kcal`}</span>
                       </div>
+                      {correctingIdx === idx && (
+                        <div style={{ fontSize: 9, color: 'var(--cyan)', fontFamily: 'Orbitron', letterSpacing: 1, marginTop: 2 }}>
+                          RECALCULATING...
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 5, flexShrink: 0, alignItems: 'center' }}>
                       {['S', 'M', 'L'].map(p => {
@@ -989,7 +1121,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
                   </div>
 
                   {/* Macros — tap any value to correct it */}
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, opacity: correctingIdx === idx ? 0.4 : 1, transition: 'opacity 0.2s' }}>
                     {[
                       { label: 'Protein', field: 'protein', value: adj.protein, color: 'var(--cyan)' },
                       { label: 'Carbs',   field: 'carbs',   value: adj.carbs,   color: 'var(--gold)' },
