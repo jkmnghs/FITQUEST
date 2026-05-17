@@ -178,6 +178,9 @@ export function useGameState(user) {
           merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
           merged.level = Math.max(cloudData.level || 1, localData.level || 1);
           merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
+          // Week and checkin count should never regress — take the higher value
+          merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
+          merged.checkins = Math.max(cloudData.checkins || 0, localData.checkins || 0);
           // Union achievements
           merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
           // Union check-ins by week — local wins for any given week (most recent edit)
@@ -201,6 +204,12 @@ export function useGameState(user) {
         } else {
           // Cloud wins over localStorage
           const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
+          // If local has a higher week (e.g., claimed reward locally before cloud save landed),
+          // keep the higher value so the week never regresses on reload.
+          const localForWeek = storageGet();
+          if (localForWeek && (localForWeek.currentWeek || 1) > (merged.currentWeek || 1)) {
+            merged.currentWeek = localForWeek.currentWeek;
+          }
           // Populate name from Supabase auth metadata if not already set
           if (!merged.name && user?.user_metadata?.full_name) {
             merged.name = user.user_metadata.full_name;
