@@ -108,7 +108,7 @@ export const stateSchema = z.object({
   streak: z.number().int().nonnegative(),
   bestStreak: z.number().int().nonnegative(),
   lastDate: z.string().nullable(),
-  currentWeek: z.number().int().min(1).max(52),
+  currentWeek: z.number().int().min(1).max(999),
   unit: z.enum(['kg', 'lbs']),
   totalSessions: z.number().int().nonnegative(),
   totalVolume: z.number().nonnegative(),
@@ -173,6 +173,7 @@ export function repairState(state) {
   if (repaired.streak == null || repaired.streak < 0) repaired.streak = 0;
   if (repaired.bestStreak == null || repaired.bestStreak < 0) repaired.bestStreak = 0;
   if (repaired.currentWeek == null || repaired.currentWeek < 1) repaired.currentWeek = 1;
+  if (repaired.currentWeek > 999) repaired.currentWeek = 999;
   if (!repaired.unit) repaired.unit = 'kg';
   if (repaired.totalSessions == null) repaired.totalSessions = 0;
   if (repaired.totalVolume == null) repaired.totalVolume = 0;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced } from '../utils/storage';
+import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
@@ -70,6 +70,20 @@ function pruneOldEntries(arr, dateKey = 'date') {
   return (arr || []).filter(e => new Date(e[dateKey]) >= cutoff);
 }
 
+function unionArrays(arr1, arr2, keyFn) {
+  const map = new Map();
+  (arr1 || []).forEach(item => {
+    const k = keyFn(item);
+    if (k !== undefined) map.set(k, item);
+  });
+  (arr2 || []).forEach(item => {
+    const k = keyFn(item);
+    if (k !== undefined) map.set(k, item); // arr2 (local) wins on collision
+    else map.set(Symbol(), item);
+  });
+  return [...map.values()];
+}
+
 function checkDayReset(state) {
   const t = today();
   let next = { ...state };
@@ -133,6 +147,9 @@ export function useGameState(user) {
   // ── Cloud load on mount / userId change ──────────────────────────────────
   useEffect(() => {
     if (!userId) {
+      cancelCloudDebounce();
+      setStateRaw({ ...DEFAULT_STATE });
+      storageClear();
       setCloudLoading(false);
       return;
     }
@@ -168,6 +185,13 @@ export function useGameState(user) {
           (cloudData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
           (localData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
           merged.weeklyCheckins = [...checkinMap.values()].sort((a, b) => a.week - b.week);
+          // Union other user-data arrays — both sides contribute, local wins on collision
+          merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
+          merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
+          merged.recoveryScores = unionArrays(cloudData.recoveryScores, localData.recoveryScores, r => r.date).slice(-90);
+          merged.aiCoachHistory = (localData.aiCoachHistory || []).length >= (cloudData.aiCoachHistory || []).length
+            ? (localData.aiCoachHistory || [])
+            : (cloudData.aiCoachHistory || []);
 
           if (!merged.name && user?.user_metadata?.full_name) {
             merged.name = user.user_metadata.full_name;
@@ -253,7 +277,7 @@ export function useGameState(user) {
   useEffect(() => {
     const save = () => {
       storageSet(state);
-      if (userId) cloudSet(userId, state);
+      if (userId) { cancelCloudDebounce(); cloudSet(userId, state); }
     };
     window.addEventListener('pagehide', save);
     window.addEventListener('beforeunload', save);
@@ -348,6 +372,7 @@ export function useGameState(user) {
       };
       // Immediate cloud save (not debounced) — assessment completion is critical
       if (userId) {
+        cancelCloudDebounce();
         cloudSet(userId, newState).then(() => {
           if (onSaved) onSaved();
         });
@@ -381,7 +406,7 @@ export function useGameState(user) {
         liftHistory: mergedHistory,
         assessment: { ...prev.assessment, programId: program.id },
       };
-      if (userId) cloudSet(userId, newState);
+      if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
       return newState;
     });
     showToast(`Program changed to ${program.name}`);
@@ -402,7 +427,7 @@ export function useGameState(user) {
             : { sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8 };
         const exerciseToAdd = { ...defaults, ...newEx };
         const newState = { ...prev, activeExercises: [...(prev.activeExercises || []), exerciseToAdd], liftWeights };
-        if (userId) cloudSet(userId, newState);
+        if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
         return newState;
       }
 
@@ -412,7 +437,7 @@ export function useGameState(user) {
       const updated = [...prev.activeExercises];
       updated[idx] = { ...updated[idx], id: newEx.id, name: newEx.name, isPlank: !!newEx.isPlank, isBodyweight: !!newEx.isBodyweight };
       const newState = { ...prev, activeExercises: updated, liftWeights };
-      if (userId) cloudSet(userId, newState);
+      if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
       return newState;
     });
     showToast(oldId === '__add__' ? `Added ${newEx.name}` : `Swapped to ${newEx.name}`);
@@ -423,22 +448,27 @@ export function useGameState(user) {
     setState(prev => {
       const updated = (prev.activeExercises || []).filter(e => e.id !== exId);
       const newState = { ...prev, activeExercises: updated };
-      if (userId) cloudSet(userId, newState);
+      if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
       return newState;
     });
     showToast('Exercise removed');
   }, [setState, userId, showToast]);
 
   const addAIEpisodic = useCallback((note) => {
-    setState(prev => ({
-      ...prev,
-      aiEpisodic: [...(prev.aiEpisodic || []), {
-        id: `ep_${Date.now()}`,
-        ...note,
-        createdAt: new Date().toISOString().slice(0, 10),
-      }]
-    }));
-  }, [setState]);
+    let nextState;
+    setState(prev => {
+      nextState = {
+        ...prev,
+        aiEpisodic: [...(prev.aiEpisodic || []), {
+          id: `ep_${Date.now()}`,
+          ...note,
+          createdAt: new Date().toISOString().slice(0, 10),
+        }].slice(-200),
+      };
+      return nextState;
+    });
+    setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
+  }, [setState, userId]);
 
   const completeExercise = useCallback((exId, sets) => {
     let pendingXP = 0;
@@ -706,14 +736,16 @@ export function useGameState(user) {
     });
     // Force-save immediately — don't wait for the debounced auto-save
     setTimeout(() => {
-      if (userId && nextState) cloudSet(userId, nextState);
+      if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); }
       addXP(25);
     }, 50);
   }, [setState, addXP, userId]);
 
   const updateSetting = useCallback((key, value) => {
-    setState(prev => ({ ...prev, [key]: value }));
-  }, [setState]);
+    let nextState;
+    setState(prev => { nextState = { ...prev, [key]: value }; return nextState; });
+    setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
+  }, [setState, userId]);
 
   const resetToday = useCallback(() => {
     setState(prev => ({
@@ -743,31 +775,40 @@ export function useGameState(user) {
   }, [setState]);
 
   const logMeal = useCallback((meal) => {
-    setState(prev => ({
-      ...prev,
-      mealLogs: pruneOldEntries([...(prev.mealLogs || []), meal])
-    }));
+    let nextState;
+    setState(prev => {
+      nextState = { ...prev, mealLogs: pruneOldEntries([...(prev.mealLogs || []), meal]) };
+      return nextState;
+    });
+    setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
     showToast(`Meal logged — ${meal.totals.calories} kcal ✓`);
-  }, [setState, showToast]);
+  }, [setState, showToast, userId]);
 
   const deleteMeal = useCallback((mealId) => {
-    setState(prev => ({
-      ...prev,
-      mealLogs: (prev.mealLogs || []).filter(m => m.id !== mealId)
-    }));
+    let nextState;
+    setState(prev => {
+      nextState = { ...prev, mealLogs: (prev.mealLogs || []).filter(m => m.id !== mealId) };
+      return nextState;
+    });
+    setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
     showToast('Meal deleted');
-  }, [setState, showToast]);
+  }, [setState, showToast, userId]);
 
   // ── Recovery check-in (Phase 4.4) ──
   const logRecovery = useCallback((scores) => {
-    setState(prev => ({
-      ...prev,
-      recoveryScores: [
-        ...(prev.recoveryScores || []).slice(-30), // keep last 30 entries
-        { date: new Date().toISOString().slice(0, 10), ...scores }
-      ]
-    }));
-  }, [setState]);
+    let nextState;
+    setState(prev => {
+      nextState = {
+        ...prev,
+        recoveryScores: [
+          ...(prev.recoveryScores || []).slice(-30),
+          { date: new Date().toISOString().slice(0, 10), ...scores }
+        ]
+      };
+      return nextState;
+    });
+    setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
+  }, [setState, userId]);
 
   // ── Daily habits tracking (Phase 4.5) ──
   const updateDailyHabits = useCallback((habits) => {
@@ -859,7 +900,12 @@ export function useGameState(user) {
       setTimeout(() => showToast(`Week ${week}: ${sessionCount}/${sessionsNeeded} sessions set ✓`), 0);
       return updatedState;
     });
-  }, [setStateRaw, showToast]);
+    if (userId) {
+      setTimeout(() => {
+        setStateRaw(prev => { cancelCloudDebounce(); cloudSet(userId, prev); return prev; });
+      }, 50);
+    }
+  }, [setStateRaw, showToast, userId]);
 
   const importData = useCallback((data) => {
     if (!data || typeof data !== 'object' ||
@@ -871,7 +917,7 @@ export function useGameState(user) {
     }
     const merged = checkQuestReset(checkDayReset(mergeState(data)));
     storageSet(merged);
-    if (userId) cloudSet(userId, merged);
+    if (userId) { cancelCloudDebounce(); cloudSet(userId, merged); }
     backfillApplied.current = {};
     setStateRaw(merged);
     showToast('Progress restored from backup! ✓');

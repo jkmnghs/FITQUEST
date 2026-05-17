@@ -82,3 +82,8 @@ export function cloudSetDebounced(userId, state) {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => cloudSet(userId, state), 3000);
 }
+
+export function cancelCloudDebounce() {
+  clearTimeout(_syncTimer);
+  _syncTimer = null;
+}
