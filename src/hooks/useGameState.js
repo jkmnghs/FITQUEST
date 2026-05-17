@@ -136,6 +136,9 @@ export function useGameState(user) {
   const [cloudLoading, setCloudLoading] = useState(!!userId);
 
   const isFinishingSession = useRef(false);
+  // Track previous userId so we can distinguish sign-out (value→null)
+  // from cold start (null→null). Only reset state on an actual sign-out.
+  const prevUserIdRef = useRef(userId);
 
   // Ref-based synchronous lock for backfill
   const backfillApplied = useRef((() => {
@@ -146,10 +149,18 @@ export function useGameState(user) {
 
   // ── Cloud load on mount / userId change ──────────────────────────────────
   useEffect(() => {
+    const prevUserId = prevUserIdRef.current;
+    prevUserIdRef.current = userId;
+
     if (!userId) {
-      cancelCloudDebounce();
-      setStateRaw({ ...DEFAULT_STATE });
-      storageClear();
+      // Only wipe state when the user explicitly signed out (had an ID before).
+      // On cold start userId is null while auth is still resolving — don't clear
+      // localStorage or reset state in that case or onboarding will flash.
+      if (prevUserId) {
+        cancelCloudDebounce();
+        setStateRaw({ ...DEFAULT_STATE });
+        storageClear();
+      }
       setCloudLoading(false);
       return;
     }
