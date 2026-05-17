@@ -237,7 +237,7 @@ export default function ProgressTab({ state, onSubmitCheckin }) {
 
       {/* Check-in */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
-        <SectionHeader icon={ClipboardCheck} title="Weekly Check-in" />
+        <SectionHeader icon={ClipboardCheck} title={`Week ${state.currentWeek} Check-in`} />
         <CheckinSection state={state} onSubmitCheckin={onSubmitCheckin} />
       </div>
 

@@ -10,9 +10,15 @@ const CHECKLIST_ITEMS = [
 ];
 
 export default function CheckinTab({ state, onSubmit }) {
-  const [weight, setWeight] = useState('');
-  const [waist, setWaist] = useState('');
-  const [sleep, setSleep] = useState('');
+  const lastCheckin = state.weeklyCheckins?.length > 0
+    ? [...state.weeklyCheckins].sort((a, b) => b.week - a.week)[0]
+    : null;
+  const thisWeekCheckin = state.weeklyCheckins?.find(c => c.week === state.currentWeek);
+
+  // Pre-fill with this week's existing values, or last check-in weight as a starting point
+  const [weight, setWeight] = useState(thisWeekCheckin ? String(thisWeekCheckin.weight) : (lastCheckin ? String(lastCheckin.weight) : ''));
+  const [waist, setWaist] = useState(thisWeekCheckin?.waist > 0 ? String(thisWeekCheckin.waist) : '');
+  const [sleep, setSleep] = useState(thisWeekCheckin?.sleep > 0 ? String(thisWeekCheckin.sleep) : '');
   const [checked, setChecked] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
@@ -21,10 +27,6 @@ export default function CheckinTab({ state, onSubmit }) {
   const dayIdx = new Date().getDay();
   const isSunday = dayIdx === 0;
   const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayIdx];
-  const lastCheckin = state.weeklyCheckins?.length > 0
-    ? state.weeklyCheckins[state.weeklyCheckins.length - 1]
-    : null;
-  const thisWeekCheckin = state.weeklyCheckins?.find(c => c.week === state.currentWeek);
 
   function validate() {
     const wt = parseFloat(weight);
@@ -70,7 +72,7 @@ export default function CheckinTab({ state, onSubmit }) {
 
   return (
     <div>
-      <SectionTitle>Weekly Check-in</SectionTitle>
+      <SectionTitle>Week {state.currentWeek} Check-in</SectionTitle>
 
       {/* Check-in form — available any day */}
       <div style={{
@@ -95,7 +97,7 @@ export default function CheckinTab({ state, onSubmit }) {
         ) : (
           <>
             <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
-              placeholder={lastCheckin ? String(lastCheckin.weight) : '70.0'} unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
+              placeholder="e.g. 70.0" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
             <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
               placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
             <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
