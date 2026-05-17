@@ -212,7 +212,11 @@ CONSTRAINTS:
 - meal_total must equal the exact arithmetic sum of all items
 - Each item's calories must satisfy Rule 5 (±5%)
 - adjustments_applied entries must start with "Rule N:" — use [] if no rules fired
-- weight_range_g must reflect the confidence level (HIGH ±10%, MEDIUM ±20%, LOW ±30%)`;
+- weight_range_g must reflect the confidence level (HIGH ±10%, MEDIUM ±20%, LOW ±30%)
+- Keep each adjustments_applied entry under 12 words
+- Keep each flags entry under 12 words
+- Keep meal_notes under 40 words
+- Prioritise valid complete JSON over verbose descriptions`;
 
 export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs = [] }) {
   const [image, setImage] = useState(null); // { base64, preview, type }
@@ -338,7 +342,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
+          max_tokens: 4096,
           system: QUEST_NUTRITION_PROMPT,
           messages: [{
             role: 'user',
