@@ -163,6 +163,11 @@ export function useGameState(user) {
           merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
           // Union achievements
           merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
+          // Union check-ins by week — local wins for any given week (most recent edit)
+          const checkinMap = new Map();
+          (cloudData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
+          (localData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
+          merged.weeklyCheckins = [...checkinMap.values()].sort((a, b) => a.week - b.week);
 
           if (!merged.name && user?.user_metadata?.full_name) {
             merged.name = user.user_metadata.full_name;
@@ -674,6 +679,7 @@ export function useGameState(user) {
   }, [setState, addXP, showToast]);
 
   const submitCheckin = useCallback((weight, waist, sleep) => {
+    let nextState;
     setState(prev => {
       const entry = { week: prev.currentWeek, weight, waist: waist || 0, sleep: sleep || 0, date: today() };
       const isUpdate = prev.weeklyCheckins.some(c => c.week === prev.currentWeek);
@@ -685,7 +691,7 @@ export function useGameState(user) {
       // Recalculate BMI from the new weight (height stays fixed from assessment)
       const weightKg = prev.unit === 'lbs' ? weight / 2.205 : weight;
       const { bmi } = calcBMI(weightKg, prev.assessment?.heightCm);
-      return {
+      nextState = {
         ...prev,
         bmi: bmi || prev.bmi,
         checkins: isUpdate ? prev.checkins : prev.checkins + 1,
@@ -696,9 +702,14 @@ export function useGameState(user) {
         ],
         log: pruneOldEntries([...prev.log, logEntry])
       };
+      return nextState;
     });
-    setTimeout(() => addXP(25), 50);
-  }, [setState, addXP]);
+    // Force-save immediately — don't wait for the debounced auto-save
+    setTimeout(() => {
+      if (userId && nextState) cloudSet(userId, nextState);
+      addXP(25);
+    }, 50);
+  }, [setState, addXP, userId]);
 
   const updateSetting = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: value }));
