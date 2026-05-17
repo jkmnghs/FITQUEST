@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Component, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { Dumbbell, Utensils, TrendingUp, User, X, Zap } from 'lucide-react';
 import BgFx from './components/BgFx';
 import Toast from './components/Toast';
@@ -7,6 +8,7 @@ import LoginScreen from './components/LoginScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 import Onboarding from './components/Onboarding';
 import { TrainTabSkeleton, FuelTabSkeleton, ProgressTabSkeleton, ProfileTabSkeleton } from './components/Skeleton';
+import ProgramCompleteModal from './components/ProgramCompleteModal';
 import { useAuth } from './hooks/useAuth';
 import { useGameState } from './hooks/useGameState';
 import { useAgentMessages } from './hooks/useAgentMessages';
@@ -85,6 +87,7 @@ export default function App() {
   const { user, loading: authLoading, authError, signIn, signUp, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('train');
   const [modalOpen, setModalOpen] = useState(false);
+  const [showCycleComplete, setShowCycleComplete] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installDismissed, setInstallDismissed] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -301,11 +304,22 @@ export default function App() {
                       onImport={importData}
                       userEmail={user?.email}
                       onSignOut={signOut}
+                      onShowCycleComplete={() => setShowCycleComplete(true)}
                     />
                   </LazyTab>
                 )}
               </div>
             </div>
+
+            {/* Cycle complete modal — triggered from Settings when user is at week 12 of a cycle */}
+            {showCycleComplete && createPortal(
+              <ProgramCompleteModal
+                state={state}
+                onClose={() => setShowCycleComplete(false)}
+                onChangeProgram={(id) => { changeProgram(id); setShowCycleComplete(false); }}
+              />,
+              document.body
+            )}
 
             {/* Bottom tab bar — hidden when workout modal is open */}
             {!modalOpen && (
