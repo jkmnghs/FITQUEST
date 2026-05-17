@@ -238,7 +238,7 @@ function getProgramExercises(state) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete }) {
   const programExercises = getProgramExercises(state);
 
   const [backfillOpen, setBackfillOpen] = useState(false);
@@ -293,11 +293,37 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       {/* Week */}
       <SettingRow label="Current Week">
         <select value={state.currentWeek} onChange={e => onUpdate('currentWeek', parseInt(e.target.value))} style={inputStyle}>
-          {Array.from({ length: 12 }, (_, i) => (
+          {Array.from({ length: Math.max(state.currentWeek + 4, 12) }, (_, i) => (
             <option key={i + 1} value={i + 1}>Week {i + 1}</option>
           ))}
         </select>
       </SettingRow>
+
+      {/* Cycle complete claim button — visible when user is on or just past the end of a 12-week cycle */}
+      {onShowCycleComplete && (((state.currentWeek - 1) % 12) + 1 === 12) && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
+          border: '1px solid rgba(0,229,255,0.2)',
+          borderRadius: 13, padding: 14, marginBottom: 8,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyan)', marginBottom: 4 }}>
+            🏆 Cycle End Reached!
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
+            Week {state.currentWeek} is the final week of your current cycle. Claim your reward and choose your next program.
+          </div>
+          <button
+            onClick={onShowCycleComplete}
+            style={{
+              width: '100%', padding: 10, border: 'none', borderRadius: 10,
+              background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+              color: 'var(--bg)', letterSpacing: 0.5, cursor: 'pointer',
+              boxShadow: '0 4px 18px var(--cyan-glow)',
+            }}
+          >CLAIM CYCLE REWARD 🏆</button>
+        </div>
+      )}
 
       {/* Unit */}
       <SettingRow label="Unit">
