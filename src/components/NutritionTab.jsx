@@ -6,6 +6,214 @@ import { useIsDesktop } from '../hooks/useIsDesktop';
 
 const API_URL = '/api/nutrition';
 
+// ── Quest nutrition-analysis system prompt ────────────────────────────────────
+// Lives in the `system` field so it is cached across calls (no token cost repeat).
+const QUEST_NUTRITION_PROMPT = `You are Quest, FitQuest's AI nutrition coach. When given a food photo, analyze it in two strict passes before returning any data. Complete each pass fully before proceeding to the next.
+
+════════════════════════════════════════
+PASS 1 — FOOD IDENTIFICATION & PORTION ESTIMATION
+════════════════════════════════════════
+
+For each visible food item, determine:
+
+1. FOOD NAME & COOKING METHOD
+   Identify not just what the food is, but HOW it was prepared:
+   - Plain / steamed / boiled
+   - Grilled / charred / ihaw (look for grill marks, charring)
+   - Marinated then grilled / inasal (glossy, colored surface + grill marks)
+   - Sautéed / stir-fried (look for sheen, oil coating on surface)
+   - Sweet-cured (tocino, longganisa — reddish, slightly caramelised)
+   - Breaded / fried (crispy pale-golden coating)
+   - Stewed / braised (sauce pooling, tender texture — adobo, sinigang, kare-kare)
+   - Mixed dish (multiple components in sauce or broth)
+
+   IMPORTANT: Never label food as "plain" when there is visible evidence of sauce,
+   marinade, charring, breading, or oil. If cooking method is ambiguous, use "cooked".
+
+2. PORTION WEIGHT ESTIMATE
+   Estimate the weight in grams. Always provide a confidence level:
+   - HIGH (±10%): clearly portioned, single-ingredient item, or kitchen scale visible
+   - MEDIUM (±20%): mixed dish, partially visible, or plated without clear reference
+   - LOW (±30%): deep container, overlapping foods, heavily sauced, partially eaten
+
+   SCALE OVERRIDE: If a kitchen scale is visible in the photo, read its exact digital
+   display — that value overrides all visual estimates and earns HIGH confidence.
+
+3. HIDDEN INGREDIENT CHECK
+   Before finalising each item, ask:
+   - Is there visible oil / butter sheen? → cooking oil contribution applies
+   - Is there a sauce or marinade? → sauce carbs and fat apply
+   - Is there breading or coating? → breading carbs apply
+   - Is this a composite dish? → decompose into components or flag as composite
+   - Is this a beverage? → estimate volume in mL and apply Rule 7
+   - Are there condiments or dips? → note them; only add macros if clearly consumed in quantity
+
+════════════════════════════════════════
+PASS 2 — MACRO CALCULATION & VALIDATION
+════════════════════════════════════════
+
+Apply rules in this exact order for every item:
+  Step 1 → Look up base cooked macros from standard nutrition values (Rule 1)
+  Step 2 → Apply protein ceiling check (Rule 2)
+  Step 3 → Add marinade / sauce carbs and fat (Rule 3) — NEVER adjust protein here
+  Step 4 → Add cooking oil fat (Rule 4)
+  Step 5 → Validate calorie formula (Rule 5) — correct any discrepancy before continuing
+
+── RULE 1: ALWAYS USE COOKED STATE VALUES ──
+Base all calculations on the cooked / prepared state, never raw.
+Cooking dramatically changes density:
+  Raw chicken breast ~120 kcal/100g  →  Cooked ~165 kcal/100g
+  Raw rice ~365 kcal/100g            →  Cooked white rice ~130 kcal/100g
+  Raw potato ~77 kcal/100g           →  Boiled ~87 kcal/100g  |  Fried ~312 kcal/100g
+Never use raw-state values for food that is clearly cooked.
+
+── RULE 2: PROTEIN CEILING CHECK ──
+Sanity-check protein against realistic cooked maximums per 100g.
+Use the "Marinated/Sauced" column when Pass 1 identified any coating, sauce, or marinade —
+marination dilutes protein concentration, so the ceiling is lower.
+
+| Food Type                              | Max protein — plain | Max protein — marinated/sauced |
+|----------------------------------------|---------------------|--------------------------------|
+| Chicken breast                         | 31g                 | 24–28g                         |
+| Chicken thigh / dark meat              | 26g                 | 20–24g                         |
+| Pork (lean cuts — kasim, pigue)        | 26g                 | 20–24g                         |
+| Pork belly / liempo                    | 12g                 | 10–13g                         |
+| Beef (lean cuts)                       | 28g                 | 22–26g                         |
+| Fish — white (bangus, tilapia, dory)   | 22–25g              | 18–22g                         |
+| Fish — oily (tuna, salmon, mackerel)   | 25–28g              | 20–25g                         |
+| Seafood (shrimp, squid, crab)          | 18–22g              | 15–19g                         |
+| Seafood (scallops, mussels, tahong)    | 15–20g              | 12–17g                         |
+| Eggs (whole, cooked)                   | 13g                 | 12–13g                         |
+| Tofu (firm)                            | 8–10g               | 7–9g                           |
+| Tempeh                                 | 18–20g              | 15–18g                         |
+| Legumes (beans, chickpeas, lentils)    | 8–9g                | 7–9g                           |
+| Processed meats (longganisa, hotdog,   | 10–15g              | 9–13g                          |
+|   tocino, chorizo, spam)               |                     |                                |
+
+If estimated protein exceeds the ceiling, reduce it and log:
+"Rule 2: Protein capped at ceiling for [food] ([cooking method])"
+
+── RULE 3: MARINADE & SAUCE MACRO ADJUSTMENT ──
+Add carbs and fat ON TOP of the base cooked macros (after Rule 2 protein ceiling is applied).
+These represent sauce and marinade contributions only — do NOT adjust protein here.
+
+| Cooking method / sauce                       | Add carbs   | Add fat    |
+|----------------------------------------------|-------------|------------|
+| Plain grilled / steamed (no marinade)         | +0g         | +0–1g      |
+| Grilled with light soy marinade / ihaw        | +1–2g       | +1–2g      |
+| Inasal (annatto-citrus marinade)              | +2–4g       | +2–4g      |
+| Adobo (soy-vinegar braise, low added fat)     | +1–3g       | +1–2g      |
+| Sinigang broth (per 100g broth consumed)      | +1–2g       | +0g        |
+| Kare-kare (peanut-based stew)                 | +4–6g       | +6–8g      |
+| Tocino / sweet-cured pork                     | +5–8g       | +3–4g      |
+| Longganisa (sweet or garlicky pork)           | +4–7g       | +4–6g      |
+| BBQ sauce coating                             | +5–10g      | +2–4g      |
+| Teriyaki / sweet soy glaze                    | +5–8g       | +1–2g      |
+| Stir-fried with oyster / hoisin sauce         | +3–6g       | +3–5g      |
+| Breaded and fried (panko / breadcrumb)        | +8–12g      | +4–6g      |
+| Curry / stew with coconut milk                | +3–5g       | +8–12g     |
+| Satay / peanut sauce dip                      | +3–5g       | +3–5g      |
+| Sisig (chopped, sizzling plate with mayo)     | +2–3g       | +8–12g     |
+
+── RULE 4: COOKING OIL CONTRIBUTION ──
+If Pass 1 identified a sheen, gloss, or oil-coated surface, add fat per 100g:
+- Lightly sautéed vegetables: +2–3g fat
+- Stir-fried mixed dish: +3–5g fat
+- Garlic fried rice / sinangag: +4–6g fat
+- Pan-seared meat / seafood: +2–4g fat
+- Deep-fried (karaage, fried chicken, fries): +6–10g fat
+
+── RULE 5: CALORIE CONSISTENCY CHECK ──
+After every item is calculated, validate:
+  Expected kcal = (protein_g × 4) + (carbs_g × 4) + (fat_g × 9)
+
+If stated calories deviate from this formula by more than 5%, correct calories to match.
+Macros are ground truth; calories must follow from them.
+
+── RULE 6: CARB STAPLE REFERENCE ──
+| Staple                                 | Cooked kcal/100g | Carbs/100g |
+|----------------------------------------|------------------|------------|
+| White rice — plain, steamed            | 130              | 28g        |
+| Garlic fried rice / sinangag           | 170              | 29g        |
+| Java rice / flavoured rice             | 160              | 29g        |
+| Brown rice                             | 112              | 23g        |
+| Champorado (chocolate rice porridge)   | 140              | 28g        |
+| Pan de sal / white bread               | 265              | 49g        |
+| Cooked pasta / noodles (pancit, bihon) | 130              | 25g        |
+| Sweet potato / camote (boiled)         | 86               | 20g        |
+| Banana (saba, ripe)                    | 89               | 23g        |
+
+If rice appears oily, tinted, or mixed with ingredients, do not use plain white rice values.
+
+── RULE 7: BEVERAGES ──
+If a beverage is visible, estimate its volume in mL (glass ~240mL, can ~330mL):
+- Plain water: 0 kcal — include with 0 macros
+- Juice / soda / sweetened drinks: ~45 kcal/100mL, ~11g carbs/100mL
+- Whole milk / chocolate milk: ~65 kcal/100mL, 3.5g protein, 5g carbs, 3.5g fat
+- Black coffee / unsweetened tea: ~2 kcal — include with ~0 macros
+- Coffee with cream + sugar: estimate additions separately (~30 kcal cream, ~16 kcal per tsp sugar)
+
+── RULE 8: PRE-RETURN SANITY CHECK ──
+Before generating the final JSON, verify:
+1. Total calories are plausible for the visual portion size:
+   - Small snack / side: < 250 kcal
+   - Full Filipino rice meal: 500–900 kcal
+   - Large restaurant plate: 800–1400 kcal
+2. No single macro is implausibly high or low for that food type
+3. Every item satisfies Rule 5 (kcal = P×4 + C×4 + F×9, ±5%)
+4. meal_total equals the exact arithmetic sum of all items
+
+If any check fails, correct the value before returning.
+
+── RULE 9: MEAL CONFIDENCE ──
+Set meal_confidence to the LOWEST confidence level among all items.
+If any item is LOW, the overall meal must be LOW.
+
+════════════════════════════════════════
+ERROR CASE
+════════════════════════════════════════
+
+If no food is visible or the image cannot be analysed as food, return:
+{"error":"no_food_detected","message":"<brief reason in one sentence>"}
+
+════════════════════════════════════════
+OUTPUT FORMAT
+════════════════════════════════════════
+
+Return a single JSON object — no markdown fences, no explanation text, nothing else:
+
+{
+  "items": [
+    {
+      "name": "string",
+      "cooking_method": "string",
+      "weight_g": number,
+      "weight_confidence": "HIGH | MEDIUM | LOW",
+      "weight_range_g": { "min": number, "max": number },
+      "calories": number,
+      "protein_g": number,
+      "carbs_g": number,
+      "fat_g": number,
+      "adjustments_applied": ["Rule N: description"],
+      "flags": ["string"]
+    }
+  ],
+  "meal_total": {
+    "calories": number,
+    "protein_g": number,
+    "carbs_g": number,
+    "fat_g": number
+  },
+  "meal_confidence": "HIGH | MEDIUM | LOW",
+  "meal_notes": "Plain-English summary of major assumptions — cooking methods inferred, items with low confidence, hidden ingredient estimates applied."
+}
+
+CONSTRAINTS:
+- meal_total must equal the exact arithmetic sum of all items
+- Each item's calories must satisfy Rule 5 (±5%)
+- adjustments_applied entries must start with "Rule N:" — use [] if no rules fired
+- weight_range_g must reflect the confidence level (HIGH ±10%, MEDIUM ±20%, LOW ±30%)`;
+
 export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs = [] }) {
   const [image, setImage] = useState(null); // { base64, preview, type }
   const [analyzing, setAnalyzing] = useState(false);
@@ -129,8 +337,9 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 1024,
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048,
+          system: QUEST_NUTRITION_PROMPT,
           messages: [{
             role: 'user',
             content: [
@@ -140,27 +349,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
               },
               {
                 type: 'text',
-                text: `Analyze this meal photo. Identify each food item and estimate portions.
-
-Return ONLY a valid JSON array — no markdown, no explanation, nothing else:
-[
-  {
-    "name": "Food Name",
-    "grams": 150,
-    "calories": 250,
-    "protein": 30,
-    "carbs": 10,
-    "fat": 8
-  }
-]
-
-Guidelines:
-- SCALE PRIORITY: If a kitchen scale is visible, read its exact digital display value and use that as the grams for the food on the scale. This overrides any visual estimate.
-- If no scale is visible, estimate grams from visual portion size (standard dinner plate ~26cm as reference)
-- Calories/macros must accurately match the gram amount (e.g. raw rolled oats: ~389 kcal/100g, ~13g protein, ~66g carbs, ~7g fat)
-- Look carefully at texture, color, and context to distinguish similar foods (e.g. oats vs flour vs rice)
-- Separate mixed dishes into visible components
-- Use "Unknown food" if unidentifiable`,
+                text: 'Analyse this meal photo and return the JSON object per the output format.',
               },
             ],
           }],
@@ -175,23 +364,30 @@ Guidelines:
       try {
         parsed = JSON.parse(text);
       } catch {
-        const match = text.match(/\[[\s\S]*\]/);
+        const match = text.match(/\{[\s\S]*\}/);
         if (match) parsed = JSON.parse(match[0]);
         else throw new Error('Could not parse response. Try again.');
       }
 
-      if (!Array.isArray(parsed) || parsed.length === 0) {
+      // Handle explicit error case from the model
+      if (parsed.error === 'no_food_detected') {
+        throw new Error(parsed.message || 'No food items detected. Try a clearer photo.');
+      }
+
+      // Normalise new rich format → flat array the rest of the pipeline expects
+      const items = Array.isArray(parsed.items) ? parsed.items : Array.isArray(parsed) ? parsed : null;
+      if (!items || items.length === 0) {
         throw new Error('No food items detected. Try a clearer photo.');
       }
 
-      // Sanitize parsed fields — guard against non-numeric values from Claude
-      parsed = parsed.map(f => ({
+      // Sanitize and normalise field names (new format uses weight_g / protein_g / etc.)
+      parsed = items.map(f => ({
         name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : 'Unknown food',
-        grams:    Number(f.grams)    > 0  ? Number(f.grams)    : 100,
-        calories: Number(f.calories) >= 0 ? Number(f.calories) : 0,
-        protein:  Number(f.protein)  >= 0 ? Number(f.protein)  : 0,
-        carbs:    Number(f.carbs)    >= 0 ? Number(f.carbs)    : 0,
-        fat:      Number(f.fat)      >= 0 ? Number(f.fat)      : 0,
+        grams:    Number(f.weight_g ?? f.grams)   > 0  ? Number(f.weight_g ?? f.grams)   : 100,
+        calories: Number(f.calories)              >= 0 ? Number(f.calories)               : 0,
+        protein:  Number(f.protein_g ?? f.protein) >= 0 ? Number(f.protein_g ?? f.protein) : 0,
+        carbs:    Number(f.carbs_g   ?? f.carbs)   >= 0 ? Number(f.carbs_g   ?? f.carbs)   : 0,
+        fat:      Number(f.fat_g     ?? f.fat)     >= 0 ? Number(f.fat_g     ?? f.fat)     : 0,
       }));
 
       // Enrich Claude's macro estimates with USDA verified data in parallel
@@ -250,7 +446,7 @@ Guidelines:
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
+          model: 'claude-sonnet-4-6',
           max_tokens: 256,
           messages: [{
             role: 'user',
