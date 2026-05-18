@@ -52,6 +52,23 @@ export function validateUSDAMacros(usdaResult, foodGrams) {
   return true;
 }
 
+// Cross-validates USDA per-100g data against Claude's per-100g estimate.
+// Rejects USDA if any macro deviates by more than 3× from Claude's estimate.
+// This catches wrong-category USDA matches (e.g. rice flour returned for cooked rice).
+export function validateUSDAAgainstClaude(usdaPer100g, claudePer100g) {
+  const macros = ['protein', 'carbs', 'fat'];
+  for (const macro of macros) {
+    const usda = usdaPer100g[macro] ?? 0;
+    const claude = claudePer100g[macro] ?? 0;
+    const larger = Math.max(usda, claude);
+    if (larger < 3) continue;
+    const ratio = claude > 0 ? usda / claude : Infinity;
+    const invRatio = usda > 0 ? claude / usda : Infinity;
+    if (ratio > 3 || invRatio > 3) return false;
+  }
+  return true;
+}
+
 export function getAdjusted(food) {
   const m = food.customGrams != null && food.grams > 0
     ? food.customGrams / food.grams

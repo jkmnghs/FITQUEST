@@ -159,11 +159,15 @@ export default function App() {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }
 
+  const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+  const todayDayTemplate = state.dayTemplates?.[dayKey];
   const currentDayTemplate = state.activeTemplates?.[state.currentDayIndex ?? 0];
   const sharedTrainProps = {
     state,
-    exercises: currentDayTemplate?.exercises ?? state.activeExercises ?? EXERCISES,
-    currentDayName: currentDayTemplate?.name ?? null,
+    exercises: (todayDayTemplate?.exercises?.length > 0)
+      ? todayDayTemplate.exercises
+      : (currentDayTemplate?.exercises ?? state.activeExercises ?? EXERCISES),
+    currentDayName: todayDayTemplate?.title ?? currentDayTemplate?.name ?? null,
     onCompleteExercise: completeExercise,
     onFinishSession: finishSession,
     onStartSession: startSession,

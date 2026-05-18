@@ -143,6 +143,7 @@ export const DEFAULT_STATE = {
   programId: 'fullbody_3x',
   sessionsPerWeek: 3,
   activeExercises: null,       // null = use EXERCISES from gameData (backwards compat)
+  dayTemplates: null,          // { 'mon': { title, sessionMinutes, exercises[] }, ... }
   // Onboarding assessment (7-step, research-validated)
   assessment: {
     completed: false,

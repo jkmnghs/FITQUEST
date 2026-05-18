@@ -1,7 +1,8 @@
 import React from 'react';
-import { User, Trophy, Settings } from 'lucide-react';
+import { User, Trophy, Settings, Dumbbell } from 'lucide-react';
 import RankTab from './RankTab';
 import { AchievementsTab, SettingsTab } from './OtherTabs';
+import ProgramEditorTab from './ProgramEditorTab';
 
 function SectionHeader({ icon: Icon, title }) {
   return (
@@ -30,6 +31,14 @@ export default function ProfileTab({
         <SectionHeader icon={User} title="Warrior Rank" />
         <div style={{ padding: '0 var(--space-4)' }}>
           <RankTab state={state} />
+        </div>
+      </div>
+
+      {/* My Program */}
+      <div style={{ marginBottom: 'var(--space-6)' }}>
+        <SectionHeader icon={Dumbbell} title="My Program" />
+        <div style={{ padding: '0 var(--space-4)' }}>
+          <ProgramEditorTab state={state} updateSetting={onUpdate} />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { searchUSDA, validateUSDAMacros, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
+import { searchUSDA, validateUSDAMacros, validateUSDAAgainstClaude, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
+import { findFoodReference } from '../utils/foodReference';
 import DailySummaryBar from './nutrition/DailySummaryBar';
 import TodaysMealHistory from './nutrition/TodaysMealHistory';
 import { useIsDesktop } from '../hooks/useIsDesktop';
@@ -194,13 +195,34 @@ Guidelines:
         fat:      Number(f.fat)      >= 0 ? Number(f.fat)      : 0,
       }));
 
-      // Enrich Claude's macro estimates with USDA verified data in parallel
-      // Only accept USDA data if it doesn't zero-out a macro Claude already estimated
+      // 3-tier enrichment: Reference DB → USDA (cross-validated) → Claude estimate
       const enriched = await Promise.all(parsed.map(async (f) => {
-        // Pass Claude's per-100g calorie estimate so USDA picks the closest match
-        const claudeCalsPer100g = f.grams > 0 ? (f.calories / f.grams) * 100 : 0;
+        if (f.grams <= 0) return { ...f, source: 'ai' };
+
+        // Tier 1: Curated reference database
+        const ref = findFoodReference(f.name, f.cookingMethod || '');
+        if (ref) {
+          const m = f.grams / 100;
+          return {
+            ...f,
+            calories: Math.round(ref.calories * m),
+            protein:  Math.round(ref.protein  * m * 10) / 10,
+            carbs:    Math.round(ref.carbs     * m * 10) / 10,
+            fat:      Math.round(ref.fat       * m * 10) / 10,
+            source: 'reference',
+          };
+        }
+
+        // Tier 2: USDA with dual validation
+        const claudeCalsPer100g = (f.calories / f.grams) * 100;
+        const claudePer100g = {
+          calories: claudeCalsPer100g,
+          protein:  (f.protein / f.grams) * 100,
+          carbs:    (f.carbs   / f.grams) * 100,
+          fat:      (f.fat     / f.grams) * 100,
+        };
         const usda = await searchUSDA(f.name, claudeCalsPer100g);
-        if (usda && f.grams > 0) {
+        if (usda) {
           const m = f.grams / 100;
           const usdaResult = {
             calories: Math.round(usda.calories * m),
@@ -208,26 +230,29 @@ Guidelines:
             carbs: Math.round(usda.carbs * m * 10) / 10,
             fat: Math.round(usda.fat * m * 10) / 10,
           };
-          // Reject USDA if values are physically implausible or internally inconsistent,
-          // or if it zeroes out a macro that Claude already estimated as present
-          const usdaValid = validateUSDAMacros(usdaResult, f.grams);
-          const usdaZeroesClaudeMacro =
-            (f.protein > 2 && usdaResult.protein === 0) ||
-            (f.carbs   > 2 && usdaResult.carbs   === 0) ||
-            (f.fat     > 2 && usdaResult.fat      === 0);
-          if (!usdaValid || usdaZeroesClaudeMacro) return f;
-          return { ...f, ...usdaResult };
+          const physicallyValid  = validateUSDAMacros(usdaResult, f.grams);
+          const consistentClaude = validateUSDAAgainstClaude(usda, claudePer100g);
+          const noMacroWipeout   =
+            !(f.protein > 2 && usdaResult.protein === 0) &&
+            !(f.carbs   > 2 && usdaResult.carbs   === 0) &&
+            !(f.fat     > 2 && usdaResult.fat      === 0);
+          if (physicallyValid && consistentClaude && noMacroWipeout) {
+            return { ...f, ...usdaResult, source: 'usda' };
+          }
         }
-        return f;
+
+        // Tier 3: Claude's estimate
+        return { ...f, source: 'ai' };
       }));
 
       setFoods(enriched.map(f => ({
-        name: f.name || 'Unknown',
-        grams: Number(f.grams) || 0,
+        name:     f.name || 'Unknown',
+        grams:    Number(f.grams)    || 0,
         calories: Number(f.calories) || 0,
-        protein: Number(f.protein) || 0,
-        carbs: Number(f.carbs) || 0,
-        fat: Number(f.fat) || 0,
+        protein:  Number(f.protein)  || 0,
+        carbs:    Number(f.carbs)    || 0,
+        fat:      Number(f.fat)      || 0,
+        source:   f.source || 'ai',
         portion: 'M',
         customGrams: null,
       })));
@@ -244,95 +269,76 @@ Guidelines:
     setAdding(true);
     setAddError(null);
     try {
-      // First get USDA data, then use it to build the Claude request
-      const usdaPer100g = await searchUSDA(query);
+      // Ask Claude for gram weight + full nutrition
       const claudeRes = await fetch(API_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
+          model: 'claude-sonnet-4-6',
           max_tokens: 256,
           messages: [{
             role: 'user',
-            content: usdaPer100g
-              ? `Estimate the gram weight for: "${query}". Return ONLY JSON: {"name":"<food name>","grams":<number>}`
-              : `Give nutritional info for: "${query}". Return ONLY a JSON array — no markdown:\n[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]\n- Realistic gram weight for the quantity described\n- Accurate macros for that gram amount`,
+            content: `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Realistic serving gram weight.`,
           }],
         }),
       });
-
       if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
       const claudeData = await claudeRes.json();
       const text = claudeData.content[0].text.trim();
+      let c = {};
+      try { c = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) c = JSON.parse(m[0]); }
 
-      if (usdaPer100g) {
-        // USDA has data — Claude just estimates grams & name
-        let parsed = {};
-        try {
-          const match = text.match(/\{[\s\S]*\}/);
-          if (match) parsed = JSON.parse(match[0]);
-        } catch {}
-        const grams = Number(parsed.grams) > 0 ? Number(parsed.grams) : 100;
+      const name  = typeof c.name === 'string' && c.name.trim() ? c.name.trim() : query;
+      const grams = Number(c.grams) > 0 ? Number(c.grams) : 100;
+      const claudePer100g = grams > 0 ? {
+        calories: ((Number(c.calories) || 0) / grams) * 100,
+        protein:  ((Number(c.protein)  || 0) / grams) * 100,
+        carbs:    ((Number(c.carbs)    || 0) / grams) * 100,
+        fat:      ((Number(c.fat)      || 0) / grams) * 100,
+      } : null;
+
+      // Tier 1: Reference database
+      const ref = findFoodReference(name, '');
+      if (ref) {
+        const m = grams / 100;
+        setFoods(prev => [...prev, {
+          name, grams,
+          calories: Math.round(ref.calories * m),
+          protein:  Math.round(ref.protein  * m * 10) / 10,
+          carbs:    Math.round(ref.carbs     * m * 10) / 10,
+          fat:      Math.round(ref.fat       * m * 10) / 10,
+          source: 'reference', portion: 'M', customGrams: null,
+        }]);
+        setAddText('');
+        return;
+      }
+
+      // Tier 2: USDA with cross-validation
+      const usdaPer100g = await searchUSDA(name, claudePer100g?.calories ?? 0);
+      if (usdaPer100g && claudePer100g) {
         const m = grams / 100;
         const usdaResult = {
           calories: Math.round(usdaPer100g.calories * m),
-          protein: Math.round(usdaPer100g.protein * m * 10) / 10,
-          carbs: Math.round(usdaPer100g.carbs * m * 10) / 10,
-          fat: Math.round(usdaPer100g.fat * m * 10) / 10,
+          protein:  Math.round(usdaPer100g.protein  * m * 10) / 10,
+          carbs:    Math.round(usdaPer100g.carbs     * m * 10) / 10,
+          fat:      Math.round(usdaPer100g.fat       * m * 10) / 10,
         };
-        // Validate USDA data before applying — same check as the image analysis path
-        if (validateUSDAMacros(usdaResult, grams)) {
-          setFoods(prev => [...prev, {
-            name: parsed.name || query,
-            grams,
-            ...usdaResult,
-            portion: 'M',
-            customGrams: null,
-          }]);
+        if (validateUSDAMacros(usdaResult, grams) && validateUSDAAgainstClaude(usdaPer100g, claudePer100g)) {
+          setFoods(prev => [...prev, { name, grams, ...usdaResult, source: 'usda', portion: 'M', customGrams: null }]);
+          setAddText('');
           return;
         }
-        // USDA failed validation — fall through to Claude's full estimate below,
-        // but we need a new request since the previous one only asked for grams
       }
 
-      // USDA not found or failed validation — ask Claude for full nutrition estimate
-      const needsFullEstimate = !usdaPer100g || true; // always re-request if we reach here
-      if (needsFullEstimate) {
-        const fullRes = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 256,
-            messages: [{
-              role: 'user',
-              content: `Give nutritional info for: "${query}". Return ONLY a JSON array — no markdown:\n[{"name":"Food Name","grams":100,"calories":150,"protein":10,"carbs":20,"fat":5}]\n- Realistic gram weight for the quantity described\n- Accurate macros for that gram amount`,
-            }],
-          }),
-        });
-        if (!fullRes.ok) throw new Error(`API error ${fullRes.status}`);
-        const fullData = await fullRes.json();
-        const fullText = fullData.content[0].text.trim();
-        let parsed;
-        try {
-          parsed = JSON.parse(fullText);
-        } catch {
-          const match = fullText.match(/\[[\s\S]*\]/);
-          if (match) parsed = JSON.parse(match[0]);
-          else throw new Error('Could not parse response.');
-        }
-        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('No items returned.');
-        setFoods(prev => [...prev, ...parsed.map(f => ({
-          name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : query,
-          grams:    Number(f.grams)    > 0  ? Number(f.grams)    : 100,
-          calories: Number(f.calories) >= 0 ? Number(f.calories) : 0,
-          protein:  Number(f.protein)  >= 0 ? Number(f.protein)  : 0,
-          carbs:    Number(f.carbs)    >= 0 ? Number(f.carbs)    : 0,
-          fat:      Number(f.fat)      >= 0 ? Number(f.fat)      : 0,
-          portion: 'M',
-          customGrams: null,
-        }))]);
-      }
+      // Tier 3: Claude's estimate
+      setFoods(prev => [...prev, {
+        name, grams,
+        calories: Math.max(0, Number(c.calories) || 0),
+        protein:  Math.max(0, Number(c.protein)  || 0),
+        carbs:    Math.max(0, Number(c.carbs)     || 0),
+        fat:      Math.max(0, Number(c.fat)       || 0),
+        source: 'ai', portion: 'M', customGrams: null,
+      }]);
       setAddText('');
     } catch (err) {
       setAddError(err.message || 'Failed to add item.');
@@ -687,8 +693,23 @@ Guidelines:
                   {/* Name row + S/M/L */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div style={{ flex: 1, paddingRight: 10 }}>
-                      <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
-                        {food.name}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
+                          {food.name}
+                        </span>
+                        {food.source && (
+                          <span style={{
+                            fontSize: 9, fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 0.5,
+                            borderRadius: 4, padding: '1px 5px',
+                            ...(food.source === 'reference'
+                              ? { color: 'var(--cyan)',   background: 'rgba(0,229,255,0.08)',  border: '1px solid rgba(0,229,255,0.3)'  }
+                              : food.source === 'usda'
+                              ? { color: '#76ff03',        background: 'rgba(118,255,3,0.07)',  border: '1px solid rgba(118,255,3,0.3)'  }
+                              : { color: 'var(--purple)', background: 'rgba(179,136,255,0.07)', border: '1px solid rgba(179,136,255,0.25)' }),
+                          }}>
+                            {food.source === 'reference' ? 'REF' : food.source === 'usda' ? 'USDA' : 'AI'}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                         {editingGram?.idx === idx ? (
