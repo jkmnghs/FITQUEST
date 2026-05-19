@@ -37,41 +37,44 @@ export function xpToLevel(targetLevel) {
   return total;
 }
 
-// ── Daily XP Cap with Diminishing Returns (Phase 2.1) ──
-const DAILY_XP_CAP = 150;
+// ── Daily XP Cap ──
+// 500 allows a competitive bodybuilder completing 7-8 exercises to earn meaningful XP
+// throughout the full session without hitting the cap mid-workout.
+const DAILY_XP_CAP = 500;
 
 export function calculateSessionXP(session, dailySessionCount) {
   const baseXP = 50;
   const setXP = (session.setsCompleted || 0) * 5;
   const raw = baseXP + setXP;
-  // Diminishing returns per session
   const multiplier = dailySessionCount === 1 ? 1.0
                    : dailySessionCount === 2 ? 0.5
-                   : 0.1;  // 3rd+ session is nearly worthless
+                   : 0.1;
   return Math.min(DAILY_XP_CAP, Math.round(raw * multiplier));
 }
 
-// ── Adherence-based XP (Phase 2.2) ──
+// ── Per-exercise adherence XP (Phase 2.2) ──
+// Intentionally small so the daily cap isn't exhausted after 2 exercises.
+// Session-level bonuses (prescribed day, RPE) are awarded in finishSession.
 export function calculateAdherenceXP(session, weeklyState, program) {
   let xp = 0;
   const reasons = [];
 
-  // Prescribed session completed
+  // Small per-exercise base for showing up on a prescribed day
   if (session.matchesPrescribedDay) {
-    xp += 40;
-    reasons.push('+40 XP: Prescribed session completed');
+    xp += 10;
+    reasons.push('+10 XP: Training day');
   }
 
-  // RPE quality (average RPE in target range 6-9)
+  // RPE quality bonus — per exercise
   if (session.avgRPE >= 6 && session.avgRPE <= 9) {
-    xp += 20;
-    reasons.push('+20 XP: Training intensity on target');
+    xp += 8;
+    reasons.push('+8 XP: Good intensity');
   }
 
-  // Progressive overload achieved on any exercise
+  // Progressive overload is per-exercise (you either beat your PR or not)
   if (session.overloadAchieved) {
-    xp += 30;
-    reasons.push('+30 XP: Progressive overload achieved!');
+    xp += 20;
+    reasons.push('+20 XP: Progressive overload!');
   }
 
   // Overtraining penalty

@@ -1,6 +1,14 @@
 import React from 'react';
 import { EXERCISES } from '../data/gameData';
+import { EX_CATALOG, lookupExName } from '../data/exerciseCatalog';
 import { convertWeight } from '../utils/gameLogic';
+
+// Combined lookup: program defaults + full catalog, keyed by id
+const ALL_EXERCISES = (() => {
+  const map = {};
+  [...EXERCISES, ...EX_CATALOG].forEach(e => { if (!map[e.id]) map[e.id] = e; });
+  return map;
+})();
 
 export default function StatsTab({ state }) {
   const { unit, overloadSuggestions, personalRecords, liftWeights, weeklyCheckins } = state;
@@ -25,7 +33,7 @@ export default function StatsTab({ state }) {
       <SleepChart checkins={weeklyCheckins || []} />
 
       <SectionTitle>Personal Records</SectionTitle>
-      <PRSection prs={personalRecords || {}} unit={unit} />
+      <PRSection prs={personalRecords || {}} unit={unit} liftWeights={liftWeights} />
 
       <SectionTitle>Lift Progression</SectionTitle>
       {EXERCISES.filter(e => !e.isPlank).map(ex => {
@@ -239,8 +247,10 @@ function WaistChart({ checkins }) {
   );
 }
 
-function PRSection({ prs, unit }) {
-  const hasPRs = Object.keys(prs).length > 0;
+function PRSection({ prs, unit, liftWeights }) {
+  // Show every exercise that has a recorded PR, across all known exercises
+  const prEntries = Object.entries(prs).filter(([, pr]) => pr?.weight > 0);
+  const hasPRs = prEntries.length > 0;
   return (
     <div style={{
       background: 'var(--card)', border: '1px solid rgba(255,214,0,0.15)',
@@ -252,23 +262,26 @@ function PRSection({ prs, unit }) {
           Complete workouts to set your first PRs!
         </div>
       ) : (
-        EXERCISES.filter(e => !e.isPlank).map(ex => {
-          const pr = prs[ex.id];
-          return (
-            <div key={ex.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)'
-            }}>
-              <div>
-                <div style={{ fontSize: 13, color: 'var(--text2)' }}>{ex.name}</div>
-                {pr && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>Week {pr.week} • {pr.date}</div>}
+        prEntries
+          .filter(([id]) => !ALL_EXERCISES[id]?.isPlank)
+          .sort((a, b) => (b[1].weight || 0) - (a[1].weight || 0))
+          .map(([exId, pr]) => {
+            const name = ALL_EXERCISES[exId]?.name || lookupExName(exId);
+            return (
+              <div key={exId} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)'
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--text2)' }}>{name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>Week {pr.week} • {pr.date}</div>
+                </div>
+                <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
+                  {convertWeight(pr.weight, unit)} {unit}
+                </div>
               </div>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: pr ? 'var(--gold)' : 'var(--text3)' }}>
-                {pr ? `${convertWeight(pr.weight, unit)} ${unit}` : '—'}
-              </div>
-            </div>
-          );
-        })
+            );
+          })
       )}
     </div>
   );

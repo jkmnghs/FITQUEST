@@ -546,9 +546,11 @@ export function useGameState(user) {
         else overloadSuggestions[exId] = 'deload';
       }
 
-      // 2-for-2 rule: track consecutive full completions
-      const ex = (prev.activeExercises || []).find(e => e.id === exId);
-      const targetReps = ex?.reps ?? 10;
+      // 2-for-2 rule: look up exercise from dayTemplates first, then activeExercises
+      const dayKey2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+      const todayTemplateEx = prev.dayTemplates?.[dayKey2]?.exercises;
+      const ex = (todayTemplateEx || prev.activeExercises || []).find(e => e.id === exId);
+      const targetReps = ex?.repMax ?? ex?.reps ?? 10;
       const allSetsHitTarget = setsCompleted >= baseSets &&
         sets.filter(s => !s.isExtra && s.done).every(s => (s.reps || 0) >= targetReps);
 
@@ -624,12 +626,30 @@ export function useGameState(user) {
       if (prev.todaySessionFinished) return prev;
       const w = prev.currentWeek;
       const isDeload = isDeloadWeek(w);
-      const exercises = prev.activeExercises || [];
+
+      // Resolve the exercises that were actually shown today
+      const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+      const todayTemplate = prev.dayTemplates?.[dayKey];
+      const exercises = (todayTemplate?.exercises?.length > 0)
+        ? todayTemplate.exercises
+        : (prev.activeExercises || []);
+
       const doneCount = (prev.todayExDone || []).length;
       const totalEx = exercises.length || 7;
       const completionPct = Math.round((doneCount / totalEx) * 100);
-      const missedCount = totalEx - doneCount;
-      const bonusXP = Math.max(10, 50 - missedCount * 8);
+      const missedCount = Math.max(0, totalEx - doneCount);
+
+      // Session-level adherence bonuses (prescribed day + overall RPE quality)
+      const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase().slice(0, 3);
+      const matchesPrescribedDay = (prev.trainingDays || []).some(d => d.toLowerCase().startsWith(todayStr));
+      const details = Object.values(prev.todayExDetails || {});
+      const rpeValues = details.map(d => d.maxRPE).filter(r => r > 0);
+      const avgSessionRPE = rpeValues.length > 0 ? rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length : 0;
+
+      let sessionBonus = Math.max(10, 50 - missedCount * 8);
+      if (matchesPrescribedDay) sessionBonus += 30;
+      if (avgSessionRPE >= 6 && avgSessionRPE <= 9) sessionBonus += 20;
+      const bonusXP = sessionBonus;
 
       // ── Overtraining check (Phase 2.4) ──
       const weekProgress = { ...prev.weekProgress };
