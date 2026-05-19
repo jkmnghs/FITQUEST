@@ -290,6 +290,17 @@ const FOOD_DB = [
   },
 ];
 
+function keywordMatches(normalized, kw) {
+  const idx = normalized.indexOf(kw);
+  if (idx === -1) return false;
+  const wordChar = /[a-z0-9]/;
+  const before = normalized[idx - 1];
+  const after = normalized[idx + kw.length];
+  if (before && wordChar.test(before)) return false;
+  if (after && wordChar.test(after)) return false;
+  return true;
+}
+
 /**
  * Returns per-100g macros from the reference database if a reliable match is found.
  * Returns null if no keyword match exists or complex cooking is detected for non-staple entries.
@@ -305,7 +316,7 @@ export function findFoodReference(foodName, cookingMethod = '') {
   for (const entry of FOOD_DB) {
     if (!entry.staple && isComplex) continue;
     for (const kw of entry.keywords) {
-      if (normalized.includes(kw) && kw.length > bestLen) {
+      if (keywordMatches(normalized, kw) && kw.length > bestLen) {
         bestMatch = entry;
         bestLen = kw.length;
       }
