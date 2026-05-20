@@ -122,7 +122,7 @@ const EXERCISE_LIBRARY = [
   },
 ];
 
-export default function WorkoutTab({ state, exercises, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise }) {
+export default function WorkoutTab({ state, exercises, currentDayName, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -197,21 +197,28 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
         background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12
       }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          {sortedTrainingDays.map((dayId, i) => {
-            const done = i < wp.count;
-            const isCur = i === wp.count && !wp.completed && isCurrentWeek;
-            return (
-              <div key={dayId} style={{
-                width: 32, height: 32, borderRadius: '50%',
-                border: `2px solid ${done ? 'var(--green)' : isCur ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
-                background: done ? 'var(--green)' : 'transparent',
-                color: done ? 'var(--bg)' : isCur ? 'var(--cyan)' : 'var(--text3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-                animation: isCur ? 'rankPulse 2s infinite' : 'none'
-              }}>{done ? '✓' : DAY_LABELS[dayId]}</div>
-            );
-          })}
+          {(() => {
+            const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+            const todayIdx = sortedTrainingDays.indexOf(todayKey);
+            const curIdx = isCurrentWeek && !wp.completed
+              ? (todayIdx >= 0 ? Math.max(wp.count, todayIdx) : wp.count)
+              : -1;
+            return sortedTrainingDays.map((dayId, i) => {
+              const done = i < wp.count;
+              const isCur = i === curIdx;
+              return (
+                <div key={dayId} style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  border: `2px solid ${done ? 'var(--green)' : isCur ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
+                  background: done ? 'var(--green)' : 'transparent',
+                  color: done ? 'var(--bg)' : isCur ? 'var(--cyan)' : 'var(--text3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                  animation: isCur ? 'rankPulse 2s infinite' : 'none'
+                }}>{done ? '✓' : DAY_LABELS[dayId]}</div>
+              );
+            });
+          })()}
         </div>
         <div>
           <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>Week {w} Sessions</div>
@@ -280,7 +287,7 @@ export default function WorkoutTab({ state, exercises, onCompleteExercise, onFin
               fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600, color: 'var(--text2)',
               letterSpacing: 1.5, textTransform: 'uppercase'
             }}>
-              Full Body Session
+              {currentDayName || "TODAY'S SESSION"}
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,

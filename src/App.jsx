@@ -143,8 +143,8 @@ export default function App() {
   if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
   if (!state.assessment?.completed) return (
     <><BgFx /><OnboardingScreen onComplete={async (a) => {
-      completeAssessment(a, fireOnboarding);
       const templates = await generateProgramFromAssessment(a);
+      completeAssessment(a, fireOnboarding);
       if (templates) updateSetting('dayTemplates', templates);
     }} /></>
   );
@@ -166,7 +166,12 @@ export default function App() {
 
   const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
   const todayDayTemplate = state.dayTemplates?.[dayKey];
-  const currentDayTemplate = state.activeTemplates?.[state.currentDayIndex ?? 0];
+  // Calendar-aware fallback: pick today's slot from activeTemplates by day name, not by index counter
+  const tdays = state.trainingDays || ['mon', 'wed', 'fri'];
+  const todayTdIdx = tdays.indexOf(dayKey);
+  const currentDayTemplate = (todayTdIdx >= 0 && state.activeTemplates?.length)
+    ? state.activeTemplates[todayTdIdx % state.activeTemplates.length]
+    : state.activeTemplates?.[state.currentDayIndex ?? 0];
   const sharedTrainProps = {
     state,
     exercises: (todayDayTemplate?.exercises?.length > 0)

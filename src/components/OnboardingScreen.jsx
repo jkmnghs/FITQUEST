@@ -244,6 +244,7 @@ const TOTAL_STEPS = 14;
 export default function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(1);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [isBuilding, setIsBuilding] = useState(false);
   const [data, setData] = useState({
     name: '',
     parqAnswers: Array(7).fill(false),
@@ -284,26 +285,62 @@ export default function OnboardingScreen({ onComplete }) {
   };
   const isAdvanced = data.level === 'intermediate' || data.level === 'advanced';
 
-  function handleNext() {
-    if (step < TOTAL_STEPS) setStep(s => s + 1);
-    else {
-      const assessment = {
-        ...data,
-        parqFlagged: data.parqAnswers.some(Boolean),
-        age: parseFloat(data.age) || null,
-        weightKg: parseFloat(data.weightKg) || null,
-        heightCm: parseFloat(data.heightCm) || null,
-        waistCm: data.waistCm ? parseFloat(data.waistCm) : null,
-        estimatedMaxes: {
-          squat: data.estimatedMaxes.squat ? parseFloat(data.estimatedMaxes.squat) : null,
-          bench: data.estimatedMaxes.bench ? parseFloat(data.estimatedMaxes.bench) : null,
-          deadlift: data.estimatedMaxes.deadlift ? parseFloat(data.estimatedMaxes.deadlift) : null,
-          ohp: data.estimatedMaxes.ohp ? parseFloat(data.estimatedMaxes.ohp) : null,
-        },
-        completed: true,
-      };
-      onComplete(assessment);
-    }
+  if (isBuilding) {
+    const STEPS = ['Analysing your profile...', 'Selecting exercises...', 'Building your schedule...', 'Personalising loads...'];
+    return (
+      <div style={{
+        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg)', padding: 32, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 36, marginBottom: 24 }}>⚡</div>
+        <div style={{
+          fontFamily: 'Orbitron', fontSize: 16, fontWeight: 700,
+          color: 'var(--cyan)', letterSpacing: 2, marginBottom: 8,
+        }}>BUILDING YOUR PROGRAM</div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 32 }}>
+          Your AI coach is generating a personalised plan…
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280 }}>
+          {STEPS.map((s, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 14px', borderRadius: 10,
+              background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.12)',
+            }}>
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%',
+                border: '2px solid var(--cyan)', flexShrink: 0,
+                animation: 'rankPulse 1.5s infinite',
+                animationDelay: `${i * 0.3}s`,
+              }} />
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  async function handleNext() {
+    if (step < TOTAL_STEPS) { setStep(s => s + 1); return; }
+    const assessment = {
+      ...data,
+      parqFlagged: data.parqAnswers.some(Boolean),
+      age: parseFloat(data.age) || null,
+      weightKg: parseFloat(data.weightKg) || null,
+      heightCm: parseFloat(data.heightCm) || null,
+      waistCm: data.waistCm ? parseFloat(data.waistCm) : null,
+      estimatedMaxes: {
+        squat: data.estimatedMaxes.squat ? parseFloat(data.estimatedMaxes.squat) : null,
+        bench: data.estimatedMaxes.bench ? parseFloat(data.estimatedMaxes.bench) : null,
+        deadlift: data.estimatedMaxes.deadlift ? parseFloat(data.estimatedMaxes.deadlift) : null,
+        ohp: data.estimatedMaxes.ohp ? parseFloat(data.estimatedMaxes.ohp) : null,
+      },
+      completed: true,
+    };
+    setIsBuilding(true);
+    await onComplete(assessment);
   }
   function handleBack() { setStep(s => Math.max(1, s - 1)); }
 

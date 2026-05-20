@@ -224,6 +224,7 @@ export default function TrainTab({
       <WorkoutTab
         state={state}
         exercises={exercises}
+        currentDayName={currentDayName}
         onCompleteExercise={onCompleteExercise}
         onFinishSession={onFinishSession}
         onStartSession={onStartSession}
