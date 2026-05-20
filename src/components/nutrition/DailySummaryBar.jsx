@@ -1,61 +1,117 @@
 import React from 'react';
 
+const MACROS = [
+  { key: 'protein', label: 'Protein', color: 'var(--color-action)',    bg: 'rgba(0,229,255,0.10)'   },
+  { key: 'carbs',   label: 'Carbs',   color: 'var(--color-premium)',   bg: 'rgba(255,214,0,0.10)'   },
+  { key: 'fat',     label: 'Fat',     color: 'var(--color-warning)',   bg: 'rgba(255,145,0,0.10)'   },
+];
+
 export default function DailySummaryBar({ dayTotals, goals, mealCount }) {
+  const calPct = goals.calories > 0
+    ? Math.min(100, (dayTotals.calories / goals.calories) * 100)
+    : 0;
+  const calOver = dayTotals.calories > goals.calories;
+
   return (
     <div style={{
-      background: 'rgba(0,229,255,0.05)',
-      border: '1px solid rgba(0,229,255,0.12)',
-      borderRadius: 12, padding: '12px 14px',
-      marginBottom: 20,
+      background: 'var(--color-surface-1)',
+      border: '1px solid var(--color-border-medium)',
+      borderRadius: 'var(--radius-lg)',
+      padding: 'var(--space-4)',
+      marginBottom: 'var(--space-4)',
     }}>
       {/* Calorie row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)', letterSpacing: 1 }}>TODAY</div>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 16, fontWeight: 700, color: 'var(--cyan)' }}>
-          {dayTotals.calories}
-          <span style={{ fontSize: 9, color: 'var(--text3)', marginLeft: 3 }}>/ {goals.calories} kcal</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-2)' }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 9,
+          color: 'var(--color-text-tertiary)', letterSpacing: '0.1em',
+        }}>TODAY</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+          <span style={{
+            fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
+            color: calOver ? 'var(--color-warning)' : 'var(--color-action)',
+          }}>
+            {dayTotals.calories}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            / {goals.calories} kcal
+          </span>
+          {mealCount > 0 && (
+            <span style={{
+              marginLeft: 6, fontSize: 10, color: 'var(--color-text-tertiary)',
+              background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)',
+              padding: '1px 7px',
+            }}>
+              {mealCount} meal{mealCount !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
       </div>
-      {/* Calorie progress bar */}
-      <div style={{ height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 3, marginBottom: 10, overflow: 'hidden' }}>
+
+      {/* Calorie bar */}
+      <div style={{
+        height: 6, background: 'var(--color-surface-3)',
+        borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-4)', overflow: 'hidden',
+      }}>
         <div style={{
-          height: '100%', borderRadius: 3,
-          width: `${Math.min(100, (dayTotals.calories / goals.calories) * 100)}%`,
-          background: dayTotals.calories > goals.calories ? 'var(--fire2)' : 'var(--cyan)',
+          height: '100%',
+          width: `${calPct}%`,
+          background: calOver
+            ? 'linear-gradient(90deg, var(--color-warning), var(--color-fire))'
+            : 'linear-gradient(90deg, var(--color-action), var(--color-accent-purple))',
+          borderRadius: 'var(--radius-full)',
           transition: 'width 0.4s ease',
+          boxShadow: calOver ? 'none' : '0 0 8px rgba(0,229,255,0.35)',
         }} />
       </div>
-      {/* Macro rows */}
-      {[
-        { label: 'PROTEIN', value: dayTotals.protein, goal: goals.protein, color: '#a78bfa' },
-        { label: 'CARBS',   value: dayTotals.carbs,   goal: goals.carbs,   color: '#34d399' },
-        { label: 'FAT',     value: dayTotals.fat,     goal: goals.fat,     color: '#fbbf24' },
-      ].map(m => {
-        const over = m.value > m.goal;
-        return (
-          <div key={m.label} style={{ marginBottom: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', letterSpacing: 1 }}>{m.label}</span>
-              <span style={{ fontFamily: 'Rajdhani', fontSize: 11, color: over ? '#ff4444' : m.color, fontWeight: 700 }}>
-                {Math.round(m.value)}g / {m.goal}g
-              </span>
-            </div>
-            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+
+      {/* Macro row */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        {MACROS.map(m => {
+          const val = dayTotals[m.key] || 0;
+          const goal = goals[m.key] || 1;
+          const pct = Math.min(100, (val / goal) * 100);
+          const over = val > goal;
+          return (
+            <div key={m.key} style={{
+              flex: 1, padding: 'var(--space-2) var(--space-3)',
+              background: m.bg, borderRadius: 'var(--radius-md)',
+              border: `1px solid ${over ? 'rgba(255,23,68,0.2)' : 'transparent'}`,
+            }}>
               <div style={{
-                height: '100%', borderRadius: 2,
-                width: `${Math.min(100, (m.value / m.goal) * 100)}%`,
-                background: over ? '#ff4444' : m.color,
-                transition: 'width 0.4s ease',
-              }} />
+                display: 'flex', justifyContent: 'space-between',
+                alignItems: 'baseline', marginBottom: 5,
+              }}>
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: 8,
+                  color: 'var(--color-text-tertiary)', letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}>{m.label}</span>
+                <span style={{
+                  fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 700,
+                  color: over ? 'var(--color-destructive)' : m.color,
+                }}>
+                  {Math.round(val)}g
+                </span>
+              </div>
+              <div style={{
+                height: 3, background: 'rgba(255,255,255,0.08)',
+                borderRadius: 'var(--radius-full)', overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%', width: `${pct}%`,
+                  background: over ? 'var(--color-destructive)' : m.color,
+                  borderRadius: 'var(--radius-full)',
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+              <div style={{
+                fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 4, textAlign: 'right',
+              }}>/ {goal}g</div>
             </div>
-          </div>
-        );
-      })}
-      {mealCount > 0 && (
-        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, textAlign: 'right' }}>
-          {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Camera, ImagePlus, ChevronRight, Info, Search, Utensils } from 'lucide-react';
 import { searchUSDA, validateUSDAMacros, validateUSDAAgainstClaude, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
 import { findFoodReference } from '../utils/foodReference';
 import DailySummaryBar from './nutrition/DailySummaryBar';
@@ -412,14 +413,27 @@ Guidelines:
   const goals = state.nutritionGoals || { calories: 2000, protein: 155, carbs: 190, fat: 60 };
 
   return (
-    <div style={{ paddingBottom: 20 }}>
+    <div className="tab-enter" style={{ padding: '0 var(--space-4)', paddingBottom: 40 }}>
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1 }}>
-          NUTRITION SCANNER
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        marginBottom: 'var(--space-4)',
+      }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 'var(--radius-md)',
+          background: 'rgba(0,229,255,0.10)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <Utensils size={22} color="var(--color-action)" />
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
-          Snap your meal — AI estimates calories &amp; macros
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
+            color: 'var(--color-text-primary)', letterSpacing: '0.05em',
+          }}>FUEL</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 1 }}>
+            AI-powered nutrition tracking
+          </div>
         </div>
       </div>
 
@@ -444,80 +458,86 @@ Guidelines:
 
       {/* Upload area or preview */}
       {!image ? (
-        <div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => fileRef.current.click()}
-              style={{
-                flex: 1, padding: '28px 12px',
-                border: '2px dashed rgba(0,229,255,0.25)',
-                borderRadius: 16, background: 'rgba(0,229,255,0.03)',
-                cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 10,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <span style={{ fontSize: 40 }}>📸</span>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--cyan)', fontWeight: 700, letterSpacing: 1 }}>
-                CAMERA
-              </div>
-            </button>
-            <button
-              onClick={() => galleryRef.current.click()}
-              style={{
-                flex: 1, padding: '28px 12px',
-                border: '2px dashed rgba(179,136,255,0.25)',
-                borderRadius: 16, background: 'rgba(179,136,255,0.03)',
-                cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 10,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <span style={{ fontSize: 40 }}>🖼️</span>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--purple)', fontWeight: 700, letterSpacing: 1 }}>
-                UPLOAD
-              </div>
-            </button>
-          </div>
-          {/* Framing tip */}
-          <div style={{
-            marginTop: 10, padding: '10px 14px',
-            border: '1px dashed rgba(0,229,255,0.18)',
-            borderRadius: 12, background: 'rgba(0,229,255,0.03)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
+        <>
+          {/* Primary action — Camera */}
+          <button
+            onClick={() => fileRef.current.click()}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
+              padding: 'var(--space-4)',
+              background: 'linear-gradient(135deg, rgba(0,229,255,0.10), rgba(179,136,255,0.06))',
+              border: '1px solid var(--color-border-accent)',
+              borderRadius: 'var(--radius-lg)',
+              cursor: 'pointer', textAlign: 'left', marginBottom: 'var(--space-2)',
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+            }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+            onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
+            onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
             <div style={{
-              width: 38, height: 38, flexShrink: 0,
-              border: '2px dashed rgba(0,229,255,0.5)',
-              borderRadius: 6, position: 'relative',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 48, height: 48, borderRadius: 'var(--radius-md)',
+              background: 'rgba(0,229,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              {/* corner marks */}
-              {[['0','0'],['0','auto'],['auto','0'],['auto','auto']].map(([t,b],i) => (
-                <div key={i} style={{
-                  position: 'absolute',
-                  top: t === '0' ? -2 : 'auto', bottom: b === 'auto' ? -2 : 'auto',
-                  left: i % 2 === 0 ? -2 : 'auto', right: i % 2 === 1 ? -2 : 'auto',
-                  width: 8, height: 8,
-                  borderTop: t === '0' ? '2px solid var(--cyan)' : 'none',
-                  borderBottom: b === 'auto' ? '2px solid var(--cyan)' : 'none',
-                  borderLeft: i % 2 === 0 ? '2px solid var(--cyan)' : 'none',
-                  borderRight: i % 2 === 1 ? '2px solid var(--cyan)' : 'none',
-                }} />
-              ))}
-              <span style={{ fontSize: 14 }}>🍽️</span>
+              <Camera size={24} color="var(--color-action)" />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
-              Fit <span style={{ color: 'var(--cyan)' }}>all food items</span> within the frame for accurate analysis. Good lighting helps too.
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
+                color: 'var(--color-action)', letterSpacing: '0.05em',
+              }}>SCAN MEAL</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                Take a photo — AI identifies food & macros
+              </div>
             </div>
+            <ChevronRight size={18} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+          </button>
+
+          {/* Secondary action — Gallery upload */}
+          <button
+            onClick={() => galleryRef.current.click()}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-border-medium)',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer', textAlign: 'left', marginBottom: 'var(--space-5)',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: 'var(--radius-sm)',
+              background: 'rgba(179,136,255,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <ImagePlus size={16} color="var(--color-accent-purple)" />
+            </div>
+            <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              Upload from gallery
+            </span>
+            <ChevronRight size={14} color="var(--color-text-tertiary)" />
+          </button>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--color-border-subtle)' }} />
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--color-text-tertiary)', letterSpacing: '0.08em' }}>
+              OR ADD MANUALLY
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--color-border-subtle)' }} />
           </div>
 
-          {/* Quick add — always visible */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 8 }}>
-              NO PHOTO? ADD MANUALLY
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+          {/* Manual text add */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search size={15} style={{
+                position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--color-text-tertiary)', pointerEvents: 'none',
+              }} />
               <input
                 type="text"
                 value={addText}
@@ -525,37 +545,52 @@ Guidelines:
                 onKeyDown={e => e.key === 'Enter' && !adding && addFoodByText()}
                 placeholder="e.g. 2 scrambled eggs"
                 style={{
-                  flex: 1, padding: '11px 14px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 10, color: 'var(--text1)',
-                  fontFamily: 'Rajdhani', fontSize: 14,
-                  outline: 'none',
+                  width: '100%', padding: '11px 14px 11px 36px',
+                  background: 'var(--color-surface-1)',
+                  border: '1px solid var(--color-border-medium)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-text-primary)',
+                  fontFamily: 'Inter, sans-serif', fontSize: 14,
+                  outline: 'none', boxSizing: 'border-box',
                 }}
               />
-              <button
-                onClick={addFoodByText}
-                disabled={adding || !addText.trim()}
-                style={{
-                  padding: '11px 16px', borderRadius: 10, border: 'none',
-                  background: adding || !addText.trim()
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,229,255,0.15)',
-                  color: adding || !addText.trim() ? 'var(--text3)' : 'var(--cyan)',
-                  fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-                  cursor: adding || !addText.trim() ? 'default' : 'pointer',
-                  flexShrink: 0,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {adding ? '...' : 'ADD'}
-              </button>
             </div>
-            {addError && (
-              <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>{addError}</div>
-            )}
+            <button
+              onClick={addFoodByText}
+              disabled={adding || !addText.trim()}
+              style={{
+                padding: '11px 18px', borderRadius: 'var(--radius-md)', border: 'none',
+                background: adding || !addText.trim()
+                  ? 'var(--color-surface-2)'
+                  : 'rgba(0,229,255,0.15)',
+                color: adding || !addText.trim() ? 'var(--color-text-tertiary)' : 'var(--color-action)',
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
+                cursor: adding || !addText.trim() ? 'default' : 'pointer',
+                flexShrink: 0, letterSpacing: '0.05em',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {adding ? '…' : 'ADD'}
+            </button>
           </div>
-        </div>
+          {addError && (
+            <div style={{ fontSize: 11, color: 'var(--color-destructive)', marginBottom: 10 }}>{addError}</div>
+          )}
+
+          {/* Tip */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)',
+            padding: 'var(--space-3) var(--space-4)',
+            background: 'var(--color-surface-1)',
+            border: '1px solid var(--color-border-subtle)',
+            borderRadius: 'var(--radius-md)',
+          }}>
+            <Info size={14} color="var(--color-text-tertiary)" style={{ flexShrink: 0, marginTop: 1 }} />
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Include a fork or your hand in the frame — it helps the AI estimate portion size more accurately.
+            </span>
+          </div>
+        </>
       ) : (
         <div style={{ position: 'relative', marginBottom: 14 }}>
           <img
@@ -602,20 +637,22 @@ Guidelines:
       {/* Loading */}
       {analyzing && (
         <div style={{
-          textAlign: 'center', padding: '28px 20px',
-          color: 'var(--cyan)', fontFamily: 'Orbitron', fontSize: 11, letterSpacing: 1,
+          textAlign: 'center', padding: '32px 20px',
+          color: 'var(--color-action)', fontFamily: 'var(--font-display)',
+          fontSize: 11, letterSpacing: '0.1em',
         }}>
-          SCANNING MEAL...
+          SCANNING MEAL…
         </div>
       )}
 
       {/* Error */}
       {error && (
         <div style={{
-          marginTop: 12, padding: 14, borderRadius: 12,
-          background: 'rgba(255,50,50,0.07)',
-          border: '1px solid rgba(255,50,50,0.2)',
-          color: 'var(--red)', fontSize: 12, lineHeight: 1.5,
+          marginTop: 'var(--space-3)', padding: 'var(--space-4)',
+          borderRadius: 'var(--radius-md)',
+          background: 'rgba(255,23,68,0.07)',
+          border: '1px solid rgba(255,23,68,0.2)',
+          color: 'var(--color-destructive)', fontSize: 12, lineHeight: 1.5,
         }}>
           {error}
         </div>
@@ -624,7 +661,10 @@ Guidelines:
       {/* Food items */}
       {foods.length > 0 && (
         <>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginTop: 20, marginBottom: 10 }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--color-text-tertiary)',
+            letterSpacing: '0.1em', marginTop: 'var(--space-5)', marginBottom: 'var(--space-3)',
+          }}>
             DETECTED FOODS — ADJUST PORTIONS
           </div>
 
@@ -869,77 +909,93 @@ Guidelines:
 
           {/* Add missing item — when image is loaded, keep field available */}
           {!logged && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 8 }}>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <div style={{
+                fontFamily: 'var(--font-display)', fontSize: 9,
+                color: 'var(--color-text-tertiary)', letterSpacing: '0.1em', marginBottom: 8,
+              }}>
                 MISSING SOMETHING?
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  value={addText}
-                  onChange={e => { setAddText(e.target.value); setAddError(null); }}
-                  onKeyDown={e => e.key === 'Enter' && !adding && addFoodByText()}
-                  placeholder="e.g. 2 scrambled eggs"
-                  style={{
-                    flex: 1, padding: '11px 14px',
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 10, color: 'var(--text1)',
-                    fontFamily: 'Rajdhani', fontSize: 14,
-                    outline: 'none',
-                  }}
-                />
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <Search size={14} style={{
+                    position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)',
+                    color: 'var(--color-text-tertiary)', pointerEvents: 'none',
+                  }} />
+                  <input
+                    type="text"
+                    value={addText}
+                    onChange={e => { setAddText(e.target.value); setAddError(null); }}
+                    onKeyDown={e => e.key === 'Enter' && !adding && addFoodByText()}
+                    placeholder="e.g. 2 scrambled eggs"
+                    style={{
+                      width: '100%', padding: '10px 12px 10px 32px',
+                      background: 'var(--color-surface-1)',
+                      border: '1px solid var(--color-border-medium)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--color-text-primary)',
+                      fontFamily: 'Inter, sans-serif', fontSize: 14,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
                 <button
                   onClick={addFoodByText}
                   disabled={adding || !addText.trim()}
                   style={{
-                    padding: '11px 16px', borderRadius: 10, border: 'none',
+                    padding: '10px 16px', borderRadius: 'var(--radius-md)', border: 'none',
                     background: adding || !addText.trim()
-                      ? 'rgba(255,255,255,0.08)'
+                      ? 'var(--color-surface-2)'
                       : 'rgba(0,229,255,0.15)',
-                    color: adding || !addText.trim() ? 'var(--text3)' : 'var(--cyan)',
-                    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                    color: adding || !addText.trim() ? 'var(--color-text-tertiary)' : 'var(--color-action)',
+                    fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
                     cursor: adding || !addText.trim() ? 'default' : 'pointer',
-                    flexShrink: 0,
+                    flexShrink: 0, letterSpacing: '0.05em',
                     WebkitTapHighlightColor: 'transparent',
                   }}
                 >
-                  {adding ? '...' : 'ADD'}
+                  {adding ? '…' : 'ADD'}
                 </button>
               </div>
               {addError && (
-                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6 }}>{addError}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-destructive)', marginTop: 6 }}>{addError}</div>
               )}
             </div>
           )}
 
           {/* Meal totals */}
           <div style={{
-            background: 'rgba(0,229,255,0.06)',
-            border: '1px solid rgba(0,229,255,0.15)',
-            borderRadius: 14, padding: '16px',
-            marginTop: 6, marginBottom: 16,
+            background: 'linear-gradient(135deg, rgba(0,229,255,0.07), rgba(179,136,255,0.04))',
+            border: '1px solid var(--color-border-accent)',
+            borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+            marginTop: 'var(--space-3)', marginBottom: 'var(--space-4)',
           }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 12 }}>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontSize: 9,
+              color: 'var(--color-action)', letterSpacing: '0.1em', marginBottom: 'var(--space-3)',
+            }}>
               MEAL TOTAL
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 26, fontWeight: 700, color: 'var(--text1)', lineHeight: 1 }}>
+                <div style={{
+                  fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 700,
+                  color: 'var(--color-text-primary)', lineHeight: 1,
+                }}>
                   {totals.calories}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>KCAL</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 3, letterSpacing: '0.05em' }}>KCAL</div>
               </div>
               {[
-                { label: 'Protein', value: totals.protein, color: 'var(--cyan)' },
-                { label: 'Carbs', value: totals.carbs, color: 'var(--gold)' },
-                { label: 'Fat', value: totals.fat, color: 'var(--fire2)' },
+                { label: 'Protein', value: totals.protein, color: 'var(--color-action)' },
+                { label: 'Carbs',   value: totals.carbs,   color: 'var(--color-premium)' },
+                { label: 'Fat',     value: totals.fat,     color: 'var(--color-warning)' },
               ].map(m => (
                 <div key={m.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: m.color, fontFamily: 'Inter, sans-serif' }}>
                     {Math.round(m.value)}g
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{m.label}</div>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{m.label}</div>
                 </div>
               ))}
             </div>
@@ -947,15 +1003,15 @@ Guidelines:
 
           {/* Action buttons */}
           {!logged ? (
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <button
                 onClick={reset}
                 style={{
                   flex: 1, padding: '13px',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 12, background: 'transparent',
-                  color: 'var(--text3)', fontFamily: 'Orbitron',
-                  fontSize: 11, cursor: 'pointer',
+                  border: '1px solid var(--color-border-medium)',
+                  borderRadius: 'var(--radius-md)', background: 'transparent',
+                  color: 'var(--color-text-secondary)', fontFamily: 'var(--font-display)',
+                  fontSize: 10, cursor: 'pointer', letterSpacing: '0.05em',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
@@ -965,10 +1021,10 @@ Guidelines:
                 onClick={handleLogMeal}
                 style={{
                   flex: 2, padding: '13px',
-                  border: 'none', borderRadius: 12,
-                  background: 'var(--cyan)',
-                  color: 'var(--bg)', fontFamily: 'Orbitron',
-                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  border: 'none', borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-action)',
+                  color: 'var(--color-bg-primary)', fontFamily: 'var(--font-display)',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.05em',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
@@ -977,22 +1033,25 @@ Guidelines:
             </div>
           ) : (
             <div style={{
-              textAlign: 'center', padding: '18px',
-              background: 'rgba(0,230,118,0.07)',
-              border: '1px solid rgba(0,230,118,0.2)',
-              borderRadius: 12,
+              textAlign: 'center', padding: 'var(--space-5)',
+              background: 'rgba(0,230,118,0.06)',
+              border: '1px solid rgba(0,230,118,0.18)',
+              borderRadius: 'var(--radius-md)',
             }}>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
+              <div style={{
+                fontFamily: 'var(--font-display)', fontSize: 12,
+                color: 'var(--color-success)', marginBottom: 'var(--space-3)',
+              }}>
                 MEAL LOGGED ✓
               </div>
               <button
                 onClick={reset}
                 style={{
-                  padding: '8px 18px',
-                  border: '1px solid rgba(0,230,118,0.3)',
-                  borderRadius: 8, background: 'transparent',
-                  color: 'var(--green)', fontFamily: 'Orbitron',
-                  fontSize: 10, cursor: 'pointer',
+                  padding: '8px 20px',
+                  border: '1px solid rgba(0,230,118,0.25)',
+                  borderRadius: 'var(--radius-sm)', background: 'transparent',
+                  color: 'var(--color-success)', fontFamily: 'var(--font-display)',
+                  fontSize: 10, cursor: 'pointer', letterSpacing: '0.05em',
                 }}
               >
                 SCAN ANOTHER
@@ -1002,22 +1061,6 @@ Guidelines:
         </>
       )}
 
-      {/* Tip when idle */}
-      {!image && (
-        <div style={{
-          marginTop: 20, padding: '14px',
-          background: 'rgba(179,136,255,0.05)',
-          border: '1px solid rgba(179,136,255,0.13)',
-          borderRadius: 12,
-        }}>
-          <div style={{ fontSize: 10, color: 'var(--purple)', fontFamily: 'Orbitron', marginBottom: 5, letterSpacing: 1 }}>
-            TIP
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
-            Place a fork or your hand next to the food for better portion accuracy.
-          </div>
-        </div>
-      )}
 
       <TodaysMealHistory todayMeals={todayMeals} onDeleteMeal={onDeleteMeal} />
     </div>
