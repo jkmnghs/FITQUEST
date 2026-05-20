@@ -40,7 +40,7 @@ export function xpToLevel(targetLevel) {
 // ── Daily XP Cap ──
 // 500 allows a competitive bodybuilder completing 7-8 exercises to earn meaningful XP
 // throughout the full session without hitting the cap mid-workout.
-const DAILY_XP_CAP = 500;
+export const DAILY_XP_CAP = 500;
 
 export function calculateSessionXP(session, dailySessionCount) {
   const baseXP = 50;

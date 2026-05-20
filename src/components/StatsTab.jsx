@@ -13,6 +13,28 @@ const ALL_EXERCISES = (() => {
 export default function StatsTab({ state }) {
   const { unit, overloadSuggestions, personalRecords, liftWeights, weeklyCheckins } = state;
 
+  // Collect all exercises to show in Lift Progression:
+  // 1. Any exercise that has a recorded liftWeight
+  // 2. Any non-bodyweight exercise in the current dayTemplates
+  const trackedIds = new Set(
+    Object.entries(liftWeights || {})
+      .filter(([, wt]) => wt > 0)
+      .map(([id]) => id)
+  );
+  Object.values(state.dayTemplates || {}).forEach(t => {
+    (t.exercises || []).forEach(e => {
+      if (!e.isBodyweight && !e.isPlank) trackedIds.add(e.id);
+    });
+  });
+  // Fall back to the 5 default exercises if nothing tracked yet
+  if (trackedIds.size === 0) {
+    EXERCISES.filter(e => !e.isPlank && !e.isBodyweight).forEach(e => trackedIds.add(e.id));
+  }
+  const liftExercises = [...trackedIds]
+    .map(id => ({ id, ...(ALL_EXERCISES[id] || {}) }))
+    .filter(e => e.name && !e.isPlank && !e.isBodyweight)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
   return (
     <div>
       <SectionTitle>Power Stats</SectionTitle>
@@ -36,13 +58,17 @@ export default function StatsTab({ state }) {
       <PRSection prs={personalRecords || {}} unit={unit} liftWeights={liftWeights} />
 
       <SectionTitle>Lift Progression</SectionTitle>
-      {EXERCISES.filter(e => !e.isPlank).map(ex => {
-        const wt = liftWeights?.[ex.id] ?? ex.startKg;
+      {liftExercises.map(ex => {
+        const wt = liftWeights?.[ex.id] ?? ex.startKg ?? 0;
         const convWt = convertWeight(wt, unit);
-        const startConv = convertWeight(ex.startKg, unit);
+        const startKg = ex.startKg ?? 0;
+        const startConv = convertWeight(startKg, unit);
         const gain = convWt - startConv;
         const sug = overloadSuggestions?.[ex.id];
         const pr = personalRecords?.[ex.id];
+        const progressPct = startKg > 0
+          ? Math.min(100, Math.max(0, ((wt - startKg) / Math.max(startKg * 0.5, 20)) * 100))
+          : (wt > 0 ? 30 : 0);
         return (
           <div key={ex.id} style={{
             background: 'var(--card)', border: '1px solid var(--card-border)',
@@ -51,14 +77,14 @@ export default function StatsTab({ state }) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{ex.name}</span>
-                {sug === 'increase' && <MiniTag color="var(--green)" bg="rgba(0,230,118,0.12)" border="rgba(0,230,118,0.2)">↑ +2.5kg</MiniTag>}
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{ex.name || lookupExName(ex.id)}</span>
+                {sug === 'increase' && <MiniTag color="var(--green)" bg="rgba(0,230,118,0.12)" border="rgba(0,230,118,0.2)">↑ +2.5</MiniTag>}
                 {sug === 'repeat'   && <MiniTag color="var(--gold)"  bg="rgba(255,214,0,0.1)"   border="rgba(255,214,0,0.2)">= REPEAT</MiniTag>}
                 {sug === 'deload'   && <MiniTag color="var(--red)"   bg="rgba(255,23,68,0.1)"   border="rgba(255,23,68,0.2)">↓ DELOAD</MiniTag>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)' }}>
-                <span style={{ fontWeight: 700 }}>{convWt} {unit}</span>
-                {gain > 0 && <span style={{ color: 'var(--green)' }}>+{gain.toFixed(1)}</span>}
+                <span style={{ fontWeight: 700 }}>{convWt > 0 ? `${convWt} ${unit}` : '—'}</span>
+                {gain > 0.1 && <span style={{ color: 'var(--green)' }}>+{gain.toFixed(1)}</span>}
                 {pr && <span style={{
                   fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700, padding: '2px 5px',
                   borderRadius: 4, background: 'rgba(255,214,0,0.12)', color: 'var(--gold)',
@@ -69,7 +95,7 @@ export default function StatsTab({ state }) {
             <div style={{ height: 5, background: 'rgba(0,229,255,0.08)', borderRadius: 6, overflow: 'hidden' }}>
               <div style={{
                 height: '100%', borderRadius: 6, background: 'var(--cyan)',
-                width: `${Math.min(100, Math.max(0, ((wt - ex.startKg) / 20) * 100))}%`,
+                width: `${progressPct}%`,
                 transition: 'width 0.6s'
               }} />
             </div>

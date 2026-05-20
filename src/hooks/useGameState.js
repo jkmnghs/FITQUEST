@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
 import { validateState, repairState } from '../utils/stateSchema';
 import { migrateState } from '../utils/stateMigrations';
 import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerciseSubstitutions';
+import { lookupExName } from '../data/exerciseCatalog';
 
 /**
  * Build a personalized exercise list from a program base by applying
@@ -537,7 +538,7 @@ export function useGameState(user) {
 
       // Apply daily XP cap
       const dailyEarned = prev.dailyXPEarned || 0;
-      const xp = Math.min(150 - dailyEarned, Math.max(5, adherenceXP));
+      const xp = Math.min(DAILY_XP_CAP - dailyEarned, Math.max(5, adherenceXP));
       pendingXP = xp;
       pendingReasons = reasons;
 
@@ -624,7 +625,7 @@ export function useGameState(user) {
         const reasonStr = pendingReasons.length > 0 ? `\n${pendingReasons[0]}` : '';
         addXP(pendingXP, `+${pendingXP} XP${reasonStr}`);
       }
-      if (pendingPR) setTimeout(() => showToast(`🏅 NEW PR: ${exId}!`), 1200);
+      if (pendingPR) setTimeout(() => showToast(`🏅 NEW PR: ${lookupExName(exId)}!`), 1200);
     }, 50);
   }, [setState, addXP, showToast]);
 
@@ -672,7 +673,7 @@ export function useGameState(user) {
       // Apply overtraining multiplier and daily cap
       const adjustedXP = Math.round(bonusXP * ot.xpMultiplier);
       const dailyEarned = prev.dailyXPEarned || 0;
-      pendingXP = Math.min(150 - dailyEarned, adjustedXP);
+      pendingXP = Math.min(DAILY_XP_CAP - dailyEarned, adjustedXP);
       if (pendingXP < 0) pendingXP = 0;
 
       const updatedWithStreak = updateStreak(prev);
