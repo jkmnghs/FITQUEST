@@ -180,6 +180,7 @@ export default function App() {
     onOpenInbox: pollAgentMessages,
     agentMessages,
     onSaveHistory: addAIHistory,
+    onSaveProgram: (updatedTemplates) => updateSetting('dayTemplates', updatedTemplates),
   };
 
   return (
