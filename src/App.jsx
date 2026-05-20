@@ -14,6 +14,7 @@ import { useGameState } from './hooks/useGameState';
 import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 import { EXERCISES } from './data/gameData';
+import { generateProgramFromAssessment } from './utils/programGenerator';
 
 const TrainTab    = lazy(() => import('./components/TrainTab'));
 const FuelTab     = lazy(() => import('./components/NutritionTab'));
@@ -141,7 +142,11 @@ export default function App() {
   if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
   if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
   if (!state.assessment?.completed) return (
-    <><BgFx /><OnboardingScreen onComplete={(a) => completeAssessment(a, fireOnboarding)} /></>
+    <><BgFx /><OnboardingScreen onComplete={async (a) => {
+      completeAssessment(a, fireOnboarding);
+      const templates = await generateProgramFromAssessment(a);
+      if (templates) updateSetting('dayTemplates', templates);
+    }} /></>
   );
 
   async function handleRequestNotif() {
@@ -180,6 +185,7 @@ export default function App() {
     onOpenInbox: pollAgentMessages,
     agentMessages,
     onSaveHistory: addAIHistory,
+    onSaveProgram: (updatedTemplates) => updateSetting('dayTemplates', updatedTemplates),
   };
 
   return (

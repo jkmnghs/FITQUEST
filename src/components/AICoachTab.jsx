@@ -4,6 +4,47 @@ import { X as XIcon } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
+import { EX_CATALOG } from '../data/exerciseCatalog';
+import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
+
+const DAY_FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+
+// Tool Claude calls to write exercises directly into the user's day template
+const SAVE_PROGRAM_TOOL = {
+  name: 'save_day_program',
+  description: 'Save or replace the exercise list for one training day. Call this whenever the user asks to set up, build, add to, or redesign their workout for a specific day.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      day: { type: 'string', enum: ['mon','tue','wed','thu','fri','sat','sun'], description: 'Training day key' },
+      title: { type: 'string', description: 'Session label, e.g. PUSH + SHOULDERS + ABS' },
+      sessionMinutes: { type: 'number', description: 'Estimated duration in minutes' },
+      exercises: {
+        type: 'array',
+        description: 'Ordered list of exercises for the session',
+        items: {
+          type: 'object',
+          properties: {
+            id:          { type: 'string',  description: 'Exact ID from the exercise catalog' },
+            name:        { type: 'string',  description: 'Display name' },
+            sets:        { type: 'number' },
+            reps:        { type: 'number',  description: 'Mid-range target reps' },
+            repMin:      { type: 'number' },
+            repMax:      { type: 'number' },
+            startKg:     { type: 'number',  description: 'Starting weight in kg; 0 for bodyweight' },
+            restSec:     { type: 'number',  description: 'Rest in seconds (e.g. 90, 120, 180)' },
+            rpe:         { type: 'number',  description: 'Target RPE 5-10' },
+            note:        { type: 'string',  description: 'Optional coaching cue' },
+            isBodyweight:{ type: 'boolean' },
+            isPlank:     { type: 'boolean' },
+          },
+          required: ['id', 'name', 'sets', 'reps', 'restSec', 'rpe'],
+        },
+      },
+    },
+    required: ['day', 'exercises'],
+  },
+};
 
 // Helper: get the user's active exercise list, falling back to the default barbell set
 function getExercises(state) {
@@ -16,6 +57,8 @@ const COACH_MODES = [
   { id: 'overload', icon: '📈', label: 'Overload Plan',  color: 'var(--green)',   bg: 'var(--green-glow)',      border: 'rgba(0,230,118,0.2)' },
   { id: 'form',     icon: '🎯', label: 'Form Tips',      color: 'var(--purple)',  bg: 'var(--purple-glow)',     border: 'rgba(179,136,255,0.2)' },
   { id: 'checkin',  icon: '📋', label: 'Check-in Review',color: 'var(--gold)',    bg: 'var(--gold-glow)',       border: 'rgba(255,214,0,0.2)' },
+  { id: 'build',    icon: '🗓️', label: 'Program Builder', color: '#b3ff5e',       bg: 'rgba(179,255,94,0.07)', border: 'rgba(179,255,94,0.25)' },
+  { id: 'physique', icon: '🔬', label: 'Physique Analysis', color: '#ff6f91',     bg: 'rgba(255,111,145,0.07)', border: 'rgba(255,111,145,0.25)' },
 ];
 
 // One-shot modes don't benefit from conversation history — each call is independent
@@ -31,6 +74,76 @@ function buildSystemPrompt(state, mode) {
   const base = `You are Coach AI for FitQuest — a hyper-personalized fitness coach for ${name}'s 12-week body recomposition program.
 COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.
 EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest the best available alternative based on their equipment. Common swaps: Bench Press → DB Bench Press or Push-ups; Barbell Squat → DB Goblet Squat or Bodyweight Squat; Lat Pulldown → DB Bent-Over Row or Inverted Row; Leg Curl → DB Romanian Deadlift or Nordic Curl. Always match the muscle group. If they have no replacement, give a bodyweight option.`;
+
+  if (mode === 'build') {
+    const equipment = state.assessment?.equipment || 'full_gym';
+    const equipmentDesc = EQUIPMENT_DESC[equipment] || EQUIPMENT_DESC.full_gym;
+    const trainingDays = (state.assessment?.trainingDays || state.trainingDays || ['mon', 'wed', 'fri'])
+      .map(d => DAY_FULL[d] || d).join(', ');
+    const currentProgram = Object.entries(state.dayTemplates || {})
+      .map(([d, t]) => `${DAY_FULL[d] || d}: ${t.title || 'Untitled'} (${(t.exercises || []).length} exercises)`)
+      .join('; ') || 'None set yet';
+    const availableCatalog = filterCatalogForEquipment(equipment);
+    const catalog = availableCatalog.map(e =>
+      `${e.id}="${e.name}"${e.isBodyweight ? '[BW]' : e.isPlank ? '[Plank]' : `[${e.startKg}kg]`}`
+    ).join(', ');
+    return `${base}
+You are ${name}'s personal program designer. You build and save evidence-based workout programs directly into their training schedule.
+
+TRAINING DAYS: ${trainingDays}
+EQUIPMENT: ${equipmentDesc}
+CURRENT PROGRAM: ${currentProgram}
+STATS: Lv ${state.level} | Wk ${state.currentWeek} | ${state.totalSessions} sessions | ${state.assessment?.level || 'intermediate'} | Goal: ${state.assessment?.goal || 'recomp'}
+
+EXERCISE CATALOG — ONLY exercises available for this user's equipment (use exact IDs): ${catalog}
+
+RULES:
+- When the user asks to set up, build, add, or modify a day's exercises, call save_day_program immediately — do not just list exercises in text
+- ONLY use exercises from the catalog above — never suggest exercises requiring equipment they don't have
+- Match exercise IDs exactly from the catalog; for custom exercises use a simple slug (e.g. cable_crunch)
+- Set isBodyweight: true and startKg: 0 for bodyweight moves
+- Use competitive bodybuilder standards: 3-5 sets, 6-15 rep ranges, appropriate rest (90-180s for compounds, 60-90s for accessories)
+- Keep sessions to 6-10 exercises max to avoid junk volume
+- After saving, briefly describe what you built and why`;
+  }
+
+  if (mode === 'physique') {
+    const checkins = state.weeklyCheckins || [];
+    const lastCheckin = checkins[checkins.length - 1];
+    const currentWeight = lastCheckin?.weight || 0;
+    const height = state.assessment?.height || 0;
+    const waist = lastCheckin?.waist || 0;
+    const bmi = (height > 0 && currentWeight > 0)
+      ? (currentWeight / Math.pow(height / 100, 2)).toFixed(1)
+      : null;
+    const whr = (height > 0 && waist > 0) ? (waist / height).toFixed(2) : null;
+    const weightTrend = checkins.slice(-8)
+      .map(c => `Wk${c.week}: ${c.weight}${unit}${c.waist > 0 ? ` w${c.waist}cm` : ''}`)
+      .join(', ') || 'No check-ins yet';
+    const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
+    return `${base}
+You are ${name}'s physique analyst. Objectively assess body composition data and recommend the optimal training focus: recomp, fat loss, muscle building, or strength. Be direct and data-driven.
+
+BODY DATA:
+- Current weight: ${currentWeight > 0 ? currentWeight + unit : 'not set'}
+- Height: ${height > 0 ? height + 'cm' : 'not set'}
+- BMI: ${bmi || 'n/a'}${bmi ? (bmi < 18.5 ? ' (underweight)' : bmi < 25 ? ' (normal)' : bmi < 30 ? ' (overweight)' : ' (obese)') : ''}
+- Waist: ${waist > 0 ? waist + 'cm' : 'not measured'}
+${whr ? `- Waist-to-height ratio: ${whr} (healthy <0.50, elevated risk >0.55)` : ''}
+- Stated goal: ${state.assessment?.goal || 'not set'}
+- Training level: ${state.assessment?.level || 'intermediate'}
+
+WEIGHT TREND (last 8 check-ins): ${weightTrend}
+TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect weeks | ${weekSessions}/${state.sessionsPerWeek || 3} this week | Streak: ${state.streak}d
+
+RECOMMENDATION FRAMEWORK:
+- Recomp: best for intermediates at moderate BF, eating at maintenance, training 3-4x/week consistently
+- Fat loss priority: waist-to-height >0.55, high BMI, health markers are the goal, visible progress for motivation
+- Muscle building: lean trainees (BF <18% men, <25% women), solid base, ready for progressive overload and slight surplus
+- Strength: established muscle base, wants performance over aesthetics, handles heavier loading
+
+Analyze the data honestly. If data is sparse, say so and ask for check-ins. Give a clear recommendation with reasoning.`;
+  }
 
   if (mode === 'form') {
     const exercises = getExercises(state);
@@ -161,6 +274,17 @@ ${userMessage ? `Question: "${userMessage}"` : ''}
 Analyze weight trend for recomposition. Are trends appropriate? What to focus on?`;
     }
 
+    case 'build':
+      return userMessage || 'Help me set up my training program.';
+
+    case 'physique': {
+      const checkins = state.weeklyCheckins || [];
+      if (checkins.length === 0 && !state.assessment?.height) {
+        return `${state.name || 'Athlete'} has no check-in data yet. Ask them to log their first Sunday check-in (weight + waist), explain why those metrics matter for physique analysis, and tell them what you'll be able to recommend once you have data.`;
+      }
+      return userMessage || 'Analyze my physique data and recommend what I should focus on — recomp, fat loss, muscle, or strength.';
+    }
+
     default:
       return userMessage || 'General coaching advice for my program.';
   }
@@ -251,7 +375,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
   );
 }
 
-export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose }) {
+export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose }) {
   const [activeMode, setActiveMode] = useState('pep');
   const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
@@ -333,24 +457,18 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
 
     const text = (overrideMessage ?? userMessage).trim();
     const systemPrompt = buildSystemPrompt(state, activeMode);
+    const isBuildMode = activeMode === 'build';
 
-    // Detect follow-up: one-shot mode where the user already has an AI response and is typing a reply
     const priorModeAIResponses = messages.filter(m => m.mode === activeMode && m.role === 'assistant');
     const isFollowUp = ONE_SHOT_MODES.includes(activeMode) && priorModeAIResponses.length > 0 && text.length > 0;
 
-    // For follow-ups in one-shot modes use raw text so Claude answers the actual question,
-    // not a freshly-reconstructed analysis prompt
     const userPrompt = isFollowUp ? text : buildUserPrompt(activeMode, state, text);
 
-    // Dedup: block same prompt within 5 seconds
-    if (userPrompt === lastSendRef.current.prompt && Date.now() - lastSendRef.current.ts < 5000) {
-      return;
-    }
+    if (userPrompt === lastSendRef.current.prompt && Date.now() - lastSendRef.current.ts < 5000) return;
     lastSendRef.current = { prompt: userPrompt, ts: Date.now() };
 
-    // Cache check — only for initial (non-follow-up) requests
     const cacheKey = `fq-ai-${activeMode}-wk${state.currentWeek}-s${state.weekProgress?.[state.currentWeek]?.count || 0}-${text ? text.slice(0, 80) : userPrompt.slice(0, 80)}`;
-    if (!isFollowUp) {
+    if (!isFollowUp && !isBuildMode) {
       const cached = getCached(cacheKey);
       if (cached) {
         const newMessages = [
@@ -374,9 +492,6 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
     setLoading(true);
     setError(null);
 
-    // One-shot modes: send only the current message (no history = token savings) for initial calls.
-    // For follow-ups in one-shot modes, include conversation history so Claude can answer in context.
-    // Checkin: always send last 6 messages for conversational continuity.
     const modeHistory = (ONE_SHOT_MODES.includes(activeMode) && !isFollowUp)
       ? [{ role: 'user', content: userPrompt }]
       : newMessages
@@ -385,23 +500,53 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
           .map(m => ({ role: m.role, content: m.content }));
 
     try {
+      const requestBody = {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: isBuildMode ? 1500 : 500,
+        system: systemPrompt,
+        messages: modeHistory,
+      };
+      if (isBuildMode) {
+        requestBody.tools = [SAVE_PROGRAM_TOOL];
+        requestBody.tool_choice = { type: 'auto' };
+      }
+
       const response = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 500,
-          system: systemPrompt,
-          messages: modeHistory
-        })
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
-      const assistantText = data.content?.find(b => b.type === 'text')?.text || 'No response';
 
-      // Cache response for reuse within this session (30-min TTL)
-      setCached(cacheKey, assistantText);
+      // ── Handle tool_use (Program Builder) ──
+      if (data.stop_reason === 'tool_use') {
+        const toolUse = data.content?.find(b => b.type === 'tool_use' && b.name === 'save_day_program');
+        const textPart = data.content?.find(b => b.type === 'text')?.text || '';
+        if (toolUse) {
+          // Show a preview card — user must confirm before anything is saved
+          const finalMessages = [
+            ...newMessages,
+            {
+              role: 'assistant',
+              type: 'program_preview',
+              toolInput: toolUse.input,
+              content: textPart,
+              mode: activeMode,
+              ts: Date.now(),
+            },
+          ];
+          setMessages(finalMessages);
+          onSaveHistory(finalMessages.slice(-20));
+          setCooldownLeft(Math.ceil(COOLDOWN_MS / 1000));
+          return;
+        }
+      }
+
+      // ── Normal text response ──
+      const assistantText = data.content?.find(b => b.type === 'text')?.text || 'No response';
+      if (!isBuildMode) setCached(cacheKey, assistantText);
 
       const finalMessages = [
         ...newMessages,
@@ -415,6 +560,22 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
     } finally {
       setLoading(false);
     }
+  }
+
+  function confirmProgramSave(toolInput) {
+    if (!onSaveProgram || !toolInput) return;
+    const { day, title, sessionMinutes, exercises } = toolInput;
+    const updated = {
+      ...(state.dayTemplates || {}),
+      [day]: { title: title || '', sessionMinutes: sessionMinutes || 75, exercises: exercises || [] },
+    };
+    onSaveProgram(updated);
+    // Replace the preview message with a saved confirmation
+    setMessages(prev => prev.map(m =>
+      m.type === 'program_preview' && m.toolInput === toolInput
+        ? { ...m, type: 'program_saved', savedDay: day }
+        : m
+    ));
   }
 
   function clearHistory() {
@@ -511,7 +672,7 @@ export default function AICoachTab({ state, onSaveHistory, unreadAgentCount, onM
         <ModePrompt mode={COACH_MODES.find(m => m.id === activeMode)} state={state} />
       )}
       {modeMessages.map((msg, i) => (
-        <MessageBubble key={i} msg={msg} />
+        <MessageBubble key={i} msg={msg} onConfirmProgram={confirmProgramSave} />
       ))}
       {loading && <ThinkingBubble />}
       {error && (
@@ -717,7 +878,91 @@ function ModePrompt({ mode, state }) {
   );
 }
 
-function MessageBubble({ msg }) {
+function ProgramPreviewBubble({ msg, onConfirm }) {
+  const { toolInput, content, savedDay } = msg;
+  const isSaved = msg.type === 'program_saved';
+  const { day, title, exercises = [] } = toolInput || {};
+  const dayLabel = DAY_FULL[day] || day || '?';
+
+  return (
+    <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+        background: 'rgba(179,255,94,0.08)', border: '1px solid rgba(179,255,94,0.25)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+      }}>🗓️</div>
+      <div style={{ flex: 1 }}>
+        {content ? (
+          <div style={{
+            padding: '10px 14px', borderRadius: '4px 14px 14px 14px',
+            background: 'var(--card)', border: '1px solid var(--card-border)',
+            fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
+            marginBottom: 10, backdropFilter: 'blur(20px)',
+          }}>{content}</div>
+        ) : null}
+        <div style={{
+          borderRadius: 14, overflow: 'hidden',
+          border: isSaved ? '1px solid rgba(0,230,118,0.4)' : '1px solid rgba(179,255,94,0.3)',
+          background: isSaved ? 'rgba(0,230,118,0.06)' : 'rgba(179,255,94,0.05)',
+        }}>
+          <div style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, color: isSaved ? 'var(--green)' : '#b3ff5e', letterSpacing: 1 }}>
+                {isSaved ? `✓ SAVED — ${dayLabel.toUpperCase()}` : `${dayLabel.toUpperCase()} PROGRAM PROPOSAL`}
+              </div>
+              {title && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{title}</div>}
+            </div>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)' }}>{exercises.length} exercises</div>
+          </div>
+          <div style={{ padding: '8px 0' }}>
+            {exercises.map((ex, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '6px 14px',
+                borderBottom: i < exercises.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              }}>
+                <div style={{
+                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                  background: 'rgba(255,255,255,0.05)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)',
+                }}>{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{ex.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>
+                    {ex.isBodyweight ? 'BW' : `${ex.startKg ?? 0}kg`}
+                    {' · '}{ex.sets}×{ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}–${ex.repMax}` : ex.reps}
+                    {' · '}{ex.restSec >= 60 ? `${ex.restSec / 60}min` : `${ex.restSec}s`}
+                    {' · '}RPE {ex.rpe}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {!isSaved && (
+            <div style={{ padding: '10px 14px', display: 'flex', gap: 8 }}>
+              <button onClick={() => onConfirm(toolInput)} style={{
+                flex: 1, padding: '10px', borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg, #b3ff5e, #69e04a)',
+                color: '#0a1a0a', fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                cursor: 'pointer', letterSpacing: 1,
+              }}>✓ SAVE TO MY PROGRAM</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ msg, onConfirmProgram }) {
+  if (msg.type === 'program_preview' || msg.type === 'program_saved') {
+    return <ProgramPreviewBubble msg={msg} onConfirm={onConfirmProgram} />;
+  }
   const isUser = msg.role === 'user';
   const mode = COACH_MODES.find(m => m.id === msg.mode);
 
@@ -791,19 +1036,6 @@ function ThinkingBubble() {
   );
 }
 
-function getModeDescription(modeId, state) {
-  const week = state.currentWeek;
-  const sessions = state.totalSessions;
-  switch (modeId) {
-    case 'pep':      return `Hit the button below to get a fired-up pre-workout pep talk tailored to Week ${week} and your current progress. Or add a note about how you're feeling.`;
-    case 'analysis': return `Get an AI breakdown of today's session. Works best after completing some exercises. ${sessions === 0 ? 'Complete your first workout to unlock full analysis.' : `You've done ${sessions} sessions total.`}`;
-    case 'overload': return 'Get your exact progressive overload plan for next session, based on your RPE data. Shows which lifts to increase, repeat, or back off.';
-    case 'form':     return 'Ask for form tips on any exercise: Squat, Bench, RDL, Lat Pulldown, OHP, Leg Curl, or Plank. Type the exercise name or hit a quick button.';
-    case 'checkin':  return `Review your body recomposition progress across ${state.weeklyCheckins?.length || 0} check-ins. Get an honest assessment of your weight trend and what it means.`;
-    default:         return 'Ask your coach anything.';
-  }
-}
-
 function getInputHint(modeId) {
   switch (modeId) {
     case 'pep':      return 'Optional: add a note (feeling tired? had a bad week?) or just hit →';
@@ -811,6 +1043,8 @@ function getInputHint(modeId) {
     case 'overload': return 'Optional: ask a specific question about progression';
     case 'form':     return 'Type an exercise name for detailed cues';
     case 'checkin':  return 'Optional: ask a specific question about your progress';
+    case 'build':    return 'Describe the session you want — the AI will design and save it';
+    case 'physique': return 'Optional: ask something specific, or just hit → for a full analysis';
     default:         return 'Ask your coach';
   }
 }
@@ -822,6 +1056,8 @@ function getPlaceholder(modeId) {
     case 'overload': return 'Should I add 2.5kg to everything?';
     case 'form':     return 'squat  (or bench, rdl, etc.)';
     case 'checkin':  return 'Am I on track for recomp?';
+    case 'build':    return 'e.g. Build me a Monday push session';
+    case 'physique': return 'Should I focus on fat loss or muscle?';
     default:         return 'Ask anything...';
   }
 }
@@ -833,6 +1069,23 @@ function getQuickPrompts(modeId) {
     case 'overload': return ['What increases next?', 'Explain the logic', 'Am I progressing well?'];
     case 'form':     return ['Squat', 'Bench', 'RDL', 'Lat Pulldown', 'OHP', 'Leg Curl'];
     case 'checkin':  return ['Am I recomping?', 'Weight trend ok?', 'Halfway check'];
+    case 'build':    return ['Build my Monday push session', 'Set up Wednesday pull day', 'Add lateral raises to Friday', 'Design a full body day'];
+    case 'physique': return ['Analyze my physique', 'Should I cut or bulk?', 'Am I recomping?', 'What does my BMI say?'];
     default:         return [];
+  }
+}
+
+function getModeDescription(modeId, state) {
+  const week = state.currentWeek;
+  const sessions = state.totalSessions;
+  switch (modeId) {
+    case 'pep':      return `Hit the button below to get a fired-up pre-workout pep talk tailored to Week ${week} and your current progress. Or add a note about how you're feeling.`;
+    case 'analysis': return `Get an AI breakdown of today's session. Works best after completing some exercises. ${sessions === 0 ? 'Complete your first workout to unlock full analysis.' : `You've done ${sessions} sessions total.`}`;
+    case 'overload': return 'Get your exact progressive overload plan for next session, based on your RPE data. Shows which lifts to increase, repeat, or back off.';
+    case 'form':     return 'Ask for form tips on any exercise: Squat, Bench, RDL, Lat Pulldown, OHP, Leg Curl, or Plank. Type the exercise name or hit a quick button.';
+    case 'checkin':  return `Review your body recomposition progress across ${state.weeklyCheckins?.length || 0} check-ins. Get an honest assessment of your weight trend and what it means.`;
+    case 'build':    return 'Tell the AI what kind of session you want and it will design a full exercise program for that day — sets, reps, rest, RPE — then show you a preview to confirm before saving.';
+    case 'physique': return `Get an honest, data-driven assessment of your body composition. Based on your weight trend, BMI, and waist measurements, the AI will tell you whether you should focus on recomp, fat loss, muscle building, or strength — with specific reasoning. ${state.weeklyCheckins?.length ? `You have ${state.weeklyCheckins.length} check-in(s) to analyze.` : 'Log your first Sunday check-in to unlock full analysis.'}`;
+    default:         return 'Ask your coach anything.';
   }
 }
