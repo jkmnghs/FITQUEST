@@ -125,6 +125,7 @@ export const stateSchema = z.object({
   overloadSuggestions: z.record(z.string(), z.any()),
   consecutiveCompletions: z.record(z.string(), z.number()),
   personalRecords: z.record(z.string(), z.any()),
+  dayTemplates: z.record(z.string(), z.any()).nullable().optional(),
   weeklyCheckins: z.array(z.object({}).passthrough()),
   aiCoachHistory: z.array(z.any()),
   aiEpisodic: z.array(z.any()),

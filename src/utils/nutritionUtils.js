@@ -61,7 +61,6 @@ export function validateUSDAAgainstClaude(usdaPer100g, claudePer100g) {
     const usda = usdaPer100g[macro] ?? 0;
     const claude = claudePer100g[macro] ?? 0;
     const larger = Math.max(usda, claude);
-    // Only check when at least one value is nutritionally significant
     if (larger < 3) continue;
     const ratio = claude > 0 ? usda / claude : Infinity;
     const invRatio = usda > 0 ? claude / usda : Infinity;
