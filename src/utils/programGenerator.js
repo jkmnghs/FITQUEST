@@ -30,37 +30,55 @@ export async function generateProgramFromAssessment(assessment) {
   const trainingDays = assessment.trainingDays || ['mon', 'wed', 'fri'];
   if (!trainingDays.length) return null;
 
-  const equipment = assessment.equipment || 'full_gym';
-  const goal      = assessment.goal      || 'recomp';
-  const level     = assessment.level     || 'intermediate';
-  const mins      = assessment.sessionLength || 60;
-  const injuries  = assessment.injuries  || 'none';
+  const equipment      = assessment.equipment      || 'full_gym';
+  const goal           = assessment.goal           || 'recomp';
+  const level          = assessment.level          || 'intermediate';
+  const mins           = assessment.sessionLength  || 60;
+  const injuries       = assessment.injuries       || 'none';
+  const splitPref      = assessment.splitPreference || 'full_body';
+  const numDays        = trainingDays.length;
+
+  // For "No Preference" or beginners (null), pick the most appropriate split by day count
+  const effectiveSplit = (splitPref === 'no_preference' || splitPref === null)
+    ? (numDays <= 3 ? 'full_body' : numDays === 4 ? 'upper_lower' : 'ppl')
+    : splitPref;
 
   const catalog = filterCatalogForEquipment(equipment)
     .map(e => `${e.id}="${e.name}"${e.isBodyweight ? '[BW,0kg]' : `[${e.startKg}kg]`}`)
     .join(', ');
 
   const goalStyle = {
-    recomp:    'Balanced hypertrophy: 3-4 sets, 8-12 reps, moderate rest 90-120s',
-    fat_loss:  'Higher reps/supersets: 3-4 sets, 12-15 reps, shorter rest 60-90s',
-    muscle:    'Progressive overload: 4-5 sets, 6-12 reps, longer rest 120-180s',
-    strength:  'Strength focus: 4-5 sets, 3-6 reps, long rest 180-300s',
+    recomp:   'Balanced hypertrophy: 3-4 sets, 8-12 reps, moderate rest 90-120s',
+    fat_loss: 'Higher reps/supersets: 3-4 sets, 12-15 reps, shorter rest 60-90s',
+    muscle:   'Progressive overload: 4-5 sets, 6-12 reps, longer rest 120-180s',
+    strength: 'Strength focus: 4-5 sets, 3-6 reps, long rest 180-300s',
   }[goal] || 'Balanced hypertrophy: 3-4 sets, 8-12 reps';
 
-  const prompt = `Design a complete ${trainingDays.length}-day training split for:
+  const splitDesc = {
+    full_body: `FULL BODY split — every session trains push, pull, AND legs together. Each day is a complete full-body workout. Title each day "FULL BODY" with a short variation note (e.g. "FULL BODY — STRENGTH FOCUS" or "FULL BODY — HYPERTROPHY").`,
+    upper_lower: numDays >= 4
+      ? `UPPER / LOWER split — alternate upper body days (chest, back, shoulders, arms) and lower body days (quads, hamstrings, glutes, calves). Upper day title: "UPPER BODY", Lower day title: "LOWER BODY". Aim for 2 upper + 2 lower across the ${numDays} days.`
+      : `UPPER / LOWER split — with ${numDays} days, alternate between an upper-body focused day (chest, back, shoulders, arms) and a lower-body focused day (quads, hamstrings, glutes). Titles: "UPPER BODY" and "LOWER BODY".`,
+    ppl: numDays >= 3
+      ? `PUSH / PULL / LEGS split — Day 1: Push (chest, shoulders, triceps), Day 2: Pull (back, biceps, rear delts), Day 3: Legs (quads, hamstrings, glutes, calves). Titles: "PUSH — CHEST + SHOULDERS + TRIS", "PULL — BACK + BICEPS", "LEGS — QUADS + HAMSTRINGS + GLUTES". If more than 3 days, repeat the cycle.`
+      : `PUSH / PULL split — with only ${numDays} days, use Day 1: Push (chest, shoulders, triceps) and Day 2: Pull + Legs combined (back, biceps, hamstrings, glutes).`,
+  }[effectiveSplit] || `FULL BODY split — train all major muscle groups each session.`;
+
+  const prompt = `Design a complete ${numDays}-day training program for:
 Goal: ${goal} — ${goalStyle}
 Level: ${level}
 Equipment: ${EQUIPMENT_DESC[equipment] || EQUIPMENT_DESC.full_gym}
 Session length: ${mins} min
 Training days: ${trainingDays.join(', ')}
 Injuries/limitations: ${injuries}
+Split style: ${splitDesc}
 
 Available exercises (use ONLY these exact IDs): ${catalog}
 
 Return ONLY valid JSON — no markdown, no explanation:
 {
   "<day>": {
-    "title": "SESSION TYPE (e.g. PUSH + SHOULDERS + ABS)",
+    "title": "SESSION NAME matching the split style above",
     "sessionMinutes": ${mins},
     "exercises": [
       {"id":"<id>","name":"<name>","sets":<n>,"reps":<n>,"repMin":<n>,"repMax":<n>,"startKg":<n>,"restSec":<n>,"rpe":<n>,"note":"<optional cue>","isBodyweight":<bool>,"isPlank":<bool>}
@@ -71,10 +89,10 @@ Return ONLY valid JSON — no markdown, no explanation:
 Rules:
 - Include exactly these days: ${trainingDays.join(', ')}
 - 6-8 exercises per day maximum
+- Follow the split style instructions above strictly — session titles must reflect the split
 - isBodyweight: true and startKg: 0 for all bodyweight moves
 - isPlank: true only for plank
 - startKg should be realistic for ${level} level
-- Balance muscle groups across the week
 - Don't repeat the same primary muscle group on consecutive days`;
 
   try {
