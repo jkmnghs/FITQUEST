@@ -97,14 +97,16 @@ STATS: Lv ${state.level} | Wk ${state.currentWeek} | ${state.totalSessions} sess
 
 EXERCISE CATALOG — ONLY exercises available for this user's equipment (use exact IDs): ${catalog}
 
-RULES:
-- When the user asks to set up, build, add, or modify a day's exercises, call save_day_program immediately — do not just list exercises in text
-- ONLY use exercises from the catalog above — never suggest exercises requiring equipment they don't have
-- Match exercise IDs exactly from the catalog; for custom exercises use a simple slug (e.g. cable_crunch)
-- Set isBodyweight: true and startKg: 0 for bodyweight moves
-- Use competitive bodybuilder standards: 3-5 sets, 6-15 rep ranges, appropriate rest (90-180s for compounds, 60-90s for accessories)
-- Keep sessions to 6-10 exercises max to avoid junk volume
-- After saving, briefly describe what you built and why`;
+CRITICAL RULES — FOLLOW EXACTLY:
+1. NEVER write out exercise lists as plain text. The save_day_program tool IS the only way to give the user a program.
+2. Call save_day_program IMMEDIATELY when you have exercises ready. Do NOT say "I'll save this now" or "I'm locking this in" — just call the tool.
+3. For multi-day programs, call save_day_program MULTIPLE TIMES in the SAME response — one call per day. Do not wait for confirmation between days.
+4. If the user pastes or describes a program they want saved, convert it to tool calls immediately.
+5. ONLY after all tool calls are made, add a brief 1-2 sentence summary of what was saved.
+6. Use ONLY exercise IDs from the catalog — never suggest exercises requiring unavailable equipment.
+7. Set isBodyweight: true and startKg: 0 for bodyweight moves.
+8. Use evidence-based standards: 3-5 sets, 6-15 rep ranges, 90-180s rest for compounds, 60-90s for accessories.
+9. Keep sessions to 6-10 exercises max.`;
   }
 
   if (mode === 'physique') {
@@ -502,7 +504,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
     try {
       const requestBody = {
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: isBuildMode ? 1500 : 500,
+        max_tokens: isBuildMode ? 4000 : 500,
         system: systemPrompt,
         messages: modeHistory,
       };
@@ -520,28 +522,26 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
 
-      // ── Handle tool_use (Program Builder) ──
-      if (data.stop_reason === 'tool_use') {
-        const toolUse = data.content?.find(b => b.type === 'tool_use' && b.name === 'save_day_program');
+      // ── Handle tool_use (Program Builder) — supports multiple days in one response ──
+      const toolCalls = (data.content || []).filter(b => b.type === 'tool_use' && b.name === 'save_day_program');
+      if (toolCalls.length > 0) {
         const textPart = data.content?.find(b => b.type === 'text')?.text || '';
-        if (toolUse) {
-          // Show a preview card — user must confirm before anything is saved
-          const finalMessages = [
-            ...newMessages,
-            {
-              role: 'assistant',
-              type: 'program_preview',
-              toolInput: toolUse.input,
-              content: textPart,
-              mode: activeMode,
-              ts: Date.now(),
-            },
-          ];
-          setMessages(finalMessages);
-          onSaveHistory(finalMessages.slice(-20));
-          setCooldownLeft(Math.ceil(COOLDOWN_MS / 1000));
-          return;
-        }
+        // Show one preview card with all days — user confirms before anything is saved
+        const finalMessages = [
+          ...newMessages,
+          {
+            role: 'assistant',
+            type: 'program_preview',
+            toolInputs: toolCalls.map(t => t.input),
+            content: textPart,
+            mode: activeMode,
+            ts: Date.now(),
+          },
+        ];
+        setMessages(finalMessages);
+        onSaveHistory(finalMessages.slice(-20));
+        setCooldownLeft(Math.ceil(COOLDOWN_MS / 1000));
+        return;
       }
 
       // ── Normal text response ──
@@ -562,19 +562,17 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
     }
   }
 
-  function confirmProgramSave(toolInput) {
-    if (!onSaveProgram || !toolInput) return;
-    const { day, title, sessionMinutes, exercises } = toolInput;
-    const updated = {
-      ...(state.dayTemplates || {}),
-      [day]: { title: title || '', sessionMinutes: sessionMinutes || 75, exercises: exercises || [] },
-    };
+  function confirmProgramSave(msg) {
+    if (!onSaveProgram || !msg) return;
+    const inputs = msg.toolInputs || (msg.toolInput ? [msg.toolInput] : []);
+    if (!inputs.length) return;
+    const updated = { ...(state.dayTemplates || {}) };
+    for (const { day, title, sessionMinutes, exercises } of inputs) {
+      if (day) updated[day] = { title: title || '', sessionMinutes: sessionMinutes || 75, exercises: exercises || [] };
+    }
     onSaveProgram(updated);
-    // Replace the preview message with a saved confirmation
     setMessages(prev => prev.map(m =>
-      m.type === 'program_preview' && m.toolInput === toolInput
-        ? { ...m, type: 'program_saved', savedDay: day }
-        : m
+      m === msg ? { ...m, type: 'program_saved' } : m
     ));
   }
 
@@ -878,11 +876,43 @@ function ModePrompt({ mode, state }) {
   );
 }
 
+function ExerciseList({ exercises }) {
+  return (
+    <div style={{ padding: '8px 0' }}>
+      {exercises.map((ex, i) => (
+        <div key={i} style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '6px 14px',
+          borderBottom: i < exercises.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+        }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,0.05)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)',
+          }}>{i + 1}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{ex.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>
+              {ex.isBodyweight ? 'BW' : `${ex.startKg ?? 0}kg`}
+              {' · '}{ex.sets}×{ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}–${ex.repMax}` : ex.reps}
+              {' · '}{ex.restSec >= 60 ? `${Math.round(ex.restSec / 60)}min` : `${ex.restSec}s`}
+              {' · '}RPE {ex.rpe}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ProgramPreviewBubble({ msg, onConfirm }) {
-  const { toolInput, content, savedDay } = msg;
+  const { content } = msg;
   const isSaved = msg.type === 'program_saved';
-  const { day, title, exercises = [] } = toolInput || {};
-  const dayLabel = DAY_FULL[day] || day || '?';
+  // Support both new multi-day (toolInputs[]) and legacy single-day (toolInput)
+  const inputs = msg.toolInputs || (msg.toolInput ? [msg.toolInput] : []);
+  const totalExercises = inputs.reduce((n, t) => n + (t.exercises?.length || 0), 0);
+  const isMultiDay = inputs.length > 1;
 
   return (
     <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
@@ -905,52 +935,55 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
           border: isSaved ? '1px solid rgba(0,230,118,0.4)' : '1px solid rgba(179,255,94,0.3)',
           background: isSaved ? 'rgba(0,230,118,0.06)' : 'rgba(179,255,94,0.05)',
         }}>
+          {/* Header */}
           <div style={{
             padding: '10px 14px',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <div>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, color: isSaved ? 'var(--green)' : '#b3ff5e', letterSpacing: 1 }}>
-                {isSaved ? `✓ SAVED — ${dayLabel.toUpperCase()}` : `${dayLabel.toUpperCase()} PROGRAM PROPOSAL`}
-              </div>
-              {title && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{title}</div>}
+            <div style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, color: isSaved ? 'var(--green)' : '#b3ff5e', letterSpacing: 1 }}>
+              {isSaved
+                ? `✓ SAVED — ${inputs.map(t => (DAY_FULL[t.day] || t.day || '').toUpperCase()).join(' · ')}`
+                : `${isMultiDay ? `${inputs.length}-DAY` : (DAY_FULL[inputs[0]?.day] || inputs[0]?.day || '?').toUpperCase()} PROGRAM PROPOSAL`}
             </div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)' }}>{exercises.length} exercises</div>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)' }}>{totalExercises} exercises</div>
           </div>
-          <div style={{ padding: '8px 0' }}>
-            {exercises.map((ex, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '6px 14px',
-                borderBottom: i < exercises.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-              }}>
-                <div style={{
-                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                  background: 'rgba(255,255,255,0.05)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)',
-                }}>{i + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{ex.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>
-                    {ex.isBodyweight ? 'BW' : `${ex.startKg ?? 0}kg`}
-                    {' · '}{ex.sets}×{ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}–${ex.repMax}` : ex.reps}
-                    {' · '}{ex.restSec >= 60 ? `${ex.restSec / 60}min` : `${ex.restSec}s`}
-                    {' · '}RPE {ex.rpe}
+
+          {/* Day sections */}
+          {inputs.map((t, di) => {
+            const dayLabel = DAY_FULL[t.day] || t.day || '?';
+            return (
+              <div key={di}>
+                {isMultiDay && (
+                  <div style={{
+                    padding: '8px 14px 4px',
+                    borderTop: di > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, color: '#b3ff5e', letterSpacing: 1 }}>
+                      {dayLabel.toUpperCase()}
+                    </div>
+                    {t.title && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t.title}</div>}
                   </div>
-                </div>
+                )}
+                {!isMultiDay && t.title && (
+                  <div style={{ padding: '4px 14px 0', fontSize: 11, color: 'var(--text3)' }}>{t.title}</div>
+                )}
+                <ExerciseList exercises={t.exercises || []} />
               </div>
-            ))}
-          </div>
+            );
+          })}
+
           {!isSaved && (
-            <div style={{ padding: '10px 14px', display: 'flex', gap: 8 }}>
-              <button onClick={() => onConfirm(toolInput)} style={{
-                flex: 1, padding: '10px', borderRadius: 10, border: 'none',
+            <div style={{ padding: '10px 14px' }}>
+              <button onClick={() => onConfirm(msg)} style={{
+                width: '100%', padding: '10px', borderRadius: 10, border: 'none',
                 background: 'linear-gradient(135deg, #b3ff5e, #69e04a)',
                 color: '#0a1a0a', fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
                 cursor: 'pointer', letterSpacing: 1,
-              }}>✓ SAVE TO MY PROGRAM</button>
+              }}>
+                {isMultiDay ? `✓ SAVE ALL ${inputs.length} DAYS TO MY PROGRAM` : '✓ SAVE TO MY PROGRAM'}
+              </button>
             </div>
           )}
         </div>
