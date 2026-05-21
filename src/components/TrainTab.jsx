@@ -137,7 +137,7 @@ function NextWorkoutCard({ state }) {
 }
 
 export default function TrainTab({
-  state, exercises, currentDayName,
+  state, exercises, currentDayName, isRestDay, nextTrainingDayKey,
   onCompleteExercise, onFinishSession, onStartSession,
   onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise,
   unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, onSaveHistory,
@@ -168,8 +168,13 @@ export default function TrainTab({
           <div style={{
             fontFamily: 'var(--font-display)', fontSize: 'var(--text-xs)', fontWeight: 700,
             color: 'var(--color-accent-purple)', letterSpacing: '0.04em',
-          }}>{phase.name}{currentDayName ? ` · ${currentDayName}` : ''}</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{phase.desc}</div>
+          }}>
+            {isRestDay ? 'REST DAY' : phase.name}
+            {!isRestDay && currentDayName ? ` · ${currentDayName}` : ''}
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+            {isRestDay ? 'Recovery — your next session is previewed below' : phase.desc}
+          </div>
         </div>
       </div>
 
@@ -225,6 +230,8 @@ export default function TrainTab({
         state={state}
         exercises={exercises}
         currentDayName={currentDayName}
+        isRestDay={isRestDay}
+        nextTrainingDayKey={nextTrainingDayKey}
         onCompleteExercise={onCompleteExercise}
         onFinishSession={onFinishSession}
         onStartSession={onStartSession}

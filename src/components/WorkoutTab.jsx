@@ -122,7 +122,7 @@ const EXERCISE_LIBRARY = [
   },
 ];
 
-export default function WorkoutTab({ state, exercises, currentDayName, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise }) {
+export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -174,7 +174,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, onComplet
 
   function jumpToWeek(n) { setViewingWeek(n); }
 
-  const todayDone = isCurrentWeek ? (todayExDone || []) : [];
+  // On rest days, nothing in today's exercise list is "done" — it's a preview
+  const todayDone = (isRestDay || !isCurrentWeek) ? [] : (todayExDone || []);
 
   return (
     <div>
@@ -259,13 +260,39 @@ export default function WorkoutTab({ state, exercises, currentDayName, onComplet
         );
       })()}
 
+      {/* Rest day banner */}
+      {isRestDay && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(179,136,255,0.07), rgba(0,229,255,0.04))',
+          border: '1px solid rgba(179,136,255,0.18)',
+          borderRadius: 12, padding: '12px 16px', marginBottom: 14,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ fontSize: 22, flexShrink: 0 }}>🌙</span>
+          <div>
+            <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--purple)', marginBottom: 3, letterSpacing: 0.8 }}>
+              REST DAY — RECOVERY
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
+              Your next session is{' '}
+              <strong style={{ color: 'var(--cyan)' }}>
+                {nextTrainingDayKey
+                  ? { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' }[nextTrainingDayKey]
+                  : 'upcoming'}
+              </strong>
+              . Preview below — rest up today.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Session timer */}
-      {state.sessionStartTime && !state.todaySessionFinished && isCurrentWeek && (
+      {!isRestDay && state.sessionStartTime && !state.todaySessionFinished && isCurrentWeek && (
         <SessionTimerBar startTime={state.sessionStartTime} />
       )}
 
       {/* Manual start session button */}
-      {isCurrentWeek && !state.sessionStartTime && !state.todaySessionFinished && (
+      {!isRestDay && isCurrentWeek && !state.sessionStartTime && !state.todaySessionFinished && (
         <button onClick={onStartSession} style={{
           width: '100%', padding: '11px 0', marginBottom: 14,
           borderRadius: 12, cursor: 'pointer',
@@ -284,10 +311,11 @@ export default function WorkoutTab({ state, exercises, currentDayName, onComplet
         return (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{
-              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600, color: 'var(--text2)',
+              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
+              color: isRestDay ? 'var(--purple)' : 'var(--text2)',
               letterSpacing: 1.5, textTransform: 'uppercase'
             }}>
-              {currentDayName || "TODAY'S SESSION"}
+              {currentDayName || (isRestDay ? 'UPCOMING SESSION' : "TODAY'S SESSION")}
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
@@ -464,7 +492,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, onComplet
         />
       )}
 
-      {/* Add Exercise button */}
+      {/* Add Exercise button — hidden on rest day previews */}
+      {!isRestDay && (
       <button
         onClick={() => setSwapTargetId('__add__')}
         style={{
@@ -478,9 +507,10 @@ export default function WorkoutTab({ state, exercises, currentDayName, onComplet
       >
         <span style={{ fontSize: 14 }}>＋</span> ADD EXERCISE
       </button>
+      )}
 
       {/* Finish session area */}
-      {isCurrentWeek && !todaySessionFinished && todayDone.length > 0 && (
+      {!isRestDay && isCurrentWeek && !todaySessionFinished && todayDone.length > 0 && (
         <FinishArea
           state={state}
           exercises={exercises}
@@ -489,7 +519,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, onComplet
       )}
 
       {/* Already done or not current week */}
-      {isCurrentWeek && todaySessionFinished && (
+      {!isRestDay && isCurrentWeek && todaySessionFinished && (
         <div style={{ textAlign: 'center', padding: 16, fontFamily: 'Orbitron', fontSize: 11, color: 'var(--green)', letterSpacing: 1 }}>
           ✓ SESSION COMPLETE — GREAT WORK!
         </div>

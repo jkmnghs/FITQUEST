@@ -164,20 +164,49 @@ export default function App() {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }
 
-  const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+  const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const DAY_ABBR  = { sun: 'SUN', mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT' };
+  const dayKey = DAY_ORDER[new Date().getDay()];
+  const tdays  = state.trainingDays || ['mon', 'wed', 'fri'];
+
+  const isTodayTrainingDay = tdays.includes(dayKey);
+
+  // Today's template (only useful if it's a training day)
   const todayDayTemplate = state.dayTemplates?.[dayKey];
-  // Calendar-aware fallback: pick today's slot from activeTemplates by day name, not by index counter
-  const tdays = state.trainingDays || ['mon', 'wed', 'fri'];
+
+  // Next training day after today (for rest-day preview)
+  const sortedTdays = [...tdays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const todayOrdinal = DAY_ORDER.indexOf(dayKey);
+  const nextTrainingDayKey = sortedTdays.find(d => DAY_ORDER.indexOf(d) > todayOrdinal) || sortedTdays[0];
+  const nextDayTemplate = state.dayTemplates?.[nextTrainingDayKey];
+
+  // Fallback for users without dayTemplates: pick from activeTemplates by calendar day
   const todayTdIdx = tdays.indexOf(dayKey);
-  const currentDayTemplate = (todayTdIdx >= 0 && state.activeTemplates?.length)
+  const calendarFallback = (todayTdIdx >= 0 && state.activeTemplates?.length)
     ? state.activeTemplates[todayTdIdx % state.activeTemplates.length]
     : state.activeTemplates?.[state.currentDayIndex ?? 0];
+
+  // What exercises to render
+  const displayTemplate = isTodayTrainingDay
+    ? (todayDayTemplate || calendarFallback)
+    : nextDayTemplate;
+  const displayExercises = displayTemplate?.exercises?.length > 0
+    ? displayTemplate.exercises
+    : (isTodayTrainingDay ? (state.activeExercises ?? EXERCISES) : EXERCISES);
+
+  // Session label
+  const currentDayName = isTodayTrainingDay
+    ? (todayDayTemplate?.title ?? calendarFallback?.name ?? null)
+    : (nextDayTemplate
+        ? `NEXT SESSION — ${DAY_ABBR[nextTrainingDayKey]}`
+        : `UPCOMING SESSION`);
+
   const sharedTrainProps = {
     state,
-    exercises: (todayDayTemplate?.exercises?.length > 0)
-      ? todayDayTemplate.exercises
-      : (currentDayTemplate?.exercises ?? state.activeExercises ?? EXERCISES),
-    currentDayName: todayDayTemplate?.title ?? currentDayTemplate?.name ?? null,
+    exercises: displayExercises,
+    currentDayName,
+    isRestDay: !isTodayTrainingDay,
+    nextTrainingDayKey,
     onCompleteExercise: completeExercise,
     onFinishSession: finishSession,
     onStartSession: startSession,
