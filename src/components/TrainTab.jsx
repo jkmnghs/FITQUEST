@@ -239,6 +239,7 @@ export default function TrainTab({
         onChangeProgram={onChangeProgram}
         onSwapExercise={onSwapExercise}
         onDeleteExercise={onDeleteExercise}
+        onOpenCoach={openCoach}
       />
 
       {/* Next workout preview */}
