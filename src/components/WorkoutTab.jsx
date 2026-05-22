@@ -193,7 +193,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         }}>
           WEEK {w}{!isCurrentWeek ? ' (VIEW)' : ''}
         </span>
-        <NavBtn onClick={() => viewingWeek < 12 && setViewingWeek(v => v + 1)}>›</NavBtn>
+        <NavBtn onClick={() => viewingWeek < state.currentWeek && setViewingWeek(v => v + 1)}>›</NavBtn>
       </div>
 
       {/* Session tracker dots */}
