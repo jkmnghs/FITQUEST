@@ -204,11 +204,6 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       }}>
         <div style={{ display: 'flex', gap: 8 }}>
           {(() => {
-            const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
-            const todayIdx = sortedTrainingDays.indexOf(todayKey);
-            const curIdx = isCurrentWeek && !wp.completed
-              ? (todayIdx >= 0 ? Math.max(wp.count, todayIdx) : wp.count)
-              : -1;
             // Build the most accurate set of completed days possible:
             // 1. Use explicit completedDays if present
             // 2. Derive from session dates (works for old sessions that lack dayKey)
@@ -220,6 +215,14 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             const resolvedDays = daysFromSessions.length > 0
               ? [...new Set([...(wp.completedDays || []), ...daysFromSessions])]
               : wp.completedDays || null;
+
+            // Highlight the next session to complete in program order (not calendar day)
+            // so M is highlighted first on a fresh week, even if today is Fri.
+            const doneCount = resolvedDays
+              ? sortedTrainingDays.filter(d => resolvedDays.includes(d)).length
+              : wp.count;
+            const curIdx = isCurrentWeek && !wp.completed ? doneCount : -1;
+
             return sortedTrainingDays.map((dayId, i) => {
               const done = resolvedDays
                 ? resolvedDays.includes(dayId)
