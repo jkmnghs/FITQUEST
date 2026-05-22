@@ -356,17 +356,29 @@ export function useGameState(user) {
     const waistToHeightRatio = calcWaistToHeight(assessment.waistCm, assessment.heightCm);
 
     setStateRaw(prev => {
+      const _dayOrder2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const _todayKey2 = _dayOrder2[new Date().getDay()];
+      const _tdays2 = assessment.trainingDays || [];
+      const _builtTemplates = program.templates
+        ? program.templates.map(t => ({ ...t, exercises: buildPersonalizedExercises(t.exercises, assessment) }))
+        : null;
+      // Start from today's slot so the first workout shown is today's, not always slot 0 (Monday)
+      const _todayOrigIdx2 = _tdays2.indexOf(_todayKey2);
+      const _initDayIndex = (_todayOrigIdx2 >= 0 && _builtTemplates?.length > 0)
+        ? _todayOrigIdx2 % _builtTemplates.length
+        : 0;
+      const _initExercises = _builtTemplates?.[_initDayIndex]?.exercises
+        ?? buildPersonalizedExercises(program.exercises, assessment);
+
       const newState = {
         ...prev,
         name: assessment.name || prev.name,
         assessment: { ...assessment, completed: true, programId },
         programId,
         sessionsPerWeek: program.sessionsPerWeek,
-        activeExercises: buildPersonalizedExercises(program.exercises, assessment),
-        activeTemplates: program.templates
-          ? program.templates.map(t => ({ ...t, exercises: buildPersonalizedExercises(t.exercises, assessment) }))
-          : null,
-        currentDayIndex: 0,
+        activeExercises: _initExercises,
+        activeTemplates: _builtTemplates,
+        currentDayIndex: _initDayIndex,
         trainingDays: assessment.trainingDays,
         liftWeights,
         liftHistory,
@@ -840,11 +852,32 @@ export function useGameState(user) {
   }, [setState, userId]);
 
   const resetToday = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      todayExDone: [], todayExDetails: {},
-      todaySessionFinished: false, sessionStartTime: null,
-    }));
+    setState(prev => {
+      // Restore currentDayIndex and activeExercises back to today's calendar slot
+      // so the workout shown after reset is today's session, not the "next" day
+      // that finishSession advanced to.
+      const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const todayKey = _dayOrder[new Date().getDay()];
+      const _origTdays = prev.trainingDays || ['mon', 'wed', 'fri'];
+      const todayOrigIdx = _origTdays.indexOf(todayKey);
+
+      let currentDayIndex = prev.currentDayIndex;
+      let activeExercises = prev.activeExercises;
+
+      if (todayOrigIdx >= 0 && prev.activeTemplates?.length > 0) {
+        currentDayIndex = todayOrigIdx % prev.activeTemplates.length;
+        activeExercises = prev.activeTemplates[currentDayIndex].exercises;
+      } else if (prev.dayTemplates?.[todayKey]?.exercises?.length > 0) {
+        activeExercises = prev.dayTemplates[todayKey].exercises;
+      }
+
+      return {
+        ...prev,
+        todayExDone: [], todayExDetails: {},
+        todaySessionFinished: false, sessionStartTime: null,
+        currentDayIndex, activeExercises,
+      };
+    });
     showToast("Today's session cleared!");
   }, [setState, showToast]);
 
