@@ -224,30 +224,24 @@ export function SummaryTab({ state }) {
 
 const _DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-// Return exercises for the first `sessionLimit` training days only.
-// sessionLimit=null means all days. Prefers dayTemplates over activeTemplates.
-function getProgramExercises(state, sessionLimit = null) {
+// Return exercises for a SINGLE session day — the Nth training day (1-based).
+// Showing one session at a time keeps the list to ~6–8 exercises regardless
+// of how many training days the user has.
+function getProgramExercises(state, sessionIndex = 1) {
   const sortedDays = (state.trainingDays || ['mon', 'wed', 'fri'])
     .slice()
     .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b));
-  const days = sessionLimit ? sortedDays.slice(0, sessionLimit) : sortedDays;
+  const idx = Math.max(0, Math.min(sessionIndex - 1, sortedDays.length - 1));
+  const targetDay = sortedDays[idx];
 
-  const seen = new Map();
-  if (state.dayTemplates && Object.keys(state.dayTemplates).length > 0) {
-    days.forEach(dk => {
-      (state.dayTemplates[dk]?.exercises || []).forEach(e => {
-        if (!seen.has(e.id)) seen.set(e.id, e);
-      });
-    });
-    if (seen.size > 0) return [...seen.values()];
+  // dayTemplates first (AI-generated per-day program)
+  if (state.dayTemplates?.[targetDay]?.exercises?.length > 0) {
+    return state.dayTemplates[targetDay].exercises;
   }
-  // Fall back to activeTemplates (legacy split programs), sliced to sessionLimit days
+  // Fall back to activeTemplates indexed by the same position
   if (state.activeTemplates?.length > 0) {
-    const slice = sessionLimit ? state.activeTemplates.slice(0, sessionLimit) : state.activeTemplates;
-    slice.forEach(t =>
-      (t.exercises || []).forEach(e => { if (!seen.has(e.id)) seen.set(e.id, e); })
-    );
-    if (seen.size > 0) return [...seen.values()];
+    const t = state.activeTemplates[idx % state.activeTemplates.length];
+    if (t?.exercises?.length > 0) return t.exercises;
   }
   if (state.activeExercises?.length > 0) return state.activeExercises;
   return EXERCISES;
