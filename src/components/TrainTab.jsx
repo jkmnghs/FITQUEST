@@ -64,11 +64,21 @@ function SessionHistory({ log }) {
 
 function NextWorkoutCard({ state }) {
   const [open, setOpen] = useState(false);
-  const templates = state.activeTemplates;
-  if (!templates || templates.length < 2) return null;
 
-  const nextIdx = ((state.currentDayIndex ?? 0) + 1) % templates.length;
-  const next = templates[nextIdx];
+  const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const dayKey = DAY_ORDER[new Date().getDay()];
+  const tdays = state.trainingDays || ['mon', 'wed', 'fri'];
+  const sortedTdays = [...tdays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const todayOrdinal = DAY_ORDER.indexOf(dayKey);
+  const nextDayKey = sortedTdays.find(d => DAY_ORDER.indexOf(d) > todayOrdinal) || sortedTdays[0];
+
+  // Prefer dayTemplates; fall back to activeTemplates keyed by original tdays index
+  const nextFromDayTemplates = state.dayTemplates?.[nextDayKey];
+  const nextOrigIdx = tdays.indexOf(nextDayKey);
+  const nextFromActiveTemplates = state.activeTemplates?.[nextOrigIdx >= 0 ? nextOrigIdx : 0];
+  const next = (nextFromDayTemplates?.exercises?.length ? nextFromDayTemplates : null)
+    ?? (nextFromActiveTemplates?.exercises?.length ? nextFromActiveTemplates : null);
+
   if (!next?.exercises?.length) return null;
 
   return (

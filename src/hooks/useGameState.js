@@ -745,15 +745,21 @@ export function useGameState(user) {
 
       // Compute next day index by calendar, not counter, so activeExercises
       // stays aligned even when sessions are skipped or done out of order.
+      // Uses calendar sort to find next day, then maps back to original
+      // trainingDays order so activeTemplates indices stay correct.
       const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-      const _tdays = (prev.trainingDays || ['mon', 'wed', 'fri'])
-        .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b));
-      const _todayTdIdx = _tdays.indexOf(dayKey);
-      const _nextTdIdx = _todayTdIdx >= 0
-        ? (_todayTdIdx + 1) % _tdays.length
-        : (prev.currentDayIndex + 1) % (prev.activeTemplates?.length || 1);
+      const _origTdays = prev.trainingDays || ['mon', 'wed', 'fri'];
+      const _sortedTdays = _origTdays.slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b));
+      const _todaySortedIdx = _sortedTdays.indexOf(dayKey);
+      const _nextSortedIdx = _todaySortedIdx >= 0
+        ? (_todaySortedIdx + 1) % _sortedTdays.length
+        : -1;
+      const _nextDayKey = _nextSortedIdx >= 0 ? _sortedTdays[_nextSortedIdx] : null;
+      // Map next day back to its position in the original (unsorted) trainingDays,
+      // because activeTemplates was built in that same original order.
+      const _nextOrigIdx = _nextDayKey ? _origTdays.indexOf(_nextDayKey) : -1;
       const nextDayIndex = prev.activeTemplates
-        ? _nextTdIdx % prev.activeTemplates.length
+        ? (_nextOrigIdx >= 0 ? _nextOrigIdx : (prev.currentDayIndex + 1) % prev.activeTemplates.length) % prev.activeTemplates.length
         : 0;
 
       return {
