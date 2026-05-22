@@ -743,8 +743,17 @@ export function useGameState(user) {
         dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
       };
 
+      // Compute next day index by calendar, not counter, so activeExercises
+      // stays aligned even when sessions are skipped or done out of order.
+      const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const _tdays = (prev.trainingDays || ['mon', 'wed', 'fri'])
+        .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b));
+      const _todayTdIdx = _tdays.indexOf(dayKey);
+      const _nextTdIdx = _todayTdIdx >= 0
+        ? (_todayTdIdx + 1) % _tdays.length
+        : (prev.currentDayIndex + 1) % (prev.activeTemplates?.length || 1);
       const nextDayIndex = prev.activeTemplates
-        ? (prev.currentDayIndex + 1) % prev.activeTemplates.length
+        ? _nextTdIdx % prev.activeTemplates.length
         : 0;
 
       return {

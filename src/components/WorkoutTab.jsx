@@ -209,10 +209,20 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             const curIdx = isCurrentWeek && !wp.completed
               ? (todayIdx >= 0 ? Math.max(wp.count, todayIdx) : wp.count)
               : -1;
+            // Build the most accurate set of completed days possible:
+            // 1. Use explicit completedDays if present
+            // 2. Derive from session dates (works for old sessions that lack dayKey)
+            // 3. Fall back to counter order only as last resort
+            const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+            const daysFromSessions = (wp.sessions || []).map(s =>
+              s.dayKey || (s.date ? DAY_KEYS[new Date(s.date).getDay()] : null)
+            ).filter(Boolean);
+            const resolvedDays = daysFromSessions.length > 0
+              ? [...new Set([...(wp.completedDays || []), ...daysFromSessions])]
+              : wp.completedDays || null;
             return sortedTrainingDays.map((dayId, i) => {
-              // Use completedDays (calendar-accurate) if available; fall back to count order
-              const done = wp.completedDays
-                ? wp.completedDays.includes(dayId)
+              const done = resolvedDays
+                ? resolvedDays.includes(dayId)
                 : i < wp.count;
               const isCur = !done && i === curIdx;
               return (
