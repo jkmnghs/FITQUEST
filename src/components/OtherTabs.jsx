@@ -410,11 +410,18 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Sessions done</div>
-            <select value={backfillCount} onChange={e => setBackfillCount(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
-              <option value={1}>1 / 3</option>
-              <option value={2}>2 / 3</option>
-              <option value={3}>3 / 3 ✓</option>
-            </select>
+            {(() => {
+              const total = state.trainingDays?.length || state.sessionsPerWeek || 3;
+              return (
+                <select value={backfillCount} onChange={e => setBackfillCount(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
+                  {Array.from({ length: total }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1} / {total}{i + 1 === total ? ' ✓' : ''}
+                    </option>
+                  ))}
+                </select>
+              );
+            })()}
           </div>
         </div>
 
@@ -475,7 +482,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         {/* Current status */}
         {(state.weekProgress?.[backfillW] || state.backfillLock?.[backfillW]) && (
           <div style={{ fontSize: 11, color: 'var(--cyan)', margin: '8px 0' }}>
-            Currently: {state.weekProgress?.[backfillW]?.count ?? 0}/3 sessions
+            Currently: {state.weekProgress?.[backfillW]?.count ?? 0}/{state.trainingDays?.length || state.sessionsPerWeek || 3} sessions
             {state.weekProgress?.[backfillW]?.completed ? ' ✓ complete' : ''}
           </div>
         )}
