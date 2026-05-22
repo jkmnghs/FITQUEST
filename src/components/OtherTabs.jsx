@@ -223,11 +223,18 @@ export function SummaryTab({ state }) {
 }
 
 // Collect all unique exercises from the user's active program.
-// For split programs (Upper/Lower, PPL), union all template days.
-// Falls back to the global EXERCISES list if onboarding isn't done yet.
+// Prefers dayTemplates (AI-generated per-day program) over the legacy activeTemplates.
 function getProgramExercises(state) {
+  const seen = new Map();
+  // dayTemplates is the primary source for AI-generated programs
+  if (state.dayTemplates && Object.keys(state.dayTemplates).length > 0) {
+    Object.values(state.dayTemplates).forEach(t =>
+      (t.exercises || []).forEach(e => { if (!seen.has(e.id)) seen.set(e.id, e); })
+    );
+    if (seen.size > 0) return [...seen.values()];
+  }
+  // Fall back to activeTemplates (legacy split programs)
   if (state.activeTemplates?.length > 0) {
-    const seen = new Map();
     state.activeTemplates.forEach(t =>
       (t.exercises || []).forEach(e => { if (!seen.has(e.id)) seen.set(e.id, e); })
     );

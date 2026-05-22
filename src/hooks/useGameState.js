@@ -930,20 +930,37 @@ export function useGameState(user) {
 
       const sessionsNeeded = prev.sessionsPerWeek || 3;
       const completed = sessionCount >= sessionsNeeded;
-      const fakeDates = ['Mon', 'Wed', 'Fri'].slice(0, sessionCount);
+
+      // Use the user's actual training days in calendar order
+      const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const _dayLabel = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+      const _tdays = (prev.trainingDays || ['mon', 'wed', 'fri'])
+        .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
+        .slice(0, sessionCount);
+      // Store real ISO-like dates so day-of-week can be derived later for dots
+      const _today = new Date();
+      const fakeDates = _tdays.map((dk, i) => {
+        // Offset back in time: session i was done (sessionCount-1-i) days ago at most — use
+        // a stable ISO date so new Date(s.date) is always parseable
+        const d = new Date(_today);
+        d.setDate(d.getDate() - (sessionCount - 1 - i) * 2);
+        return d.toISOString().slice(0, 10);
+      });
 
       const doneExIds = Object.entries(customSets)
         .filter(([, sets]) => sets > 0)
         .map(([exId]) => exId);
 
-      const sessions = fakeDates.map(d => ({
-        date: `Week ${week} ${d} (backfilled)`,
+      const sessions = _tdays.map((dk, idx) => ({
+        date: fakeDates[idx],
+        dayKey: dk,
         exercisesDone: doneExIds, completion: completionPct
       }));
+      const completedDays = _tdays;
 
       const weekProgress = {
         ...prev.weekProgress,
-        [week]: { count: sessionCount, dates: fakeDates, completed, sessions }
+        [week]: { count: sessionCount, dates: fakeDates, completed, sessions, completedDays }
       };
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
@@ -960,13 +977,13 @@ export function useGameState(user) {
       const { xp, totalXp, level } = applyXP(prev, xpGain);
 
       const totalExCount = Object.keys(customSets).length || 7;
-      const dayLabels = ['Mon', 'Wed', 'Fri'];
       const newLogEntries = [];
       for (let i = prevSessionCount; i < sessionCount; i++) {
+        const dk = _tdays[i] || `S${i + 1}`;
         newLogEntries.push({
           name: `Session ${i + 1}/${sessionsNeeded} • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
-          xp: sessionXp, date: `Week ${week} (backfill)`, type: 'session', week,
-          dateStr: `Week ${week} ${dayLabels[i] || `S${i + 1}`} (backfill)`
+          xp: sessionXp, date: fakeDates[i] || today(), type: 'session', week,
+          dateStr: `Week ${week} ${_dayLabel[dk] || dk} (backfill)`
         });
       }
 
