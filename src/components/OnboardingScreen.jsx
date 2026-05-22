@@ -323,7 +323,12 @@ export default function OnboardingScreen({ onComplete }) {
   }
 
   async function handleNext() {
-    if (step < TOTAL_STEPS) { setStep(s => s + 1); return; }
+    if (step < TOTAL_STEPS) {
+      const next = step + 1;
+      // Step 5 (Estimated Lifts) is only shown for intermediate/advanced
+      setStep(next === 5 && !isAdvanced ? 6 : next);
+      return;
+    }
     const assessment = {
       ...data,
       parqFlagged: data.parqAnswers.some(Boolean),
@@ -342,7 +347,11 @@ export default function OnboardingScreen({ onComplete }) {
     setIsBuilding(true);
     await onComplete(assessment);
   }
-  function handleBack() { setStep(s => Math.max(1, s - 1)); }
+  function handleBack() {
+    const prev = Math.max(1, step - 1);
+    // Step 5 (Estimated Lifts) is skipped for beginners going back too
+    setStep(prev === 5 && !isAdvanced ? 4 : prev);
+  }
 
   // ── Step 1: PAR-Q+ ──
   if (step === 1) {
@@ -485,10 +494,6 @@ export default function OnboardingScreen({ onComplete }) {
 
   // ── Step 5: Estimated Current Lifts (Intermediate/Advanced only) (Phase 3.2) ──
   if (step === 5) {
-    if (!isAdvanced) {
-      // Skip this step for beginners
-      if (step === 5) { setStep(6); return null; }
-    }
     return (
       <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
         <Card>

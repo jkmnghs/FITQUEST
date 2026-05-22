@@ -353,7 +353,11 @@ Guidelines:
   }
 
   function setGrams(idx, grams) {
-    setFoods(prev => prev.map((f, i) => i === idx ? { ...f, customGrams: grams } : f));
+    const val = Number(grams);
+    const cleaned = (grams === '' || grams == null) ? null
+      : (isNaN(val) || val <= 0) ? null
+      : Math.round(val * 10) / 10;
+    setFoods(prev => prev.map((f, i) => i === idx ? { ...f, customGrams: cleaned } : f));
   }
 
   function saveMacroEdit() {
@@ -377,7 +381,7 @@ Guidelines:
   function handleLogMeal() {
     const totals = sumTotals(foods);
     const meal = {
-      id: Date.now() * 1000 + Math.floor(Math.random() * 1000),
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       date: new Date().toISOString(),
       dateStr: new Date().toLocaleDateString('en-US', {
         weekday: 'short', month: 'short', day: 'numeric',
@@ -401,9 +405,11 @@ Guidelines:
 
   const totals = sumTotals(foods);
 
-  // Today's logged meals
-  const today = new Date().toDateString();
-  const todayMeals = mealLogs.filter(m => new Date(m.date).toDateString() === today);
+  // Today's logged meals — compare local calendar dates to avoid UTC midnight drift
+  const todayLocalStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
+  const todayMeals = mealLogs.filter(m =>
+    m.date && new Date(m.date).toLocaleDateString('en-CA') === todayLocalStr
+  );
   const dayTotals = todayMeals.reduce((acc, meal) => ({
     calories: acc.calories + meal.totals.calories,
     protein: Math.round((acc.protein + meal.totals.protein) * 10) / 10,

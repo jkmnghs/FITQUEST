@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // ── Meal entry schema ──
 const mealEntrySchema = z.object({
-  id: z.string(),
+  id: z.union([z.string(), z.number()]), // legacy meals used numeric IDs
   date: z.string(),
   items: z.array(z.object({
     name: z.string(),
@@ -191,6 +191,8 @@ export function repairState(state) {
   if (!Array.isArray(repaired.aiCoachHistory)) repaired.aiCoachHistory = [];
   if (!Array.isArray(repaired.aiEpisodic)) repaired.aiEpisodic = [];
   if (!Array.isArray(repaired.mealLogs)) repaired.mealLogs = [];
+  // Zod schema has .max(500) — pruning here ensures repair always produces a valid state
+  if (repaired.mealLogs.length > 500) repaired.mealLogs = repaired.mealLogs.slice(-500);
   if (!Array.isArray(repaired.recoveryScores)) repaired.recoveryScores = [];
 
   // Fix null objects

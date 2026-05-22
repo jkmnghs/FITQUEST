@@ -35,17 +35,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  // ── Extract userId from request body (system prompt or metadata) ──
+  // ── Require userId — unauthenticated requests must not reach the Anthropic API ──
   const userId = req.body?.metadata?.userId || req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
   // ── Rate limiting: max 2 requests/min per user ──
-  if (userId && !checkRateLimit(userId)) {
+  if (!checkRateLimit(userId)) {
     return res.status(429).json({ error: 'Too many requests. Max 2 per minute.' });
   }
 
   // ── Server-side quest message quota enforcement ──
   const supabase = getSupabase();
-  if (supabase && userId) {
+  if (supabase) {
     try {
       const { data: profile } = await supabase
         .from('user_profiles')

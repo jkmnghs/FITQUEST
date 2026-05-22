@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -189,6 +189,10 @@ export function useGameState(user) {
           // Take higher XP/level
           merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
           merged.level = Math.max(cloudData.level || 1, localData.level || 1);
+          // Recalculate xp (progress within current level) from the authoritative totalXp+level
+          // so the XP bar is always consistent after the merge, regardless of which source
+          // provided each value.
+          merged.xp = Math.max(0, merged.totalXp - xpToLevel(merged.level));
           merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
           // Week and checkin count should never regress — take the higher value
           merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
@@ -782,7 +786,9 @@ export function useGameState(user) {
           ? prev.activeTemplates[nextDayIndex].exercises
           : prev.activeExercises,
         totalSessions: prev.totalSessions + 1,
-        totalMinutes: prev.totalMinutes + 50,
+        totalMinutes: prev.totalMinutes + (prev.sessionStartTime
+          ? Math.max(5, Math.min(300, Math.round((Date.now() - prev.sessionStartTime) / 60000)))
+          : 50),
         perfectWeeks: (wp.count >= sessionsNeeded && !prev.weekProgress[w]?.completed) ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
         deloadDone: isDeload && wp.count >= sessionsNeeded ? true : prev.deloadDone,
         weekProgress,
@@ -956,13 +962,15 @@ export function useGameState(user) {
       const lockedCount = prev.backfillLock?.[week] ?? 0;
       if (sessionCount <= lockedCount) return prev;
 
+      const sessionsNeeded = prev.sessionsPerWeek || 3;
+      // Cap to one full week — prevents XP inflation from inflated session counts
+      const cappedSessionCount = Math.min(sessionCount, sessionsNeeded);
       const prevSessionCount = prev.weekProgress?.[week]?.count ?? 0;
       const prevCompleted = prev.weekProgress?.[week]?.completed ?? false;
-      const newSessions = Math.max(0, sessionCount - prevSessionCount);
+      const newSessions = Math.max(0, cappedSessionCount - prevSessionCount);
       if (newSessions === 0) return prev;
 
-      const sessionsNeeded = prev.sessionsPerWeek || 3;
-      const completed = sessionCount >= sessionsNeeded;
+      const completed = cappedSessionCount >= sessionsNeeded;
 
       const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
       const _dayLabel = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
@@ -972,14 +980,13 @@ export function useGameState(user) {
         ? [...selectedDays].sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
         : (prev.trainingDays || ['mon', 'wed', 'fri'])
             .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
-            .slice(0, sessionCount);
+            .slice(0, cappedSessionCount);
       // Store real ISO-like dates so day-of-week can be derived later for dots
       const _today = new Date();
       const fakeDates = _tdays.map((dk, i) => {
-        // Offset back in time: session i was done (sessionCount-1-i) days ago at most — use
-        // a stable ISO date so new Date(s.date) is always parseable
+        // Offset back in time: session i was done (cappedSessionCount-1-i) days ago at most
         const d = new Date(_today);
-        d.setDate(d.getDate() - (sessionCount - 1 - i) * 2);
+        d.setDate(d.getDate() - (cappedSessionCount - 1 - i) * 2);
         return d.toISOString().slice(0, 10);
       });
 
@@ -996,7 +1003,7 @@ export function useGameState(user) {
 
       const weekProgress = {
         ...prev.weekProgress,
-        [week]: { count: sessionCount, dates: fakeDates, completed, sessions, completedDays }
+        [week]: { count: cappedSessionCount, dates: fakeDates, completed, sessions, completedDays }
       };
       const liftWeights = { ...prev.liftWeights, ...customWeights };
 
@@ -1014,7 +1021,7 @@ export function useGameState(user) {
 
       const totalExCount = Object.keys(customSets).length || 7;
       const newLogEntries = [];
-      for (let i = prevSessionCount; i < sessionCount; i++) {
+      for (let i = prevSessionCount; i < cappedSessionCount; i++) {
         const dk = _tdays[i] || `S${i + 1}`;
         newLogEntries.push({
           name: `Session ${i + 1}/${sessionsNeeded} • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
@@ -1025,7 +1032,7 @@ export function useGameState(user) {
 
       const updatedState = {
         ...prev, xp, totalXp, level, weekProgress, liftWeights,
-        backfillLock: { ...prev.backfillLock, [week]: sessionCount },
+        backfillLock: { ...prev.backfillLock, [week]: cappedSessionCount },
         totalSessions: prev.totalSessions + newSessions,
         totalMinutes: prev.totalMinutes + newSessions * durationMins,
         totalVolume: prev.totalVolume + addedVolume,
