@@ -224,21 +224,17 @@ export function SummaryTab({ state }) {
 
 const _DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-// Return exercises for a SINGLE session day — the Nth training day (1-based).
-// Showing one session at a time keeps the list to ~6–8 exercises regardless
-// of how many training days the user has.
-function getProgramExercises(state, sessionIndex = 1) {
+// Return exercises for a specific training day key (e.g. 'fri').
+// Falls back through dayTemplates → activeTemplates → activeExercises → EXERCISES.
+function getProgramExercisesForDay(state, dayKey) {
   const sortedDays = (state.trainingDays || ['mon', 'wed', 'fri'])
     .slice()
     .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b));
-  const idx = Math.max(0, Math.min(sessionIndex - 1, sortedDays.length - 1));
-  const targetDay = sortedDays[idx];
+  const idx = Math.max(0, sortedDays.indexOf(dayKey));
 
-  // dayTemplates first (AI-generated per-day program)
-  if (state.dayTemplates?.[targetDay]?.exercises?.length > 0) {
-    return state.dayTemplates[targetDay].exercises;
+  if (state.dayTemplates?.[dayKey]?.exercises?.length > 0) {
+    return state.dayTemplates[dayKey].exercises;
   }
-  // Fall back to activeTemplates indexed by the same position
   if (state.activeTemplates?.length > 0) {
     const t = state.activeTemplates[idx % state.activeTemplates.length];
     if (t?.exercises?.length > 0) return t.exercises;
@@ -251,18 +247,29 @@ function getProgramExercises(state, sessionIndex = 1) {
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(1);
-  const [backfillCount, setBackfillCount] = useState(1);
+  // Which specific training days the user completed — defaults to none selected
+  const [backfillDays, setBackfillDays] = useState([]);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState({});
   const [backfillSets, setBackfillSets] = useState({});
 
-  // Recompute visible exercises whenever the session count changes.
-  // Only shows exercises from the first N training days to avoid showing
-  // all split-program exercises when the user only did 1 or 2 sessions.
+  const _sortedTdays = useMemo(() => (
+    (state.trainingDays || ['mon', 'wed', 'fri'])
+      .slice()
+      .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b))
+  ), [state.trainingDays]);
+
+  // Show exercises for the LAST selected day (most recent session of the week)
+  const _previewDay = useMemo(() => {
+    const selected = backfillDays.filter(d => _sortedTdays.includes(d));
+    if (selected.length === 0) return _sortedTdays[0] || 'mon';
+    return [...selected].sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b)).at(-1);
+  }, [backfillDays, _sortedTdays]);
+
   const programExercises = useMemo(
-    () => getProgramExercises(state, backfillCount),
+    () => getProgramExercisesForDay(state, _previewDay),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [backfillCount, state.dayTemplates, state.activeTemplates, state.trainingDays]
+    [_previewDay, state.dayTemplates, state.activeTemplates, state.trainingDays]
   );
 
   // Seed default weights/sets whenever the exercise list changes
@@ -422,31 +429,50 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           Lost your data? Set sessions done, completion, and weights you were lifting.
         </div>
 
-        {/* Week + sessions row */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
-            <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
-              {Array.from({ length: state.currentWeek }, (_, i) => (
-                <option key={i + 1} value={i + 1}>Week {i + 1}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Sessions done</div>
-            {(() => {
-              const total = state.trainingDays?.length || state.sessionsPerWeek || 3;
+        {/* Week selector */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
+          <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
+            {Array.from({ length: state.currentWeek }, (_, i) => (
+              <option key={i + 1} value={i + 1}>Week {i + 1}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Which training days were completed */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>Sessions completed this week</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {_sortedTdays.map(dk => {
+              const DAY_FULL = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+              const isSelected = backfillDays.includes(dk);
               return (
-                <select value={backfillCount} onChange={e => setBackfillCount(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
-                  {Array.from({ length: total }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1} / {total}{i + 1 === total ? ' ✓' : ''}
-                    </option>
-                  ))}
-                </select>
+                <button
+                  key={dk}
+                  onClick={() => setBackfillDays(prev =>
+                    prev.includes(dk) ? prev.filter(d => d !== dk) : [...prev, dk]
+                  )}
+                  style={{
+                    padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+                    background: isSelected ? 'var(--purple)' : 'rgba(255,255,255,0.06)',
+                    color: isSelected ? '#fff' : 'var(--text3)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {DAY_FULL[dk] || dk}
+                </button>
               );
-            })()}
+            })}
           </div>
+          {backfillDays.length > 0 && (
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+              {backfillDays.length}/{_sortedTdays.length} sessions — exercises previewed for{' '}
+              <span style={{ color: 'var(--cyan)' }}>
+                {{ sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' }[_previewDay]}
+              </span>
+            </div>
+          )}
         </div>
 
 
@@ -529,12 +555,13 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         {(() => {
           const realCount = state.weekProgress?.[backfillW]?.count ?? 0;
           const lockedCount = Math.max(state.backfillLock?.[backfillW] ?? 0, realCount);
-          const alreadyDone = backfillCount <= lockedCount;
+          const noDaysSelected = backfillDays.length === 0;
+          const alreadyDone = !noDaysSelected && backfillDays.length <= lockedCount;
           return (
             <button
-              disabled={alreadyDone}
+              disabled={noDaysSelected || alreadyDone}
               onClick={() => {
-                if (alreadyDone) return;
+                if (noDaysSelected || alreadyDone) return;
                 const done = Object.values(backfillSets).filter(s => s > 0).length;
                 const autoPct = Math.round(done / programExercises.length * 100);
                 const custom = {};
@@ -545,18 +572,24 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                     custom[ex.id] = state.unit === 'lbs' ? clamped / 2.205 : clamped;
                   }
                 });
-                onBackfillWeek(backfillW, backfillCount, autoPct, custom, backfillSets, backfillDuration);
+                onBackfillWeek(backfillW, backfillDays.length, autoPct, custom, backfillSets, backfillDuration, backfillDays);
               }}
               style={{
                 width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
-                background: alreadyDone
+                background: noDaysSelected || alreadyDone
                   ? 'rgba(255,255,255,0.08)'
                   : 'linear-gradient(135deg, var(--purple2), var(--purple))',
                 fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
-                color: alreadyDone ? 'var(--text3)' : '#fff',
-                letterSpacing: 0.5, cursor: alreadyDone ? 'not-allowed' : 'pointer'
+                color: noDaysSelected || alreadyDone ? 'var(--text3)' : '#fff',
+                letterSpacing: 0.5, cursor: noDaysSelected || alreadyDone ? 'not-allowed' : 'pointer'
               }}
-            >{alreadyDone ? `WEEK ${backfillW} ALREADY HAS ${lockedCount} SESSION${lockedCount !== 1 ? 'S' : ''}` : `APPLY WEEK ${backfillW}`}</button>
+            >
+              {noDaysSelected
+                ? 'SELECT SESSIONS ABOVE'
+                : alreadyDone
+                  ? `WEEK ${backfillW} ALREADY HAS ${lockedCount} SESSION${lockedCount !== 1 ? 'S' : ''}`
+                  : `APPLY WEEK ${backfillW}`}
+            </button>
           );
         })()}
         </>}

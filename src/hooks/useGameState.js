@@ -943,7 +943,7 @@ export function useGameState(user) {
     }));
   }, [setState]);
 
-  const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
+  const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50, selectedDays = null) => {
     const key = String(week);
     const guardCount = _backfillGuard[key] ?? 0;
     if (sessionCount <= guardCount) {
@@ -964,12 +964,15 @@ export function useGameState(user) {
       const sessionsNeeded = prev.sessionsPerWeek || 3;
       const completed = sessionCount >= sessionsNeeded;
 
-      // Use the user's actual training days in calendar order
       const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
       const _dayLabel = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
-      const _tdays = (prev.trainingDays || ['mon', 'wed', 'fri'])
-        .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
-        .slice(0, sessionCount);
+      // If caller specified exact days (e.g. user ticked Fri only), use those.
+      // Otherwise fall back to the first N training days in calendar order.
+      const _tdays = (selectedDays?.length > 0)
+        ? [...selectedDays].sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
+        : (prev.trainingDays || ['mon', 'wed', 'fri'])
+            .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
+            .slice(0, sessionCount);
       // Store real ISO-like dates so day-of-week can be derived later for dots
       const _today = new Date();
       const fakeDates = _tdays.map((dk, i) => {
