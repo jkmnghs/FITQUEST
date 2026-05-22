@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ACHIEVEMENTS, EXERCISES } from '../data/gameData';
 
 // ─── ACHIEVEMENTS TAB ───
@@ -222,20 +222,29 @@ export function SummaryTab({ state }) {
   );
 }
 
-// Collect all unique exercises from the user's active program.
-// Prefers dayTemplates (AI-generated per-day program) over the legacy activeTemplates.
-function getProgramExercises(state) {
+const _DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+// Return exercises for the first `sessionLimit` training days only.
+// sessionLimit=null means all days. Prefers dayTemplates over activeTemplates.
+function getProgramExercises(state, sessionLimit = null) {
+  const sortedDays = (state.trainingDays || ['mon', 'wed', 'fri'])
+    .slice()
+    .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b));
+  const days = sessionLimit ? sortedDays.slice(0, sessionLimit) : sortedDays;
+
   const seen = new Map();
-  // dayTemplates is the primary source for AI-generated programs
   if (state.dayTemplates && Object.keys(state.dayTemplates).length > 0) {
-    Object.values(state.dayTemplates).forEach(t =>
-      (t.exercises || []).forEach(e => { if (!seen.has(e.id)) seen.set(e.id, e); })
-    );
+    days.forEach(dk => {
+      (state.dayTemplates[dk]?.exercises || []).forEach(e => {
+        if (!seen.has(e.id)) seen.set(e.id, e);
+      });
+    });
     if (seen.size > 0) return [...seen.values()];
   }
-  // Fall back to activeTemplates (legacy split programs)
+  // Fall back to activeTemplates (legacy split programs), sliced to sessionLimit days
   if (state.activeTemplates?.length > 0) {
-    state.activeTemplates.forEach(t =>
+    const slice = sessionLimit ? state.activeTemplates.slice(0, sessionLimit) : state.activeTemplates;
+    slice.forEach(t =>
       (t.exercises || []).forEach(e => { if (!seen.has(e.id)) seen.set(e.id, e); })
     );
     if (seen.size > 0) return [...seen.values()];
@@ -246,18 +255,39 @@ function getProgramExercises(state) {
 
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete }) {
-  const programExercises = getProgramExercises(state);
-
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(1);
   const [backfillCount, setBackfillCount] = useState(1);
   const [backfillDuration, setBackfillDuration] = useState(50);
-  const [backfillWeights, setBackfillWeights] = useState(() =>
-    Object.fromEntries(programExercises.filter(e => !e.isPlank).map(e => [e.id, '']))
+  const [backfillWeights, setBackfillWeights] = useState({});
+  const [backfillSets, setBackfillSets] = useState({});
+
+  // Recompute visible exercises whenever the session count changes.
+  // Only shows exercises from the first N training days to avoid showing
+  // all split-program exercises when the user only did 1 or 2 sessions.
+  const programExercises = useMemo(
+    () => getProgramExercises(state, backfillCount),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [backfillCount, state.dayTemplates, state.activeTemplates, state.trainingDays]
   );
-  const [backfillSets, setBackfillSets] = useState(() =>
-    Object.fromEntries(programExercises.map(e => [e.id, e.isPlank ? 2 : 3]))
-  );
+
+  // Seed default weights/sets whenever the exercise list changes
+  useEffect(() => {
+    setBackfillWeights(prev => {
+      const next = { ...prev };
+      programExercises.filter(e => !e.isPlank).forEach(e => {
+        if (next[e.id] === undefined) next[e.id] = '';
+      });
+      return next;
+    });
+    setBackfillSets(prev => {
+      const next = { ...prev };
+      programExercises.forEach(e => {
+        if (next[e.id] === undefined) next[e.id] = e.isPlank ? 2 : 3;
+      });
+      return next;
+    });
+  }, [programExercises]);
   return (
     <div>
       <div style={{
