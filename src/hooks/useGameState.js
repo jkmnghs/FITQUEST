@@ -716,8 +716,9 @@ export function useGameState(user) {
       const wp = { ...weekProgress[w] };
       wp.count = (wp.count || 0) + 1;
       wp.dates = [...(wp.dates || []), today()];
+      wp.completedDays = [...(wp.completedDays || []), dayKey]; // track which calendar days were trained
       wp.sessions = [...(wp.sessions || []), {
-        date: today(), exercisesDone: [...(prev.todayExDone || [])], completion: completionPct
+        date: today(), dayKey, exercisesDone: [...(prev.todayExDone || [])], completion: completionPct
       }];
 
       const sessionsNeeded = prev.sessionsPerWeek || 3;
