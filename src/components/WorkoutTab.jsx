@@ -210,8 +210,11 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               ? (todayIdx >= 0 ? Math.max(wp.count, todayIdx) : wp.count)
               : -1;
             return sortedTrainingDays.map((dayId, i) => {
-              const done = i < wp.count;
-              const isCur = i === curIdx;
+              // Use completedDays (calendar-accurate) if available; fall back to count order
+              const done = wp.completedDays
+                ? wp.completedDays.includes(dayId)
+                : i < wp.count;
+              const isCur = !done && i === curIdx;
               return (
                 <div key={dayId} style={{
                   width: 32, height: 32, borderRadius: '50%',
