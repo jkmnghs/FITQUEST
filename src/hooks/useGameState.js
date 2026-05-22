@@ -439,20 +439,42 @@ export function useGameState(user) {
       const liftWeights = { ...prev.liftWeights };
       if (liftWeights[newEx.id] == null) liftWeights[newEx.id] = newEx.startKg ?? 0;
 
-      // Add mode — append with sensible defaults for sets/reps/rest/rpe
-      if (oldId === '__add__') {
-        const defaults = newEx.isPlank
-          ? { sets: 2, reps: 0,  rest: '60 sec', restSec: 60,  rpe: 0 }
-          : newEx.isBodyweight
-            ? { sets: 3, reps: 12, rest: '60 sec', restSec: 60, rpe: 7 }
-            : { sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8 };
-        const exerciseToAdd = { ...defaults, ...newEx };
-        const newState = { ...prev, activeExercises: [...(prev.activeExercises || []), exerciseToAdd], liftWeights };
+      const defaults = newEx.isPlank
+        ? { sets: 2, reps: 0,  rest: '60 sec', restSec: 60,  rpe: 0 }
+        : newEx.isBodyweight
+          ? { sets: 3, reps: 12, rest: '60 sec', restSec: 60, rpe: 7 }
+          : { sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8 };
+
+      // Prefer dayTemplates when that is the active source
+      const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+      const dayTemplates = prev.dayTemplates || {};
+      const todayTemplate = dayTemplates[dayKey];
+
+      if (todayTemplate?.exercises?.length > 0) {
+        const exList = todayTemplate.exercises;
+        let updatedExercises;
+        if (oldId === '__add__') {
+          updatedExercises = [...exList, { ...defaults, ...newEx }];
+        } else {
+          const idx = exList.findIndex(e => e.id === oldId);
+          if (idx === -1) return prev;
+          updatedExercises = [...exList];
+          updatedExercises[idx] = { ...updatedExercises[idx], id: newEx.id, name: newEx.name, isPlank: !!newEx.isPlank, isBodyweight: !!newEx.isBodyweight };
+        }
+        const newState = {
+          ...prev, liftWeights,
+          dayTemplates: { ...dayTemplates, [dayKey]: { ...todayTemplate, exercises: updatedExercises } },
+        };
         if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
         return newState;
       }
 
-      // Swap mode — replace in place
+      // Legacy activeExercises path
+      if (oldId === '__add__') {
+        const newState = { ...prev, activeExercises: [...(prev.activeExercises || []), { ...defaults, ...newEx }], liftWeights };
+        if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
+        return newState;
+      }
       const idx = (prev.activeExercises || []).findIndex(e => e.id === oldId);
       if (idx === -1) return prev;
       const updated = [...prev.activeExercises];
@@ -467,8 +489,21 @@ export function useGameState(user) {
   // ── deleteExercise ────────────────────────────────────────────────────────
   const deleteExercise = useCallback((exId) => {
     setState(prev => {
-      const updated = (prev.activeExercises || []).filter(e => e.id !== exId);
-      const newState = { ...prev, activeExercises: updated };
+      const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+      const dayTemplates = prev.dayTemplates || {};
+      const todayTemplate = dayTemplates[dayKey];
+
+      if (todayTemplate?.exercises?.length > 0) {
+        const updatedExercises = todayTemplate.exercises.filter(e => e.id !== exId);
+        const newState = {
+          ...prev,
+          dayTemplates: { ...dayTemplates, [dayKey]: { ...todayTemplate, exercises: updatedExercises } },
+        };
+        if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
+        return newState;
+      }
+
+      const newState = { ...prev, activeExercises: (prev.activeExercises || []).filter(e => e.id !== exId) };
       if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
       return newState;
     });
