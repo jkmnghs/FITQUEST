@@ -116,7 +116,10 @@ export function calcNutritionGoals(assessment) {
   let carbs = Math.round((calories - protein * 4 - fat * 9) / 4);
   if (carbs < 0) {
     carbs = 0;
-    warnings.push('Carbohydrates adjusted to zero — consider increasing calorie target or reducing fat/protein slightly.');
+    // Protein + fat already exceed the calorie budget; align the calorie goal to the
+    // actual macro sum so the UI never shows a target the user cannot hit with these macros.
+    calories = protein * 4 + fat * 9;
+    warnings.push('Protein and fat already meet your calorie target — carbohydrates set to zero. Consider increasing your calorie goal slightly if you want to include carbs.');
   }
 
   return { calories, protein, carbs, fat, warnings };
