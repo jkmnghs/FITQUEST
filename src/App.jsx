@@ -143,7 +143,7 @@ export default function App() {
   if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
   if (!state.assessment?.completed) return (
     <><BgFx /><OnboardingScreen onComplete={async (a) => {
-      const templates = await generateProgramFromAssessment(a);
+      const templates = await generateProgramFromAssessment(a, user?.id);
       completeAssessment(a, fireOnboarding);
       if (templates) updateSetting('dayTemplates', templates);
     }} /></>
@@ -220,6 +220,7 @@ export default function App() {
     agentMessages,
     onSaveHistory: addAIHistory,
     onSaveProgram: (updatedTemplates) => updateSetting('dayTemplates', updatedTemplates),
+    userId: user?.id,
   };
 
   return (

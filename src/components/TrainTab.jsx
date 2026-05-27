@@ -151,7 +151,7 @@ export default function TrainTab({
   onCompleteExercise, onFinishSession, onStartSession,
   onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise,
   unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, onSaveHistory,
-  onSaveProgram,
+  onSaveProgram, userId,
 }) {
   const [coachOpen, setCoachOpen] = useState(false);
   const phase = getPhase(state.currentWeek);
@@ -279,6 +279,7 @@ export default function TrainTab({
           onSaveHistory={onSaveHistory}
           onSaveProgram={onSaveProgram}
           agentMessages={agentMessages}
+          userId={userId}
         />
       )}
     </div>

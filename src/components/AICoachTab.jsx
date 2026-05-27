@@ -377,7 +377,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
   );
 }
 
-export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose }) {
+export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose, userId }) {
   const [activeMode, setActiveMode] = useState('pep');
   const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
@@ -513,9 +513,11 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
         requestBody.tool_choice = { type: 'auto' };
       }
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (userId) headers['x-user-id'] = userId;
       const response = await fetch('/api/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(requestBody),
       });
 
