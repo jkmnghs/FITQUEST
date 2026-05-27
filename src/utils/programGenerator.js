@@ -26,7 +26,7 @@ export function filterCatalogForEquipment(equipment) {
  * Silently generates a per-day training program using Claude, based on the user's
  * assessment. Returns a dayTemplates object or null on failure.
  */
-export async function generateProgramFromAssessment(assessment) {
+export async function generateProgramFromAssessment(assessment, userId) {
   const trainingDays = assessment.trainingDays || ['mon', 'wed', 'fri'];
   if (!trainingDays.length) return null;
 
@@ -96,9 +96,11 @@ Rules:
 - Don't repeat the same primary muscle group on consecutive days`;
 
   try {
+    const pgHeaders = { 'Content-Type': 'application/json' };
+    if (userId) pgHeaders['x-user-id'] = userId;
     const res = await fetch('/api/coach', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: pgHeaders,
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2500,
