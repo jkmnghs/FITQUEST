@@ -44,6 +44,20 @@ export function formatForCoach(state) {
   }
   lines.push('');
 
+  // ── Today's planned workout (from day templates) ────────────────────────────
+  const DAY_KEYS_ORD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayKey = DAY_KEYS_ORD[new Date().getDay()];
+  const todayTemplate = state.dayTemplates?.[todayKey];
+  if (todayTemplate) {
+    lines.push(`TODAY'S PLANNED WORKOUT — ${todayKey.toUpperCase()} (${todayTemplate.title || 'Session'})`);
+    lines.push('---');
+    for (const ex of (todayTemplate.exercises || [])) {
+      const wt = ex.isBodyweight ? 'bodyweight' : convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit) + unit;
+      lines.push(`  ${ex.name}: ${ex.sets} sets × ${ex.reps} reps @ ${wt}`);
+    }
+    lines.push('');
+  }
+
   // ── Today's session ─────────────────────────────────────────────────────────
   const todayDone = state.todayExDone || [];
   const details = state.todayExDetails || {};
@@ -161,8 +175,8 @@ export function formatForCoach(state) {
   }
 
   // Today's nutrition intake
-  const todayStr = new Date().toDateString();
-  const todayMeals = (state.mealLogs || []).filter(m => new Date(m.date).toDateString() === todayStr);
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const todayMeals = (state.mealLogs || []).filter(m => m.date && new Date(m.date).toLocaleDateString('en-CA') === todayStr);
   if (todayMeals.length > 0) {
     const totals = todayMeals.reduce((acc, meal) => {
       acc.calories += meal.totals?.calories || 0;
