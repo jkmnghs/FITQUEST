@@ -204,10 +204,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       }}>
         <div style={{ display: 'flex', gap: 8 }}>
           {(() => {
-            // Build the most accurate set of completed days possible:
-            // 1. Use explicit completedDays if present
-            // 2. Derive from session dates (works for old sessions that lack dayKey)
-            // 3. Fall back to counter order only as last resort
+            // Build the most accurate set of completed days possible
             const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
             const daysFromSessions = (wp.sessions || []).map(s =>
               s.dayKey || (s.date ? DAY_KEYS[new Date(s.date).getDay()] : null)
@@ -216,28 +213,43 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               ? [...new Set([...(wp.completedDays || []), ...daysFromSessions])]
               : wp.completedDays || null;
 
-            // Highlight the next session to complete in program order (not calendar day)
-            // so M is highlighted first on a fresh week, even if today is Fri.
-            const doneCount = resolvedDays
-              ? sortedTrainingDays.filter(d => resolvedDays.includes(d)).length
-              : wp.count;
-            const curIdx = isCurrentWeek && !wp.completed ? doneCount : -1;
+            // Today's day-of-week ordinal (0 = Sun … 6 = Sat)
+            const todayOrd = new Date().getDay();
+
+            // Current indicator = first undone training day at or after today.
+            // Calendar-aware: skipped past days don't block the cursor.
+            const currentDayId = (isCurrentWeek && !wp.completed)
+              ? sortedTrainingDays.find(d => {
+                  const ord = DAY_KEYS.indexOf(d);
+                  const done = resolvedDays ? resolvedDays.includes(d) : false;
+                  return ord >= todayOrd && !done;
+                }) ?? null
+              : null;
 
             return sortedTrainingDays.map((dayId, i) => {
-              const done = resolvedDays
-                ? resolvedDays.includes(dayId)
-                : i < wp.count;
-              const isCur = !done && i === curIdx;
+              const done = resolvedDays ? resolvedDays.includes(dayId) : i < wp.count;
+              const dayOrd = DAY_KEYS.indexOf(dayId);
+              // Skipped = current week, training day already passed, no session recorded
+              const isSkipped = isCurrentWeek && !done && dayOrd < todayOrd;
+              const isCur = dayId === currentDayId;
+
+              let borderColor = 'rgba(255,255,255,0.1)';
+              let bgColor = 'transparent';
+              let textColor = 'var(--text3)';
+              if (done)       { borderColor = 'var(--green)'; bgColor = 'var(--green)'; textColor = 'var(--bg)'; }
+              else if (isSkipped) { borderColor = 'rgba(255,23,68,0.7)'; bgColor = 'var(--red-glow)'; textColor = 'var(--red)'; }
+              else if (isCur) { borderColor = 'var(--cyan)'; textColor = 'var(--cyan)'; }
+
               return (
                 <div key={dayId} style={{
                   width: 32, height: 32, borderRadius: '50%',
-                  border: `2px solid ${done ? 'var(--green)' : isCur ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
-                  background: done ? 'var(--green)' : 'transparent',
-                  color: done ? 'var(--bg)' : isCur ? 'var(--cyan)' : 'var(--text3)',
+                  border: `2px solid ${borderColor}`,
+                  background: bgColor,
+                  color: textColor,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
                   animation: isCur ? 'rankPulse 2s infinite' : 'none'
-                }}>{done ? '✓' : DAY_LABELS[dayId]}</div>
+                }}>{done ? '✓' : isSkipped ? '✗' : DAY_LABELS[dayId]}</div>
               );
             });
           })()}
