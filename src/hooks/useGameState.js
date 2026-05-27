@@ -756,7 +756,10 @@ export function useGameState(user) {
       const logEntry = {
         name: `Session ${wp.count}/${sessionsNeeded} • ${doneCount}/${totalEx} exercises (${completionPct}%)`,
         xp: bonusXP, date: today(), type: 'session', week: w,
-        dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        exerciseDetails: { ...prev.todayExDetails },
+        exercisesDone: [...(prev.todayExDone || [])],
+        dayKey,
       };
 
       // Compute next day index by calendar, not counter, so activeExercises

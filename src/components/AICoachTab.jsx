@@ -220,7 +220,16 @@ Be specific and energetic.`;
     }
 
     case 'analysis': {
-      if (todayDone.length === 0) {
+      // Fall back to most recent session log if todayExDone already cleared
+      const recentLog = (state.log || [])
+        .filter(e => e.type === 'session' && e.exerciseDetails && Object.keys(e.exerciseDetails).length > 0)
+        .at(-1);
+      const activeDone = todayDone.length > 0 ? todayDone : (recentLog?.exercisesDone || []);
+      const activeDetails2 = todayDone.length > 0 ? details : (recentLog?.exerciseDetails || {});
+      const sessionDateLabel = recentLog && todayDone.length === 0
+        ? ` (${recentLog.dateStr || recentLog.date})` : '';
+
+      if (activeDone.length === 0) {
         const DAY_ORD2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
         const todayKey2 = DAY_ORD2[new Date().getDay()];
         const tmpl = state.dayTemplates?.[todayKey2];
@@ -233,16 +242,18 @@ Be specific and energetic.`;
           : 'No program set for today.';
         return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}).\n${planStr}\n${userMessage ? `They said: "${userMessage}"\n` : ''}Give specific advice about today's workout — weights to use, cues, what to focus on.`;
       }
-      const summary = todayDone.map(id => {
+      const summary = activeDone.map(id => {
         const exercises = getExercises(state);
         const ex = exercises.find(e => e.id === id);
-        const det = details[id];
+        const det = activeDetails2[id];
         if (!det || !ex) return `  ${id}: done`;
         const compliance = det.setsCompleted >= det.setsPrescribed ? 'completed as programmed' : `only ${det.setsCompleted} of ${det.setsPrescribed} prescribed sets`;
-        return `  ${ex.name}: ${compliance}${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}`;
+        const rpeStr = det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : '';
+        const wtStr = det.maxWeight > 0 ? `, ${convertWeight(det.maxWeight, unit)}${unit}` : '';
+        return `  ${ex.name}: ${compliance}${wtStr}${rpeStr}`;
       }).join('\n');
-      const missed = getExercises(state).filter(e => !todayDone.includes(e.id)).map(e => e.name);
-      return `Post-session analysis Week ${state.currentWeek}:
+      const missed = getExercises(state).filter(e => !activeDone.includes(e.id)).map(e => e.name);
+      return `Post-session analysis Week ${state.currentWeek}${sessionDateLabel}:
 Note: set counts vary per exercise by program design (compounds are 3 sets, accessories are 2 sets — this is intentional).
 ${summary}
 ${missed.length > 0 ? `Skipped: ${missed.join(', ')}` : 'All exercises done!'}
