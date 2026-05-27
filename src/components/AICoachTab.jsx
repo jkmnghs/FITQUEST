@@ -542,7 +542,15 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
         body: JSON.stringify(requestBody),
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = response.status === 429
+          ? (errData.error || 'Too many requests — wait a moment and try again.')
+          : response.status === 401
+          ? 'Session expired — please refresh the page.'
+          : (errData.error || `API error: ${response.status}`);
+        throw new Error(msg);
+      }
       const data = await response.json();
 
       // ── Handle tool_use (Program Builder) — supports multiple days in one response ──
