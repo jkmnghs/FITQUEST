@@ -166,9 +166,20 @@ PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
   const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
 
   if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
+    const DAY_ORD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const todayKey = DAY_ORD[new Date().getDay()];
+    const todayTemplate = state.dayTemplates?.[todayKey];
+    const todayPlan = todayTemplate
+      ? `TODAY'S WORKOUT (${todayKey.toUpperCase()} — ${todayTemplate.title || 'Session'}):\n` +
+        (todayTemplate.exercises || []).map(ex => {
+          const wt = ex.isBodyweight ? 'bodyweight' : `${convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit)}${unit}`;
+          return `  ${ex.name}: ${ex.sets}×${ex.reps} @ ${wt}`;
+        }).join('\n')
+      : 'No workout scheduled today (rest day or no program set).';
     return `${base}
 STATUS: ${statusLine}
-LIFTS:\n${liftSummary}`;
+LIFTS:\n${liftSummary}
+${todayPlan}`;
   }
 
   // checkin — needs weight trend + training stats
@@ -210,7 +221,17 @@ Be specific and energetic.`;
 
     case 'analysis': {
       if (todayDone.length === 0) {
-        return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
+        const DAY_ORD2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const todayKey2 = DAY_ORD2[new Date().getDay()];
+        const tmpl = state.dayTemplates?.[todayKey2];
+        const planStr = tmpl
+          ? `Today's plan (${tmpl.title || todayKey2}):\n` +
+            (tmpl.exercises || []).map(ex => {
+              const wt = ex.isBodyweight ? 'bodyweight' : `${convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit)}${unit}`;
+              return `  ${ex.name}: ${ex.sets}×${ex.reps} @ ${wt}`;
+            }).join('\n')
+          : 'No program set for today.';
+        return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}).\n${planStr}\n${userMessage ? `They said: "${userMessage}"\n` : ''}Give specific advice about today's workout — weights to use, cues, what to focus on.`;
       }
       const summary = todayDone.map(id => {
         const exercises = getExercises(state);
