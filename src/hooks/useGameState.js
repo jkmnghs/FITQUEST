@@ -204,6 +204,31 @@ export function useGameState(user) {
           (cloudData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
           (localData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
           merged.weeklyCheckins = [...checkinMap.values()].sort((a, b) => a.week - b.week);
+          // Union weekProgress — take max session count per week, union completedDays/dates/sessions
+          // without this, a sync conflict silently drops sessions from whichever source loses
+          const mergedWP = { ...(baseData.weekProgress || {}) };
+          const otherWP = (baseData === cloudData ? localData : cloudData).weekProgress || {};
+          for (const [week, other] of Object.entries(otherWP)) {
+            if (!mergedWP[week]) {
+              mergedWP[week] = other;
+            } else {
+              const base = mergedWP[week];
+              const sessionMap = new Map();
+              [...(base.sessions || []), ...(other.sessions || [])].forEach(s => {
+                const key = `${s.dayKey || ''}-${s.date || ''}`;
+                if (!sessionMap.has(key)) sessionMap.set(key, s);
+              });
+              mergedWP[week] = {
+                ...base,
+                count: Math.max(base.count || 0, other.count || 0),
+                completedDays: [...new Set([...(base.completedDays || []), ...(other.completedDays || [])])],
+                dates: [...new Set([...(base.dates || []), ...(other.dates || [])])],
+                completed: base.completed || other.completed,
+                sessions: [...sessionMap.values()],
+              };
+            }
+          }
+          merged.weekProgress = mergedWP;
           // Union other user-data arrays — both sides contribute, local wins on collision
           merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
           merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
