@@ -830,6 +830,13 @@ export function useGameState(user) {
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
+    // Immediately push to cloud — session data is too important to leave to the 3s debounce.
+    // If the app backgrounds within that window the cloud save never fires and the session is lost.
+    setTimeout(() => {
+      if (userId) {
+        setStateRaw(prev => { cancelCloudDebounce(); cloudSet(userId, prev); return prev; });
+      }
+    }, 200);
     setTimeout(() => addXP(pendingXP), 100);
     if (pendingAdvance !== null) {
       setTimeout(() => {
@@ -847,7 +854,7 @@ export function useGameState(user) {
     } else {
       isFinishingSession.current = false;
     }
-  }, [setState, addXP, showToast]);
+  }, [setState, addXP, showToast, userId]);
 
   const submitCheckin = useCallback((weight, waist, sleep) => {
     let nextState;
