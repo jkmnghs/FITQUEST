@@ -555,41 +555,53 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         {(() => {
           const realCount = state.weekProgress?.[backfillW]?.count ?? 0;
           const lockedCount = Math.max(state.backfillLock?.[backfillW] ?? 0, realCount);
+          const sessionsNeeded = _sortedTdays.length;
           const noDaysSelected = backfillDays.length === 0;
           const alreadyDone = !noDaysSelected && backfillDays.length <= lockedCount;
+          const wouldAdd = Math.max(0, backfillDays.length - lockedCount);
           return (
-            <button
-              disabled={noDaysSelected || alreadyDone}
-              onClick={() => {
-                if (noDaysSelected || alreadyDone) return;
-                const done = Object.values(backfillSets).filter(s => s > 0).length;
-                const autoPct = Math.round(done / programExercises.length * 100);
-                const custom = {};
-                programExercises.filter(e => !e.isPlank).forEach(ex => {
-                  const v = parseFloat(backfillWeights[ex.id]);
-                  if (!isNaN(v) && v > 0) {
-                    const clamped = Math.min(1000, v);
-                    custom[ex.id] = state.unit === 'lbs' ? clamped / 2.205 : clamped;
-                  }
-                });
-                onBackfillWeek(backfillW, backfillDays.length, autoPct, custom, backfillSets, backfillDuration, backfillDays);
-              }}
-              style={{
-                width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
-                background: noDaysSelected || alreadyDone
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'linear-gradient(135deg, var(--purple2), var(--purple))',
-                fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
-                color: noDaysSelected || alreadyDone ? 'var(--text3)' : '#fff',
-                letterSpacing: 0.5, cursor: noDaysSelected || alreadyDone ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {noDaysSelected
-                ? 'SELECT SESSIONS ABOVE'
-                : alreadyDone
-                  ? `WEEK ${backfillW} ALREADY HAS ${lockedCount} SESSION${lockedCount !== 1 ? 'S' : ''}`
-                  : `APPLY WEEK ${backfillW}`}
-            </button>
+            <>
+              {lockedCount > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6, lineHeight: 1.5 }}>
+                  {lockedCount} session{lockedCount !== 1 ? 's' : ''} already recorded.
+                  {lockedCount < sessionsNeeded
+                    ? ` Select ${lockedCount + 1}+ days to add more.`
+                    : ' Week is full.'}
+                </div>
+              )}
+              <button
+                disabled={noDaysSelected || alreadyDone}
+                onClick={() => {
+                  if (noDaysSelected || alreadyDone) return;
+                  const done = Object.values(backfillSets).filter(s => s > 0).length;
+                  const autoPct = Math.round(done / programExercises.length * 100);
+                  const custom = {};
+                  programExercises.filter(e => !e.isPlank).forEach(ex => {
+                    const v = parseFloat(backfillWeights[ex.id]);
+                    if (!isNaN(v) && v > 0) {
+                      const clamped = Math.min(1000, v);
+                      custom[ex.id] = state.unit === 'lbs' ? clamped / 2.205 : clamped;
+                    }
+                  });
+                  onBackfillWeek(backfillW, backfillDays.length, autoPct, custom, backfillSets, backfillDuration, backfillDays);
+                }}
+                style={{
+                  width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
+                  background: noDaysSelected || alreadyDone
+                    ? 'rgba(255,255,255,0.08)'
+                    : 'linear-gradient(135deg, var(--purple2), var(--purple))',
+                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                  color: noDaysSelected || alreadyDone ? 'var(--text3)' : '#fff',
+                  letterSpacing: 0.5, cursor: noDaysSelected || alreadyDone ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {noDaysSelected
+                  ? 'SELECT SESSIONS ABOVE'
+                  : alreadyDone
+                    ? `SELECT MORE DAYS TO ADD SESSIONS (${lockedCount} ALREADY RECORDED)`
+                    : `ADD ${wouldAdd} SESSION${wouldAdd !== 1 ? 'S' : ''} TO WEEK ${backfillW}`}
+              </button>
+            </>
           );
         })()}
         </>}
