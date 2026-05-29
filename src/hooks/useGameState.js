@@ -135,6 +135,8 @@ export function useGameState(user) {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
   const [cloudLoading, setCloudLoading] = useState(!!userId);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   const isFinishingSession = useRef(false);
   // Track previous userId so we can distinguish sign-out (value→null)
@@ -275,6 +277,7 @@ export function useGameState(user) {
           setTimeout(() => showToast('Progress synced to account ✓'), 800);
         }
       }
+      setLastSyncedAt(Date.now());
       setCloudLoading(false);
     }).catch(() => setCloudLoading(false));
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1087,6 +1090,93 @@ export function useGameState(user) {
     }
   }, [setStateRaw, showToast, userId]);
 
+  // ── Helper: apply the full cloud+local merge into a state object ──
+  function applyCloudMerge(localData, cloudData) {
+    const cloudModified = cloudData.lastDate || '';
+    const localModified = localData.lastDate || '';
+    const baseData = cloudModified >= localModified ? cloudData : localData;
+    const merged = checkQuestReset(checkDayReset(mergeState(baseData)));
+    // Union log (cloud first so cloud entries win dedup)
+    const seenDates = new Set();
+    merged.log = [...(cloudData.log || []), ...(localData.log || [])].filter(e => {
+      const key = e.dateStr || e.date;
+      if (seenDates.has(key)) return false;
+      seenDates.add(key);
+      return true;
+    }).slice(-200);
+    // Maximums
+    merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
+    merged.level = Math.max(cloudData.level || 1, localData.level || 1);
+    merged.xp = Math.max(0, merged.totalXp - xpToLevel(merged.level));
+    merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
+    merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
+    merged.checkins = Math.max(cloudData.checkins || 0, localData.checkins || 0);
+    merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
+    // Union check-ins
+    const ciMap = new Map();
+    (cloudData.weeklyCheckins || []).forEach(c => ciMap.set(c.week, c));
+    (localData.weeklyCheckins || []).forEach(c => ciMap.set(c.week, c));
+    merged.weeklyCheckins = [...ciMap.values()].sort((a, b) => a.week - b.week);
+    // Union weekProgress — never drop sessions from either source
+    const mergedWP = { ...(baseData.weekProgress || {}) };
+    const otherWP = ((baseData === cloudData) ? localData : cloudData).weekProgress || {};
+    for (const [week, other] of Object.entries(otherWP)) {
+      if (!mergedWP[week]) {
+        mergedWP[week] = other;
+      } else {
+        const base = mergedWP[week];
+        const sMap = new Map();
+        [...(base.sessions || []), ...(other.sessions || [])].forEach(s => {
+          const k = `${s.dayKey || ''}-${s.date || ''}`;
+          if (!sMap.has(k)) sMap.set(k, s);
+        });
+        mergedWP[week] = {
+          ...base,
+          count: Math.max(base.count || 0, other.count || 0),
+          completedDays: [...new Set([...(base.completedDays || []), ...(other.completedDays || [])])],
+          dates: [...new Set([...(base.dates || []), ...(other.dates || [])])],
+          completed: base.completed || other.completed,
+          sessions: [...sMap.values()],
+        };
+      }
+    }
+    merged.weekProgress = mergedWP;
+    // Union arrays
+    merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
+    merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
+    merged.recoveryScores = unionArrays(cloudData.recoveryScores, localData.recoveryScores, r => r.date).slice(-90);
+    merged.aiCoachHistory = (localData.aiCoachHistory || []).length >= (cloudData.aiCoachHistory || []).length
+      ? (localData.aiCoachHistory || []) : (cloudData.aiCoachHistory || []);
+    return merged;
+  }
+
+  const syncFromCloud = useCallback(async () => {
+    if (!userId) { showToast('Sign in to sync from cloud.'); return; }
+    setSyncing(true);
+    try {
+      const cloudData = await cloudGet(userId);
+      if (!cloudData || Object.keys(cloudData).length === 0) {
+        showToast('No cloud data found.');
+        setSyncing(false);
+        return;
+      }
+      setStateRaw(prev => {
+        const merged = applyCloudMerge(prev, cloudData);
+        storageSet(merged);
+        cancelCloudDebounce();
+        cloudSet(userId, merged);
+        return merged;
+      });
+      setLastSyncedAt(Date.now());
+      showToast('Synced from cloud ✓');
+    } catch (e) {
+      showToast('Sync failed — check your connection.');
+      console.error('[syncFromCloud]', e);
+    } finally {
+      setSyncing(false);
+    }
+  }, [userId, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const importData = useCallback((data) => {
     if (!data || typeof data !== 'object' ||
         typeof data.currentWeek !== 'number' ||
@@ -1117,5 +1207,6 @@ export function useGameState(user) {
     logRecovery, updateDailyHabits,
     importData, completeAssessment, changeProgram,
     swapExercise, deleteExercise,
+    syncFromCloud, lastSyncedAt, syncing,
   };
 }

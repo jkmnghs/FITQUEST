@@ -23,6 +23,7 @@ function SectionHeader({ icon: Icon, title }) {
 export default function ProfileTab({
   state, onUpdate, onReset, onResetToday, onBackfillWeek,
   notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete,
+  onSyncFromCloud, lastSyncedAt, syncing,
 }) {
   return (
     <div className="tab-enter">
@@ -66,6 +67,9 @@ export default function ProfileTab({
             userEmail={userEmail}
             onSignOut={onSignOut}
             onShowCycleComplete={onShowCycleComplete}
+            onSyncFromCloud={onSyncFromCloud}
+            lastSyncedAt={lastSyncedAt}
+            syncing={syncing}
           />
         </div>
       </div>

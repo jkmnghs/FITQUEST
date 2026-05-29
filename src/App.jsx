@@ -102,6 +102,7 @@ export default function App() {
     resetAll, resetToday, startSession, backfillWeek,
     addAIHistory, logMeal, deleteMeal, importData,
     completeAssessment, changeProgram, swapExercise, deleteExercise,
+    syncFromCloud, lastSyncedAt, syncing,
   } = useGameState(user);
 
   const {
@@ -350,6 +351,9 @@ export default function App() {
                       userEmail={user?.email}
                       onSignOut={signOut}
                       onShowCycleComplete={() => setShowCycleComplete(true)}
+                      onSyncFromCloud={syncFromCloud}
+                      lastSyncedAt={lastSyncedAt}
+                      syncing={syncing}
                     />
                   </LazyTab>
                 )}
