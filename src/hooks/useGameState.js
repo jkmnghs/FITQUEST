@@ -106,6 +106,10 @@ function checkDayReset(state) {
     const daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
     if (daysSinceLast > 3) next.streak = 0;
   }
+  // Auto-advance currentWeek if it's already marked complete (e.g. via backfill)
+  while (next.weekProgress?.[next.currentWeek]?.completed && next.currentWeek < 999) {
+    next.currentWeek += 1;
+  }
   return next;
 }
 
