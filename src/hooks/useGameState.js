@@ -1068,8 +1068,13 @@ export function useGameState(user) {
         });
       }
 
+      const nextWeek = (completed && !prevCompleted && week === prev.currentWeek)
+        ? prev.currentWeek + 1
+        : prev.currentWeek;
+
       const updatedState = {
         ...prev, xp, totalXp, level, weekProgress, liftWeights,
+        currentWeek: nextWeek,
         backfillLock: { ...prev.backfillLock, [week]: cappedSessionCount },
         totalSessions: prev.totalSessions + newSessions,
         totalMinutes: prev.totalMinutes + newSessions * durationMins,
