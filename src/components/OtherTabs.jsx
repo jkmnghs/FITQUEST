@@ -246,8 +246,7 @@ function getProgramExercisesForDay(state, dayKey) {
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
-  const [backfillW, setBackfillW] = useState(state.currentWeek || 1);
-  // Single training day being backfilled
+  const [backfillW, setBackfillW] = useState(() => Math.max(1, (state.currentWeek || 1) - 1));
   const [backfillDay, setBackfillDay] = useState(null);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState({});
@@ -272,6 +271,13 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [backfillDay, state.dayTemplates, state.activeTemplates, state.trainingDays]
   );
+
+  // Pre-populate selected days from already-recorded data when week changes
+  useEffect(() => {
+    const existing = (state.weekProgress?.[backfillW]?.completedDays || [])
+      .filter(d => _sortedTdays.includes(d));
+    setBackfillDays(existing);
+  }, [backfillW, _sortedTdays]);
 
   // Seed default weights/sets whenever the exercise list changes
   useEffect(() => {
