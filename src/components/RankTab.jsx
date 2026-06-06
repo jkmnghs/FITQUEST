@@ -8,6 +8,10 @@ export default function RankTab({ state }) {
   const nextRank = rankIdx < RANKS.length - 1 ? RANKS[rankIdx + 1] : null;
   const xpTarget = nextRank ? xpToLevel(nextRank.minLevel) : xpToLevel(RANKS[RANKS.length - 1].minLevel + 10);
 
+  // Scale targets by the number of 12-week cycles the user has been through
+  const cycles = Math.max(1, Math.ceil((state.currentWeek || 1) / 12));
+  const cycleWeek = ((state.currentWeek || 1) - 1) % 12 + 1;
+
   return (
     <div>
       <SectionTitle>Warrior Rank</SectionTitle>
@@ -32,7 +36,7 @@ export default function RankTab({ state }) {
           {rank.name}
         </div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 6 }}>
-          Level {state.level} • Week {state.currentWeek}/12
+          Level {state.level} • Week {cycleWeek}/12{cycles > 1 ? ` (Cycle ${cycles})` : ''}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text3)' }}>
           {nextRank ? `Next: ${nextRank.name} (Level ${nextRank.minLevel})` : 'MAX RANK ACHIEVED!'}
@@ -74,9 +78,9 @@ export default function RankTab({ state }) {
           RANK PROGRESS
         </div>
         {[
-          { label: 'Sessions Completed', value: state.totalSessions, target: 36, color: 'var(--cyan)' },
-          { label: 'Perfect Weeks', value: state.perfectWeeks, target: 12, color: 'var(--purple)' },
-          { label: 'Best Streak', value: state.bestStreak, target: 12, color: 'var(--fire2)' },
+          { label: 'Sessions Completed', value: state.totalSessions, target: cycles * 36, color: 'var(--cyan)' },
+          { label: 'Perfect Weeks', value: state.perfectWeeks, target: cycles * 12, color: 'var(--purple)' },
+          { label: 'Best Streak', value: state.bestStreak, target: cycles * 12, color: 'var(--fire2)' },
           { label: 'Total XP', value: state.totalXp, target: xpTarget, color: 'var(--gold)' }
         ].map(row => (
           <div key={row.label} style={{ marginBottom: 10 }}>
