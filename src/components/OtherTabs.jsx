@@ -246,9 +246,9 @@ function getProgramExercisesForDay(state, dayKey) {
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
-  const [backfillW, setBackfillW] = useState(1);
-  // Which specific training days the user completed — defaults to none selected
-  const [backfillDays, setBackfillDays] = useState([]);
+  const [backfillW, setBackfillW] = useState(state.currentWeek || 1);
+  // Single training day being backfilled
+  const [backfillDay, setBackfillDay] = useState(null);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState({});
   const [backfillSets, setBackfillSets] = useState({});
@@ -259,17 +259,18 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b))
   ), [state.trainingDays]);
 
-  // Show exercises for the LAST selected day (most recent session of the week)
-  const _previewDay = useMemo(() => {
-    const selected = backfillDays.filter(d => _sortedTdays.includes(d));
-    if (selected.length === 0) return _sortedTdays[0] || 'mon';
-    return [...selected].sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b)).at(-1);
-  }, [backfillDays, _sortedTdays]);
+  // Days already recorded for the selected week (real sessions + backfill)
+  const _doneDays = useMemo(() => {
+    const wp = state.weekProgress?.[backfillW];
+    const fromCompleted = wp?.completedDays || [];
+    const fromSessions = (wp?.sessions || []).map(s => s.dayKey).filter(Boolean);
+    return new Set([...fromCompleted, ...fromSessions]);
+  }, [state.weekProgress, backfillW]);
 
   const programExercises = useMemo(
-    () => getProgramExercisesForDay(state, _previewDay),
+    () => backfillDay ? getProgramExercisesForDay(state, backfillDay) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [_previewDay, state.dayTemplates, state.activeTemplates, state.trainingDays]
+    [backfillDay, state.dayTemplates, state.activeTemplates, state.trainingDays]
   );
 
   // Seed default weights/sets whenever the exercise list changes
@@ -289,6 +290,9 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       return next;
     });
   }, [programExercises]);
+
+  // Reset day selection when week changes
+  useEffect(() => { setBackfillDay(null); }, [backfillW]);
   return (
     <div>
       <div style={{
@@ -424,175 +428,170 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           <span style={{ fontSize: 16, color: 'var(--text3)', transition: 'transform 0.2s', display: 'inline-block', transform: backfillOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
         </button>
 
-        {backfillOpen && <>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, marginTop: 4, lineHeight: 1.5 }}>
-          Lost your data? Set sessions done, completion, and weights you were lifting.
-        </div>
+        {backfillOpen && (() => {
+          const DAY_FULL = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+          const DAY_SHORT = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+          const alreadyDone = backfillDay ? _doneDays.has(backfillDay) : false;
+          const canApply = backfillDay && !alreadyDone && programExercises.length > 0;
+          const doneCount = Object.values(backfillSets).filter(s => s > 0).length;
+          const pct = programExercises.length > 0 ? Math.round(doneCount / programExercises.length * 100) : 0;
 
-        {/* Week selector */}
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
-          <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
-            {Array.from({ length: state.currentWeek }, (_, i) => (
-              <option key={i + 1} value={i + 1}>Week {i + 1}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Which training days were completed */}
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>Sessions completed this week</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {_sortedTdays.map(dk => {
-              const DAY_FULL = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
-              const isSelected = backfillDays.includes(dk);
-              return (
-                <button
-                  key={dk}
-                  onClick={() => setBackfillDays(prev =>
-                    prev.includes(dk) ? prev.filter(d => d !== dk) : [...prev, dk]
-                  )}
-                  style={{
-                    padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                    fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-                    background: isSelected ? 'var(--purple)' : 'rgba(255,255,255,0.06)',
-                    color: isSelected ? '#fff' : 'var(--text3)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {DAY_FULL[dk] || dk}
-                </button>
-              );
-            })}
+          return <>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, marginTop: 4, lineHeight: 1.5 }}>
+            Select the week and the specific training day you want to log.
           </div>
-          {backfillDays.length > 0 && (
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
-              {backfillDays.length}/{_sortedTdays.length} sessions — exercises previewed for{' '}
-              <span style={{ color: 'var(--cyan)' }}>
-                {{ sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' }[_previewDay]}
-              </span>
+
+          {/* Week selector */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Week</div>
+            <select value={backfillW} onChange={e => setBackfillW(Number(e.target.value))} style={{ ...inputStyle, width: '100%' }}>
+              {Array.from({ length: state.currentWeek }, (_, i) => (
+                <option key={i + 1} value={i + 1}>Week {i + 1}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Week status */}
+          {_doneDays.size > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--cyan)', marginBottom: 10 }}>
+              Week {backfillW}: {[..._doneDays].map(d => DAY_SHORT[d] || d).join(', ')} already recorded
             </div>
           )}
-        </div>
 
-
-
-        {/* Session duration */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Session duration (per session)</div>
-            <div style={{ fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700, color: 'var(--cyan)' }}>
-              {backfillDuration} min
+          {/* Single-day picker */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>Training day to log</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {_sortedTdays.map(dk => {
+                const isDone = _doneDays.has(dk);
+                const isSelected = backfillDay === dk;
+                return (
+                  <button
+                    key={dk}
+                    disabled={isDone}
+                    onClick={() => setBackfillDay(dk)}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, border: 'none',
+                      cursor: isDone ? 'not-allowed' : 'pointer',
+                      fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+                      background: isDone
+                        ? 'rgba(0,230,118,0.12)'
+                        : isSelected
+                          ? 'var(--purple)'
+                          : 'rgba(255,255,255,0.06)',
+                      color: isDone ? 'var(--green)' : isSelected ? '#fff' : 'var(--text3)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {DAY_SHORT[dk] || dk}{isDone ? ' ✓' : ''}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <input type="range" min={20} max={120} step={5} value={backfillDuration}
-            onChange={e => setBackfillDuration(Number(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--cyan)' }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-            <span>20 min</span><span>120 min</span>
-          </div>
-        </div>
 
-        {/* Per-exercise weights + sets */}
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-          Exercise details — leave weight blank to keep current. Set sets to <span style={{ color: 'var(--fire2)', fontWeight: 700 }}>0</span> for any exercise you skipped.
-        </div>
-        {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 4 }}>
-          {['Exercise', state.unit.toUpperCase(), 'Sets (0=skip)'].map(h => (
-            <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Orbitron', fontWeight: 600 }}>{h}</div>
-          ))}
-        </div>
-        {programExercises.map(ex => (
-          <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-            <div style={{ fontSize: 12, color: 'var(--text2)' }}>{ex.name}</div>
-            {ex.isPlank ? (
-              <div style={{ fontSize: 10, color: 'var(--text3)', textAlign: 'center' }}>—</div>
-            ) : (
-              <input
-                type="number" inputMode="decimal"
-                min={0} max={1000}
-                placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
-                value={backfillWeights[ex.id] ?? ''}
-                onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
-                style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
+          {/* Exercise details — only shown once a day is selected */}
+          {backfillDay && !alreadyDone && <>
+            <div style={{
+              fontSize: 12, fontWeight: 600, color: 'var(--cyan)',
+              marginBottom: 8, fontFamily: 'Orbitron',
+            }}>
+              {DAY_FULL[backfillDay]} session
+            </div>
+
+            {/* Session duration */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)' }}>Session duration</div>
+                <div style={{ fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700, color: 'var(--cyan)' }}>
+                  {backfillDuration} min
+                </div>
+              </div>
+              <input type="range" min={20} max={120} step={5} value={backfillDuration}
+                onChange={e => setBackfillDuration(Number(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--cyan)' }}
               />
-            )}
-            <input
-              type="number" inputMode="numeric"
-              min={0} max={ex.sets + 2}
-              value={backfillSets[ex.id] ?? (ex.isPlank ? 2 : 3)}
-              onChange={e => setBackfillSets(prev => ({ ...prev, [ex.id]: Number(e.target.value) }))}
-              style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
-            />
-          </div>
-        ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+                <span>20 min</span><span>120 min</span>
+              </div>
+            </div>
 
-        {/* Current status */}
-        {(state.weekProgress?.[backfillW] || state.backfillLock?.[backfillW]) && (
-          <div style={{ fontSize: 11, color: 'var(--cyan)', margin: '8px 0' }}>
-            Currently: {state.weekProgress?.[backfillW]?.count ?? 0}/{state.trainingDays?.length || state.sessionsPerWeek || 3} sessions
-            {state.weekProgress?.[backfillW]?.completed ? ' ✓ complete' : ''}
-          </div>
-        )}
+            {/* Per-exercise weights + sets */}
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
+              Leave weight blank to keep current. Set sets to <span style={{ color: 'var(--fire2)', fontWeight: 700 }}>0</span> to skip an exercise.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 4 }}>
+              {['Exercise', state.unit.toUpperCase(), 'Sets (0=skip)'].map(h => (
+                <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Orbitron', fontWeight: 600 }}>{h}</div>
+              ))}
+            </div>
+            {programExercises.map(ex => (
+              <div key={ex.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--text2)' }}>{ex.name}</div>
+                {ex.isPlank ? (
+                  <div style={{ fontSize: 10, color: 'var(--text3)', textAlign: 'center' }}>—</div>
+                ) : (
+                  <input
+                    type="number" inputMode="decimal" min={0} max={1000}
+                    placeholder={`${state.liftWeights?.[ex.id] ?? ex.startKg}`}
+                    value={backfillWeights[ex.id] ?? ''}
+                    onChange={e => setBackfillWeights(prev => ({ ...prev, [ex.id]: e.target.value }))}
+                    style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
+                  />
+                )}
+                <input
+                  type="number" inputMode="numeric" min={0} max={ex.sets + 2}
+                  value={backfillSets[ex.id] ?? (ex.isPlank ? 2 : 3)}
+                  onChange={e => setBackfillSets(prev => ({ ...prev, [ex.id]: Number(e.target.value) }))}
+                  style={{ ...inputStyle, width: '100%', height: 30, fontSize: 12 }}
+                />
+              </div>
+            ))}
 
-        {/* Auto-computed completion */}
-        {(() => {
-          const done = Object.values(backfillSets).filter(s => s > 0).length;
-          const pct = Math.round(done / programExercises.length * 100);
-          return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
+            {/* Completion preview */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--text3)' }}>Completion (auto)</div>
               <div style={{ fontSize: 12, fontFamily: 'Orbitron', fontWeight: 700,
                 color: pct >= 95 ? 'var(--green)' : pct >= 70 ? 'var(--cyan)' : 'var(--fire2)' }}>
-                {done}/{programExercises.length} &nbsp;{pct}%
+                {doneCount}/{programExercises.length} &nbsp;{pct}%
               </div>
             </div>
-          );
-        })()}
+          </>}
 
-        {(() => {
-          const realCount = state.weekProgress?.[backfillW]?.count ?? 0;
-          const lockedCount = Math.max(state.backfillLock?.[backfillW] ?? 0, realCount);
-          const noDaysSelected = backfillDays.length === 0;
-          const alreadyDone = !noDaysSelected && backfillDays.length <= lockedCount;
-          return (
-            <button
-              disabled={noDaysSelected || alreadyDone}
-              onClick={() => {
-                if (noDaysSelected || alreadyDone) return;
-                const done = Object.values(backfillSets).filter(s => s > 0).length;
-                const autoPct = Math.round(done / programExercises.length * 100);
-                const custom = {};
-                programExercises.filter(e => !e.isPlank).forEach(ex => {
-                  const v = parseFloat(backfillWeights[ex.id]);
-                  if (!isNaN(v) && v > 0) {
-                    const clamped = Math.min(1000, v);
-                    custom[ex.id] = state.unit === 'lbs' ? clamped / 2.205 : clamped;
-                  }
-                });
-                onBackfillWeek(backfillW, backfillDays.length, autoPct, custom, backfillSets, backfillDuration, backfillDays);
-              }}
-              style={{
-                width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
-                background: noDaysSelected || alreadyDone
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'linear-gradient(135deg, var(--purple2), var(--purple))',
-                fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
-                color: noDaysSelected || alreadyDone ? 'var(--text3)' : '#fff',
-                letterSpacing: 0.5, cursor: noDaysSelected || alreadyDone ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {noDaysSelected
-                ? 'SELECT SESSIONS ABOVE'
-                : alreadyDone
-                  ? `WEEK ${backfillW} ALREADY HAS ${lockedCount} SESSION${lockedCount !== 1 ? 'S' : ''}`
-                  : `APPLY WEEK ${backfillW}`}
-            </button>
-          );
+          <button
+            disabled={!canApply}
+            onClick={() => {
+              if (!canApply) return;
+              const autoPct = pct;
+              const custom = {};
+              programExercises.filter(e => !e.isPlank).forEach(ex => {
+                const v = parseFloat(backfillWeights[ex.id]);
+                if (!isNaN(v) && v > 0) {
+                  const clamped = Math.min(1000, v);
+                  custom[ex.id] = state.unit === 'lbs' ? clamped / 2.205 : clamped;
+                }
+              });
+              onBackfillWeek(backfillW, backfillDay, autoPct, custom, backfillSets, backfillDuration);
+              setBackfillDay(null);
+            }}
+            style={{
+              width: '100%', padding: 10, border: 'none', borderRadius: 10, marginTop: 4,
+              background: canApply
+                ? 'linear-gradient(135deg, var(--purple2), var(--purple))'
+                : 'rgba(255,255,255,0.08)',
+              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+              color: canApply ? '#fff' : 'var(--text3)',
+              letterSpacing: 0.5, cursor: canApply ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {!backfillDay
+              ? 'SELECT A DAY ABOVE'
+              : alreadyDone
+                ? `${DAY_SHORT[backfillDay]?.toUpperCase()} ALREADY RECORDED`
+                : `LOG WEEK ${backfillW} — ${DAY_SHORT[backfillDay]?.toUpperCase()}`}
+          </button>
+          </>;
         })()}
-        </>}
       </div>
 
       {/* Nutrition Goals */}

@@ -42,12 +42,12 @@ function buildPersonalizedExercises(exercises, assessment) {
 }
 
 // Module-level guard — lives completely outside React, reset only on page reload.
-// Initialized from backfillLock (not weekProgress) so real sessions don't
-// incorrectly block the guard. weekProgress.count includes real sessions;
-// backfillLock only tracks what backfill has already applied.
+// Tracks "week_dayKey" strings already backfilled to prevent double-apply on re-render.
 const _initSaved = storageGet();
-const _backfillGuard = Object.fromEntries(
-  Object.entries(_initSaved?.backfillLock ?? {}).map(([w, n]) => [w, n])
+const _backfillGuard = new Set(
+  Object.entries(_initSaved?.backfillLock ?? {}).flatMap(([w, val]) =>
+    Array.isArray(val) ? val.map(dk => `${w}_${dk}`) : []
+  )
 );
 
 function mergeState(saved) {
@@ -341,7 +341,7 @@ export function useGameState(user) {
     storageClear();
     if (userId) cloudClear(userId);
     backfillApplied.current = {};
-    Object.keys(_backfillGuard).forEach(k => delete _backfillGuard[k]);
+    _backfillGuard.clear();
     setStateRaw({ ...DEFAULT_STATE });
     showToast('Progress reset!');
   }, [showToast, userId]);
@@ -943,94 +943,86 @@ export function useGameState(user) {
     }));
   }, [setState]);
 
-  const backfillWeek = useCallback((week, sessionCount, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50, selectedDays = null) => {
-    const key = String(week);
-    const guardCount = _backfillGuard[key] ?? 0;
-    if (sessionCount <= guardCount) {
-      showToast(`Week ${week}: already recorded ${guardCount}/3 sessions`);
+  // Backfill ONE specific training-day session for a given week.
+  // Call once per day you want to log — each call is independently guarded.
+  const backfillWeek = useCallback((week, dayKey, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
+    const guardKey = `${week}_${dayKey}`;
+    if (_backfillGuard.has(guardKey)) {
+      showToast(`${dayKey} already recorded for week ${week}`);
       return;
     }
-    _backfillGuard[key] = sessionCount;
+    _backfillGuard.add(guardKey);
 
     setStateRaw(prev => {
-      const lockedCount = prev.backfillLock?.[week] ?? 0;
-      if (sessionCount <= lockedCount) return prev;
-
-      const prevSessionCount = prev.weekProgress?.[week]?.count ?? 0;
-      const prevCompleted = prev.weekProgress?.[week]?.completed ?? false;
-      const newSessions = Math.max(0, sessionCount - prevSessionCount);
-      if (newSessions === 0) return prev;
-
-      const sessionsNeeded = prev.sessionsPerWeek || 3;
-      const completed = sessionCount >= sessionsNeeded;
+      // Double-check against persisted state (handles page refresh)
+      const existingDays = prev.weekProgress?.[week]?.completedDays || [];
+      if (existingDays.includes(dayKey)) return prev;
 
       const _dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
       const _dayLabel = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
-      // If caller specified exact days (e.g. user ticked Fri only), use those.
-      // Otherwise fall back to the first N training days in calendar order.
-      const _tdays = (selectedDays?.length > 0)
-        ? [...selectedDays].sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
-        : (prev.trainingDays || ['mon', 'wed', 'fri'])
-            .slice().sort((a, b) => _dayOrder.indexOf(a) - _dayOrder.indexOf(b))
-            .slice(0, sessionCount);
-      // Store real ISO-like dates so day-of-week can be derived later for dots
-      const _today = new Date();
-      const fakeDates = _tdays.map((dk, i) => {
-        // Offset back in time: session i was done (sessionCount-1-i) days ago at most — use
-        // a stable ISO date so new Date(s.date) is always parseable
-        const d = new Date(_today);
-        d.setDate(d.getDate() - (sessionCount - 1 - i) * 2);
-        return d.toISOString().slice(0, 10);
-      });
+
+      // Compute a realistic date: go back (currentWeek − week) weeks then
+      // snap to the target weekday within that week.
+      const weeksBack = (prev.currentWeek || 1) - week;
+      const d = new Date();
+      d.setDate(d.getDate() - weeksBack * 7);
+      const targetDow = _dayOrder.indexOf(dayKey);
+      const diff = targetDow - d.getDay();
+      d.setDate(d.getDate() + diff);
+      const fakeDateStr = d.toISOString().slice(0, 10);
 
       const doneExIds = Object.entries(customSets)
         .filter(([, sets]) => sets > 0)
         .map(([exId]) => exId);
 
-      const sessions = _tdays.map((dk, idx) => ({
-        date: fakeDates[idx],
-        dayKey: dk,
-        exercisesDone: doneExIds, completion: completionPct
-      }));
-      const completedDays = _tdays;
+      const prevWp = prev.weekProgress?.[week] || { count: 0, dates: [], completed: false, sessions: [], completedDays: [] };
+      const prevCompleted = prevWp.completed || false;
+      const newCount = (prevWp.count || 0) + 1;
+      const sessionsNeeded = prev.sessionsPerWeek || 3;
+      const completed = newCount >= sessionsNeeded;
 
-      const weekProgress = {
-        ...prev.weekProgress,
-        [week]: { count: sessionCount, dates: fakeDates, completed, sessions, completedDays }
+      const newWp = {
+        ...prevWp,
+        count: newCount,
+        dates: [...(prevWp.dates || []), fakeDateStr],
+        completedDays: [...existingDays, dayKey],
+        sessions: [...(prevWp.sessions || []), {
+          date: fakeDateStr, dayKey, exercisesDone: doneExIds, completion: completionPct,
+        }],
+        completed,
       };
-      const liftWeights = { ...prev.liftWeights, ...customWeights };
+
+      const sessionXp = Math.round(60 * (completionPct / 100));
+      const { xp, totalXp, level } = applyXP(prev, sessionXp);
 
       let addedVolume = 0;
       Object.entries(customSets).forEach(([exId, sets]) => {
         if (!sets || sets <= 0) return;
         const reps = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
         const wt = customWeights[exId] ?? prev.liftWeights?.[exId] ?? 0;
-        addedVolume += sets * reps * wt * newSessions;
+        addedVolume += sets * reps * wt;
       });
 
-      const sessionXp = Math.round(60 * (completionPct / 100));
-      const xpGain = newSessions * sessionXp;
-      const { xp, totalXp, level } = applyXP(prev, xpGain);
-
       const totalExCount = Object.keys(customSets).length || 7;
-      const newLogEntries = [];
-      for (let i = prevSessionCount; i < sessionCount; i++) {
-        const dk = _tdays[i] || `S${i + 1}`;
-        newLogEntries.push({
-          name: `Session ${i + 1}/${sessionsNeeded} • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
-          xp: sessionXp, date: fakeDates[i] || today(), type: 'session', week,
-          dateStr: `Week ${week} ${_dayLabel[dk] || dk} (backfill)`
-        });
-      }
+      const logEntry = {
+        name: `Session ${newCount}/${sessionsNeeded} • ${doneExIds.length}/${totalExCount} exercises (${completionPct}%) [backfill]`,
+        xp: sessionXp, date: fakeDateStr, type: 'session', week,
+        dateStr: `Week ${week} ${_dayLabel[dayKey] || dayKey} (backfill)`,
+      };
+
+      // backfillLock stores the array of locked day keys for each week
+      const prevLockDays = Array.isArray(prev.backfillLock?.[week]) ? prev.backfillLock[week] : [];
 
       const updatedState = {
-        ...prev, xp, totalXp, level, weekProgress, liftWeights,
-        backfillLock: { ...prev.backfillLock, [week]: sessionCount },
-        totalSessions: prev.totalSessions + newSessions,
-        totalMinutes: prev.totalMinutes + newSessions * durationMins,
+        ...prev, xp, totalXp, level,
+        weekProgress: { ...prev.weekProgress, [week]: newWp },
+        liftWeights: { ...prev.liftWeights, ...customWeights },
+        backfillLock: { ...prev.backfillLock, [week]: [...prevLockDays, dayKey] },
+        totalSessions: prev.totalSessions + 1,
+        totalMinutes: prev.totalMinutes + durationMins,
         totalVolume: prev.totalVolume + addedVolume,
         perfectWeeks: completed && !prevCompleted ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
-        log: pruneOldEntries([...prev.log, ...newLogEntries]),
+        log: pruneOldEntries([...prev.log, logEntry]),
       };
 
       const newlyUnlocked = checkAchievements(updatedState);
@@ -1042,9 +1034,10 @@ export function useGameState(user) {
         });
       }
 
-      setTimeout(() => showToast(`Week ${week}: ${sessionCount}/${sessionsNeeded} sessions set ✓`), 0);
+      setTimeout(() => showToast(`Week ${week} ${_dayLabel[dayKey]} backfilled ✓`), 0);
       return updatedState;
     });
+
     if (userId) {
       setTimeout(() => {
         setStateRaw(prev => { cancelCloudDebounce(); cloudSet(userId, prev); return prev; });
