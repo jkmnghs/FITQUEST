@@ -216,6 +216,25 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             // Today's day-of-week ordinal (0 = Sun … 6 = Sat)
             const todayOrd = new Date().getDay();
 
+            // Determine when this program week started.
+            // Use the earliest session/date recorded; if none, assume the week started today.
+            // This prevents Mon/Wed from showing as "skipped" when the week just advanced on Fri
+            // and those days are actually next calendar week.
+            const allSessionDates = [
+              ...(wp.dates || []),
+              ...(wp.sessions || []).map(s => s.date).filter(Boolean),
+            ];
+            let weekStartOrd = todayOrd;
+            if (allSessionDates.length > 0) {
+              weekStartOrd = new Date(Math.min(...allSessionDates.map(d => +new Date(d)))).getDay();
+            }
+            const daysAgo = (todayOrd - weekStartOrd + 7) % 7;
+            const weekStartDate = new Date();
+            weekStartDate.setHours(0, 0, 0, 0);
+            weekStartDate.setDate(weekStartDate.getDate() - daysAgo);
+            const todayMidnight = new Date();
+            todayMidnight.setHours(0, 0, 0, 0);
+
             // Current indicator = first undone training day at or after today.
             // Calendar-aware: skipped past days don't block the cursor.
             const currentDayId = (isCurrentWeek && !wp.completed)
@@ -229,8 +248,12 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             return sortedTrainingDays.map((dayId, i) => {
               const done = resolvedDays ? resolvedDays.includes(dayId) : i < wp.count;
               const dayOrd = DAY_KEYS.indexOf(dayId);
-              // Skipped = current week, training day already passed, no session recorded
-              const isSkipped = isCurrentWeek && !done && dayOrd < todayOrd;
+              // Compute this training day's actual calendar date anchored to the week start.
+              // A day is "skipped" only if its actual date has already passed.
+              const daysFromStart = (dayOrd - weekStartOrd + 7) % 7;
+              const trainingDayDate = new Date(weekStartDate);
+              trainingDayDate.setDate(weekStartDate.getDate() + daysFromStart);
+              const isSkipped = isCurrentWeek && !done && trainingDayDate < todayMidnight;
               const isCur = dayId === currentDayId;
 
               let borderColor = 'rgba(255,255,255,0.1)';
