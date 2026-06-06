@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// ── Rate limiting: max 2 requests/min per user (in-memory, resets on cold start) ──
+// ── Rate limiting: max 10 requests/min per user (in-memory, resets on cold start) ──
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 2;
+const RATE_LIMIT_MAX = 10;
 
 function checkRateLimit(userId) {
   if (!userId) return true; // no user = no rate limit (will fail auth anyway)
@@ -35,17 +35,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
-  // ── Extract userId from request body (system prompt or metadata) ──
+  // ── Require userId — unauthenticated requests must not reach the Anthropic API ──
   const userId = req.body?.metadata?.userId || req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
   // ── Rate limiting: max 2 requests/min per user ──
-  if (userId && !checkRateLimit(userId)) {
-    return res.status(429).json({ error: 'Too many requests. Max 2 per minute.' });
+  if (!checkRateLimit(userId)) {
+    return res.status(429).json({ error: 'Too many requests. Max 10 per minute — wait a moment and try again.' });
   }
 
   // ── Server-side quest message quota enforcement ──
   const supabase = getSupabase();
-  if (supabase && userId) {
+  if (supabase) {
     try {
       const { data: profile } = await supabase
         .from('user_profiles')

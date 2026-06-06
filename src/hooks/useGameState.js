@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -106,6 +106,10 @@ function checkDayReset(state) {
     const daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
     if (daysSinceLast > 3) next.streak = 0;
   }
+  // Auto-advance currentWeek if it's already marked complete (e.g. via backfill)
+  while (next.weekProgress?.[next.currentWeek]?.completed && next.currentWeek < 999) {
+    next.currentWeek += 1;
+  }
   return next;
 }
 
@@ -135,6 +139,8 @@ export function useGameState(user) {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
   const [cloudLoading, setCloudLoading] = useState(!!userId);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   const isFinishingSession = useRef(false);
   // Track previous userId so we can distinguish sign-out (value→null)
@@ -189,6 +195,10 @@ export function useGameState(user) {
           // Take higher XP/level
           merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
           merged.level = Math.max(cloudData.level || 1, localData.level || 1);
+          // Recalculate xp (progress within current level) from the authoritative totalXp+level
+          // so the XP bar is always consistent after the merge, regardless of which source
+          // provided each value.
+          merged.xp = Math.max(0, merged.totalXp - xpToLevel(merged.level));
           merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
           // Week and checkin count should never regress — take the higher value
           merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
@@ -200,6 +210,31 @@ export function useGameState(user) {
           (cloudData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
           (localData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
           merged.weeklyCheckins = [...checkinMap.values()].sort((a, b) => a.week - b.week);
+          // Union weekProgress — take max session count per week, union completedDays/dates/sessions
+          // without this, a sync conflict silently drops sessions from whichever source loses
+          const mergedWP = { ...(baseData.weekProgress || {}) };
+          const otherWP = (baseData === cloudData ? localData : cloudData).weekProgress || {};
+          for (const [week, other] of Object.entries(otherWP)) {
+            if (!mergedWP[week]) {
+              mergedWP[week] = other;
+            } else {
+              const base = mergedWP[week];
+              const sessionMap = new Map();
+              [...(base.sessions || []), ...(other.sessions || [])].forEach(s => {
+                const key = `${s.dayKey || ''}-${s.date || ''}`;
+                if (!sessionMap.has(key)) sessionMap.set(key, s);
+              });
+              mergedWP[week] = {
+                ...base,
+                count: Math.max(base.count || 0, other.count || 0),
+                completedDays: [...new Set([...(base.completedDays || []), ...(other.completedDays || [])])],
+                dates: [...new Set([...(base.dates || []), ...(other.dates || [])])],
+                completed: base.completed || other.completed,
+                sessions: [...sessionMap.values()],
+              };
+            }
+          }
+          merged.weekProgress = mergedWP;
           // Union other user-data arrays — both sides contribute, local wins on collision
           merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
           merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
@@ -246,6 +281,7 @@ export function useGameState(user) {
           setTimeout(() => showToast('Progress synced to account ✓'), 800);
         }
       }
+      setLastSyncedAt(Date.now());
       setCloudLoading(false);
     }).catch(() => setCloudLoading(false));
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -752,7 +788,10 @@ export function useGameState(user) {
       const logEntry = {
         name: `Session ${wp.count}/${sessionsNeeded} • ${doneCount}/${totalEx} exercises (${completionPct}%)`,
         xp: bonusXP, date: today(), type: 'session', week: w,
-        dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        exerciseDetails: { ...prev.todayExDetails },
+        exercisesDone: [...(prev.todayExDone || [])],
+        dayKey,
       };
 
       // Compute next day index by calendar, not counter, so activeExercises
@@ -782,7 +821,9 @@ export function useGameState(user) {
           ? prev.activeTemplates[nextDayIndex].exercises
           : prev.activeExercises,
         totalSessions: prev.totalSessions + 1,
-        totalMinutes: prev.totalMinutes + 50,
+        totalMinutes: prev.totalMinutes + (prev.sessionStartTime
+          ? Math.max(5, Math.min(300, Math.round((Date.now() - prev.sessionStartTime) / 60000)))
+          : 50),
         perfectWeeks: (wp.count >= sessionsNeeded && !prev.weekProgress[w]?.completed) ? (prev.perfectWeeks || 0) + 1 : prev.perfectWeeks,
         deloadDone: isDeload && wp.count >= sessionsNeeded ? true : prev.deloadDone,
         weekProgress,
@@ -793,6 +834,13 @@ export function useGameState(user) {
         log: pruneOldEntries([...prev.log, logEntry])
       };
     });
+    // Immediately push to cloud — session data is too important to leave to the 3s debounce.
+    // If the app backgrounds within that window the cloud save never fires and the session is lost.
+    setTimeout(() => {
+      if (userId) {
+        setStateRaw(prev => { cancelCloudDebounce(); cloudSet(userId, prev); return prev; });
+      }
+    }, 200);
     setTimeout(() => addXP(pendingXP), 100);
     if (pendingAdvance !== null) {
       setTimeout(() => {
@@ -810,7 +858,7 @@ export function useGameState(user) {
     } else {
       isFinishingSession.current = false;
     }
-  }, [setState, addXP, showToast]);
+  }, [setState, addXP, showToast, userId]);
 
   const submitCheckin = useCallback((weight, waist, sleep) => {
     let nextState;
@@ -1010,13 +1058,19 @@ export function useGameState(user) {
         dateStr: `Week ${week} ${_dayLabel[dayKey] || dayKey} (backfill)`,
       };
 
-      // backfillLock stores the array of locked day keys for each week
+      // backfillLock stores array of locked day keys per week
       const prevLockDays = Array.isArray(prev.backfillLock?.[week]) ? prev.backfillLock[week] : [];
+
+      // Auto-advance currentWeek when backfill completes the current week
+      const nextWeek = (completed && !prevCompleted && week === prev.currentWeek)
+        ? prev.currentWeek + 1
+        : prev.currentWeek;
 
       const updatedState = {
         ...prev, xp, totalXp, level,
         weekProgress: { ...prev.weekProgress, [week]: newWp },
         liftWeights: { ...prev.liftWeights, ...customWeights },
+        currentWeek: nextWeek,
         backfillLock: { ...prev.backfillLock, [week]: [...prevLockDays, dayKey] },
         totalSessions: prev.totalSessions + 1,
         totalMinutes: prev.totalMinutes + durationMins,
@@ -1044,6 +1098,93 @@ export function useGameState(user) {
       }, 50);
     }
   }, [setStateRaw, showToast, userId]);
+
+  // ── Helper: apply the full cloud+local merge into a state object ──
+  function applyCloudMerge(localData, cloudData) {
+    const cloudModified = cloudData.lastDate || '';
+    const localModified = localData.lastDate || '';
+    const baseData = cloudModified >= localModified ? cloudData : localData;
+    const merged = checkQuestReset(checkDayReset(mergeState(baseData)));
+    // Union log (cloud first so cloud entries win dedup)
+    const seenDates = new Set();
+    merged.log = [...(cloudData.log || []), ...(localData.log || [])].filter(e => {
+      const key = e.dateStr || e.date;
+      if (seenDates.has(key)) return false;
+      seenDates.add(key);
+      return true;
+    }).slice(-200);
+    // Maximums
+    merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
+    merged.level = Math.max(cloudData.level || 1, localData.level || 1);
+    merged.xp = Math.max(0, merged.totalXp - xpToLevel(merged.level));
+    merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
+    merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
+    merged.checkins = Math.max(cloudData.checkins || 0, localData.checkins || 0);
+    merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
+    // Union check-ins
+    const ciMap = new Map();
+    (cloudData.weeklyCheckins || []).forEach(c => ciMap.set(c.week, c));
+    (localData.weeklyCheckins || []).forEach(c => ciMap.set(c.week, c));
+    merged.weeklyCheckins = [...ciMap.values()].sort((a, b) => a.week - b.week);
+    // Union weekProgress — never drop sessions from either source
+    const mergedWP = { ...(baseData.weekProgress || {}) };
+    const otherWP = ((baseData === cloudData) ? localData : cloudData).weekProgress || {};
+    for (const [week, other] of Object.entries(otherWP)) {
+      if (!mergedWP[week]) {
+        mergedWP[week] = other;
+      } else {
+        const base = mergedWP[week];
+        const sMap = new Map();
+        [...(base.sessions || []), ...(other.sessions || [])].forEach(s => {
+          const k = `${s.dayKey || ''}-${s.date || ''}`;
+          if (!sMap.has(k)) sMap.set(k, s);
+        });
+        mergedWP[week] = {
+          ...base,
+          count: Math.max(base.count || 0, other.count || 0),
+          completedDays: [...new Set([...(base.completedDays || []), ...(other.completedDays || [])])],
+          dates: [...new Set([...(base.dates || []), ...(other.dates || [])])],
+          completed: base.completed || other.completed,
+          sessions: [...sMap.values()],
+        };
+      }
+    }
+    merged.weekProgress = mergedWP;
+    // Union arrays
+    merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
+    merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
+    merged.recoveryScores = unionArrays(cloudData.recoveryScores, localData.recoveryScores, r => r.date).slice(-90);
+    merged.aiCoachHistory = (localData.aiCoachHistory || []).length >= (cloudData.aiCoachHistory || []).length
+      ? (localData.aiCoachHistory || []) : (cloudData.aiCoachHistory || []);
+    return merged;
+  }
+
+  const syncFromCloud = useCallback(async () => {
+    if (!userId) { showToast('Sign in to sync from cloud.'); return; }
+    setSyncing(true);
+    try {
+      const cloudData = await cloudGet(userId);
+      if (!cloudData || Object.keys(cloudData).length === 0) {
+        showToast('No cloud data found.');
+        setSyncing(false);
+        return;
+      }
+      setStateRaw(prev => {
+        const merged = applyCloudMerge(prev, cloudData);
+        storageSet(merged);
+        cancelCloudDebounce();
+        cloudSet(userId, merged);
+        return merged;
+      });
+      setLastSyncedAt(Date.now());
+      showToast('Synced from cloud ✓');
+    } catch (e) {
+      showToast('Sync failed — check your connection.');
+      console.error('[syncFromCloud]', e);
+    } finally {
+      setSyncing(false);
+    }
+  }, [userId, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const importData = useCallback((data) => {
     if (!data || typeof data !== 'object' ||
@@ -1075,5 +1216,6 @@ export function useGameState(user) {
     logRecovery, updateDailyHabits,
     importData, completeAssessment, changeProgram,
     swapExercise, deleteExercise,
+    syncFromCloud, lastSyncedAt, syncing,
   };
 }

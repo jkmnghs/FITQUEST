@@ -244,7 +244,7 @@ function getProgramExercisesForDay(state, dayKey) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(state.currentWeek || 1);
   // Single training day being backfilled
@@ -591,7 +591,6 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 : `LOG WEEK ${backfillW} — ${DAY_SHORT[backfillDay]?.toUpperCase()}`}
           </button>
           </>;
-        })()}
       </div>
 
       {/* Nutrition Goals */}
@@ -633,6 +632,35 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
           Export your progress as a JSON file, or restore from a previous backup.
         </div>
+
+        {/* Cloud Resync */}
+        {onSyncFromCloud && (
+          <div style={{ marginBottom: 10 }}>
+            <button
+              onClick={onSyncFromCloud}
+              disabled={syncing}
+              style={{
+                width: '100%', padding: 11, border: 'none', borderRadius: 10,
+                background: syncing
+                  ? 'rgba(0,229,255,0.1)'
+                  : 'linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.08))',
+                border: '1px solid rgba(0,229,255,0.3)',
+                fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                color: syncing ? 'var(--text3)' : 'var(--cyan)',
+                cursor: syncing ? 'default' : 'pointer', letterSpacing: 0.5,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {syncing ? '⟳ SYNCING...' : '☁ RESYNC FROM CLOUD'}
+            </button>
+            {lastSyncedAt && (
+              <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginTop: 5 }}>
+                Last synced: {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => {

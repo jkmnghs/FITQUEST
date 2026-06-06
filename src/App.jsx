@@ -102,6 +102,7 @@ export default function App() {
     resetAll, resetToday, startSession, backfillWeek,
     addAIHistory, logMeal, deleteMeal, importData,
     completeAssessment, changeProgram, swapExercise, deleteExercise,
+    syncFromCloud, lastSyncedAt, syncing,
   } = useGameState(user);
 
   const {
@@ -143,7 +144,7 @@ export default function App() {
   if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
   if (!state.assessment?.completed) return (
     <><BgFx /><OnboardingScreen onComplete={async (a) => {
-      const templates = await generateProgramFromAssessment(a);
+      const templates = await generateProgramFromAssessment(a, user?.id);
       completeAssessment(a, fireOnboarding);
       if (templates) updateSetting('dayTemplates', templates);
     }} /></>
@@ -220,6 +221,7 @@ export default function App() {
     agentMessages,
     onSaveHistory: addAIHistory,
     onSaveProgram: (updatedTemplates) => updateSetting('dayTemplates', updatedTemplates),
+    userId: user?.id,
   };
 
   return (
@@ -349,6 +351,9 @@ export default function App() {
                       userEmail={user?.email}
                       onSignOut={signOut}
                       onShowCycleComplete={() => setShowCycleComplete(true)}
+                      onSyncFromCloud={syncFromCloud}
+                      lastSyncedAt={lastSyncedAt}
+                      syncing={syncing}
                     />
                   </LazyTab>
                 )}

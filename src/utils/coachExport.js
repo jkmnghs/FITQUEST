@@ -44,16 +44,41 @@ export function formatForCoach(state) {
   }
   lines.push('');
 
-  // ── Today's session ─────────────────────────────────────────────────────────
+  // ── Today's planned workout (from day templates) ────────────────────────────
+  const DAY_KEYS_ORD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayKey = DAY_KEYS_ORD[new Date().getDay()];
+  const todayTemplate = state.dayTemplates?.[todayKey];
+  if (todayTemplate) {
+    lines.push(`TODAY'S PLANNED WORKOUT — ${todayKey.toUpperCase()} (${todayTemplate.title || 'Session'})`);
+    lines.push('---');
+    for (const ex of (todayTemplate.exercises || [])) {
+      const wt = ex.isBodyweight ? 'bodyweight' : convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit) + unit;
+      lines.push(`  ${ex.name}: ${ex.sets} sets × ${ex.reps} reps @ ${wt}`);
+    }
+    lines.push('');
+  }
+
+  // ── Today's session (in-progress or just finished) ──────────────────────────
   const todayDone = state.todayExDone || [];
   const details = state.todayExDetails || {};
-  if (todayDone.length > 0) {
-    const sessionLabel = state.todaySessionFinished ? 'TODAY\'S COMPLETED SESSION' : 'TODAY\'S SESSION (in progress)';
+
+  // Fall back to the most recent session log entry if todayExDone has been cleared
+  const recentSessionLog = (state.log || [])
+    .filter(e => e.type === 'session' && e.exerciseDetails && Object.keys(e.exerciseDetails).length > 0)
+    .at(-1);
+
+  const activeDone = todayDone.length > 0 ? todayDone : (recentSessionLog?.exercisesDone || []);
+  const activeDetails = todayDone.length > 0 ? details : (recentSessionLog?.exerciseDetails || {});
+  const sessionLabel = todayDone.length > 0
+    ? (state.todaySessionFinished ? 'TODAY\'S COMPLETED SESSION' : 'TODAY\'S SESSION (in progress)')
+    : recentSessionLog ? `MOST RECENT SESSION (${recentSessionLog.dateStr || recentSessionLog.date})` : null;
+
+  if (sessionLabel && activeDone.length > 0) {
     lines.push(sessionLabel);
     lines.push('---');
     for (const ex of getExercises(state)) {
-      if (!todayDone.includes(ex.id)) continue;
-      const d = details[ex.id];
+      if (!activeDone.includes(ex.id)) continue;
+      const d = activeDetails[ex.id];
       if (!d) continue;
       if (ex.isPlank) {
         lines.push(`  Plank: ${d.setsCompleted} set(s) done`);
@@ -70,7 +95,7 @@ export function formatForCoach(state) {
         lines.push(`  ${ex.name}: ${wt}${unit} × ${d.setsCompleted}/${d.setsPrescribed} sets${repsStr}${rpeStr}`);
       }
     }
-    const skipped = EXERCISES.filter(e => !todayDone.includes(e.id)).map(e => e.name);
+    const skipped = EXERCISES.filter(e => !activeDone.includes(e.id)).map(e => e.name);
     if (skipped.length) lines.push(`  Skipped: ${skipped.join(', ')}`);
     lines.push('');
   }
@@ -161,8 +186,8 @@ export function formatForCoach(state) {
   }
 
   // Today's nutrition intake
-  const todayStr = new Date().toDateString();
-  const todayMeals = (state.mealLogs || []).filter(m => new Date(m.date).toDateString() === todayStr);
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const todayMeals = (state.mealLogs || []).filter(m => m.date && new Date(m.date).toLocaleDateString('en-CA') === todayStr);
   if (todayMeals.length > 0) {
     const totals = todayMeals.reduce((acc, meal) => {
       acc.calories += meal.totals?.calories || 0;

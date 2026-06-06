@@ -166,9 +166,20 @@ PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
   const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
 
   if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
+    const DAY_ORD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const todayKey = DAY_ORD[new Date().getDay()];
+    const todayTemplate = state.dayTemplates?.[todayKey];
+    const todayPlan = todayTemplate
+      ? `TODAY'S WORKOUT (${todayKey.toUpperCase()} — ${todayTemplate.title || 'Session'}):\n` +
+        (todayTemplate.exercises || []).map(ex => {
+          const wt = ex.isBodyweight ? 'bodyweight' : `${convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit)}${unit}`;
+          return `  ${ex.name}: ${ex.sets}×${ex.reps} @ ${wt}`;
+        }).join('\n')
+      : 'No workout scheduled today (rest day or no program set).';
     return `${base}
 STATUS: ${statusLine}
-LIFTS:\n${liftSummary}`;
+LIFTS:\n${liftSummary}
+${todayPlan}`;
   }
 
   // checkin — needs weight trend + training stats
@@ -209,19 +220,40 @@ Be specific and energetic.`;
     }
 
     case 'analysis': {
-      if (todayDone.length === 0) {
-        return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}). Give a brief motivating push to get going.`;
+      // Fall back to most recent session log if todayExDone already cleared
+      const recentLog = (state.log || [])
+        .filter(e => e.type === 'session' && e.exerciseDetails && Object.keys(e.exerciseDetails).length > 0)
+        .at(-1);
+      const activeDone = todayDone.length > 0 ? todayDone : (recentLog?.exercisesDone || []);
+      const activeDetails2 = todayDone.length > 0 ? details : (recentLog?.exerciseDetails || {});
+      const sessionDateLabel = recentLog && todayDone.length === 0
+        ? ` (${recentLog.dateStr || recentLog.date})` : '';
+
+      if (activeDone.length === 0) {
+        const DAY_ORD2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const todayKey2 = DAY_ORD2[new Date().getDay()];
+        const tmpl = state.dayTemplates?.[todayKey2];
+        const planStr = tmpl
+          ? `Today's plan (${tmpl.title || todayKey2}):\n` +
+            (tmpl.exercises || []).map(ex => {
+              const wt = ex.isBodyweight ? 'bodyweight' : `${convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit)}${unit}`;
+              return `  ${ex.name}: ${ex.sets}×${ex.reps} @ ${wt}`;
+            }).join('\n')
+          : 'No program set for today.';
+        return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}).\n${planStr}\n${userMessage ? `They said: "${userMessage}"\n` : ''}Give specific advice about today's workout — weights to use, cues, what to focus on.`;
       }
-      const summary = todayDone.map(id => {
+      const summary = activeDone.map(id => {
         const exercises = getExercises(state);
         const ex = exercises.find(e => e.id === id);
-        const det = details[id];
+        const det = activeDetails2[id];
         if (!det || !ex) return `  ${id}: done`;
         const compliance = det.setsCompleted >= det.setsPrescribed ? 'completed as programmed' : `only ${det.setsCompleted} of ${det.setsPrescribed} prescribed sets`;
-        return `  ${ex.name}: ${compliance}${det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : ''}`;
+        const rpeStr = det.maxRPE > 0 ? `, RPE ${det.maxRPE}` : '';
+        const wtStr = det.maxWeight > 0 ? `, ${convertWeight(det.maxWeight, unit)}${unit}` : '';
+        return `  ${ex.name}: ${compliance}${wtStr}${rpeStr}`;
       }).join('\n');
-      const missed = getExercises(state).filter(e => !todayDone.includes(e.id)).map(e => e.name);
-      return `Post-session analysis Week ${state.currentWeek}:
+      const missed = getExercises(state).filter(e => !activeDone.includes(e.id)).map(e => e.name);
+      return `Post-session analysis Week ${state.currentWeek}${sessionDateLabel}:
 Note: set counts vary per exercise by program design (compounds are 3 sets, accessories are 2 sets — this is intentional).
 ${summary}
 ${missed.length > 0 ? `Skipped: ${missed.join(', ')}` : 'All exercises done!'}
@@ -377,7 +409,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
   );
 }
 
-export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose }) {
+export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose, userId }) {
   const [activeMode, setActiveMode] = useState('pep');
   const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
@@ -513,13 +545,23 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
         requestBody.tool_choice = { type: 'auto' };
       }
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (userId) headers['x-user-id'] = userId;
       const response = await fetch('/api/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(requestBody),
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = response.status === 429
+          ? (errData.error || 'Too many requests — wait a moment and try again.')
+          : response.status === 401
+          ? 'Session expired — please refresh the page.'
+          : (errData.error || `API error: ${response.status}`);
+        throw new Error(msg);
+      }
       const data = await response.json();
 
       // ── Handle tool_use (Program Builder) — supports multiple days in one response ──
