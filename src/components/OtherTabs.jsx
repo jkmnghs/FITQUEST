@@ -272,12 +272,10 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
     [backfillDay, state.dayTemplates, state.activeTemplates, state.trainingDays]
   );
 
-  // Pre-populate selected days from already-recorded data when week changes
+  // Reset selected day when week changes
   useEffect(() => {
-    const existing = (state.weekProgress?.[backfillW]?.completedDays || [])
-      .filter(d => _sortedTdays.includes(d));
-    setBackfillDays(existing);
-  }, [backfillW, _sortedTdays]);
+    setBackfillDay(null);
+  }, [backfillW]);
 
   // Seed default weights/sets whenever the exercise list changes
   useEffect(() => {
