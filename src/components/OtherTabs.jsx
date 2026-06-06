@@ -647,7 +647,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
               onClick={onSyncFromCloud}
               disabled={syncing}
               style={{
-                width: '100%', padding: 11, border: 'none', borderRadius: 10,
+                width: '100%', padding: 11, borderRadius: 10,
                 background: syncing
                   ? 'rgba(0,229,255,0.1)'
                   : 'linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.08))',

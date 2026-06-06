@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), devApiPlugin()],
     server: { port: 3000, host: true },
+    build: { chunkSizeWarningLimit: 1000 },
     test: {
       environment: 'node',
       globals: true,
