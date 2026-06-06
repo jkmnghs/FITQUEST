@@ -24,6 +24,31 @@ export function formatForCoach(state) {
   lines.push(`Total volume lifted: ${Math.round(state.totalVolume || 0).toLocaleString()} ${unit}`);
   lines.push('');
 
+  // ── Athlete profile ──────────────────────────────────────────────────────────
+  const a = state.assessment || {};
+  const GOAL_LABELS = { fat_loss: 'Fat Loss', muscle: 'Build Muscle', recomp: 'Body Recomp', strength: 'Strength' };
+  const LEVEL_LABELS = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+  const ACTIVITY_LABELS = { sedentary: 'Sedentary', light: 'Light', moderate: 'Moderate', active: 'Active', very_active: 'Very Active' };
+  lines.push('ATHLETE PROFILE');
+  lines.push('---');
+  if (a.heightCm)   lines.push(`  Height:   ${a.heightCm} cm`);
+  if (a.age)        lines.push(`  Age:      ${a.age} yrs`);
+  if (a.sex)        lines.push(`  Sex:      ${a.sex === 'male' ? 'Male' : 'Female'}`);
+  if (a.goal)       lines.push(`  Goal:     ${GOAL_LABELS[a.goal] ?? a.goal}`);
+  if (a.level)      lines.push(`  Level:    ${LEVEL_LABELS[a.level] ?? a.level}`);
+  if (a.dailyActivity) lines.push(`  Activity: ${ACTIVITY_LABELS[a.dailyActivity] ?? a.dailyActivity}`);
+  // Current body metrics (most recent check-in weight, or assessment baseline)
+  const latestCheckin = (state.weeklyCheckins || []).at(-1);
+  const currentWeightKg = latestCheckin?.weight ?? a.weightKg;
+  const currentWaistCm  = latestCheckin?.waist  ?? a.waistCm;
+  if (currentWeightKg) {
+    const dispWt = unit === 'lbs' ? `${(currentWeightKg * 2.205).toFixed(1)} lbs` : `${currentWeightKg} kg`;
+    lines.push(`  Weight:   ${dispWt}${latestCheckin ? ` (Wk ${latestCheckin.week} check-in)` : ' (baseline)'}`);
+  }
+  if (currentWaistCm)   lines.push(`  Waist:    ${currentWaistCm} cm`);
+  if (state.bmi)        lines.push(`  BMI:      ${state.bmi.toFixed(1)} (${state.bmiCategory || ''})`);
+  lines.push('');
+
   // ── Current weights + overload status ───────────────────────────────────────
   lines.push('CURRENT WORKING WEIGHTS & OVERLOAD STATUS');
   lines.push('---');
