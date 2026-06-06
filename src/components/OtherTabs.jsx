@@ -597,6 +597,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 : `LOG WEEK ${backfillW} — ${DAY_SHORT[backfillDay]?.toUpperCase()}`}
           </button>
           </>;
+        })()}
       </div>
 
       {/* Nutrition Goals */}
