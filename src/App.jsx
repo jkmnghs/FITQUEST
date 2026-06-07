@@ -15,6 +15,8 @@ import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 import { EXERCISES } from './data/gameData';
 import { generateProgramFromAssessment } from './utils/programGenerator';
+import AIBuilderScreen from './components/AIBuilderScreen';
+import SyncIndicator from './components/SyncIndicator';
 
 const TrainTab    = lazy(() => import('./components/TrainTab'));
 const FuelTab     = lazy(() => import('./components/NutritionTab'));
@@ -68,21 +70,6 @@ class ErrorBoundary extends Component {
   }
 }
 
-function FullScreenLoader({ label = 'LOADING...' }) {
-  return (
-    <div style={{
-      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--color-bg-primary)', gap: 16,
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
-        color: 'var(--color-action)', letterSpacing: 2,
-        animation: 'rankPulse 1.4s ease-in-out infinite',
-      }}>{label}</div>
-    </div>
-  );
-}
 
 export default function App() {
   const { user, loading: authLoading, authError, signIn, signUp, signOut } = useAuth();
@@ -93,6 +80,9 @@ export default function App() {
   const [installDismissed, setInstallDismissed] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [showTour, setShowTour] = useState(false);
+  const [generatingProgram, setGeneratingProgram] = useState(false);
+  const [apiReady, setApiReady] = useState(false);
+  const [pendingAssessment, setPendingAssessment] = useState(null);
   const contentRef = useRef(null);
 
   const {
@@ -139,14 +129,25 @@ export default function App() {
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (authLoading)  return <><BgFx /><FullScreenLoader label="LOADING..." /></>;
+  if (authLoading)  return <SyncIndicator label="LOADING..." />;
   if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
-  if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
+  if (cloudLoading) return <SyncIndicator label="SYNCING..." />;
+  if (generatingProgram) return (
+    <AIBuilderScreen
+      assessment={pendingAssessment}
+      apiReady={apiReady}
+      onDismiss={() => { setGeneratingProgram(false); setApiReady(false); setPendingAssessment(null); }}
+    />
+  );
   if (!state.assessment?.completed) return (
     <><BgFx /><OnboardingScreen onComplete={async (a) => {
+      setPendingAssessment(a);
+      setApiReady(false);
+      setGeneratingProgram(true);
       const templates = await generateProgramFromAssessment(a, user?.id);
       completeAssessment(a, fireOnboarding);
       if (templates) updateSetting('dayTemplates', templates);
+      setApiReady(true); // signals AIBuilderScreen it can transition to reveal
     }} /></>
   );
 
