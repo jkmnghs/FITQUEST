@@ -172,7 +172,7 @@ function NeuralCore({ phase }) {
 function HUDBg({ children }) {
   return (
     <div style={{
-      position: 'absolute', inset: 0, overflow: 'hidden',
+      position: 'fixed', inset: 0, overflow: 'hidden',
       background: `radial-gradient(ellipse at 50% 30%, #16263f 0%, ${NAVY} 58%, #050a14 100%)`,
     }}>
       <div style={{
@@ -268,12 +268,14 @@ function StepRow({ step, status }) {
 // ── Reveal card ───────────────────────────────────────────────
 function RevealCard({ assessment, onDismiss }) {
   const [shown, setShown] = useState(false);
+  // Stable ref so the auto-dismiss timer doesn't reset when App re-renders
+  // and passes a new onDismiss arrow reference
+  const dismissRef = useRef(onDismiss);
   useEffect(() => {
-    const id = requestAnimationFrame(() => setShown(true));
-    // Auto-dismiss after 3.5 s if user doesn't tap
-    const auto = setTimeout(onDismiss, 3500);
+    const id   = requestAnimationFrame(() => setShown(true));
+    const auto = setTimeout(() => dismissRef.current(), 3500);
     return () => { cancelAnimationFrame(id); clearTimeout(auto); };
-  }, [onDismiss]);
+  }, []); // intentionally empty — runs once only
 
   const days   = assessment?.trainingDays?.length || assessment?.daysPerWeek || 3;
   const mins   = assessment?.sessionLength || 60;
@@ -353,7 +355,7 @@ function RevealCard({ assessment, onDismiss }) {
       </div>
 
       {/* CTA */}
-      <button onClick={onDismiss} style={{
+      <button onClick={() => dismissRef.current()} style={{
         width:'100%', marginTop:12, padding:'15px', border:'none', cursor:'pointer',
         background:`linear-gradient(135deg,${CYAN},${PURPLE})`,
         borderRadius:12, fontFamily:ORBITRON, fontSize:13, fontWeight:700, letterSpacing:2,
@@ -367,14 +369,21 @@ function RevealCard({ assessment, onDismiss }) {
 
 // ── Main screen ───────────────────────────────────────────────
 export default function AIBuilderScreen({ assessment, apiReady = false, onDismiss }) {
-  const STEPS = buildSteps(assessment);
+  const STEPS     = buildSteps(assessment);
   const TOTAL_DUR = STEPS.reduce((s, x) => s + x.dur, 0); // ~9800ms
 
   const [current,  setCurrent]  = useState(0);
   const [animDone, setAnimDone] = useState(false);
   const [phase,    setPhase]    = useState('building'); // 'building' | 'done'
   const [pct,      setPct]      = useState(0);
+  const [smoothPct, setSmoothPct] = useState(0);
   const timers = useRef([]);
+
+  // Derived: animation has covered all steps but API hasn't returned yet.
+  // Using current >= STEPS.length catches the 300ms gap before animDone fires
+  // so the last step never flickers done → active.
+  const waitingForAPI = !apiReady && (animDone || current >= STEPS.length);
+  const done = phase === 'done';
 
   // Kick off step timers once
   useEffect(() => {
@@ -383,7 +392,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
       acc += step.dur;
       timers.current.push(setTimeout(() => {
         setCurrent(i + 1);
-        setPct(Math.round(((acc) / TOTAL_DUR) * 100));
+        setPct(Math.round((acc / TOTAL_DUR) * 100));
       }, acc));
     });
     timers.current.push(setTimeout(() => setAnimDone(true), TOTAL_DUR + 300));
@@ -399,16 +408,17 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
     }
   }, [animDone, apiReady]);
 
-  // Smooth progress bar
-  const [smoothPct, setSmoothPct] = useState(0);
+  // Smooth progress bar — hold at current position (≤98%) while waiting for API
+  // so the bar never visually regresses when pct hits 100 before apiReady.
   useEffect(() => {
-    if (phase === 'done') { setSmoothPct(100); return; }
+    if (done) { setSmoothPct(100); return; }
     let raf;
     const tick = () => {
       let stop = false;
       setSmoothPct(p => {
-        const target = animDone && !apiReady ? 98 : pct; // hold at 98% while waiting for API
-        const next = p + (target - p) * 0.1;
+        if (waitingForAPI && p >= 98) { stop = true; return p; } // freeze, don't regress
+        const target = waitingForAPI ? 98 : pct;
+        const next   = p + (target - p) * 0.1;
         if (Math.abs(target - next) < 0.3) { stop = true; return target; }
         return next;
       });
@@ -416,13 +426,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [pct, phase, animDone, apiReady]);
-
-  const done = phase === 'done';
-
-  // Which step is "active" — if animation done but API not ready, keep last step spinning
-  const activeStep = animDone && !apiReady ? STEPS.length - 1 : current;
-  const stepsDisplayCurrent = animDone && !apiReady ? STEPS.length - 1 : current;
+  }, [pct, done, waitingForAPI]);
 
   return (
     <HUDBg>
@@ -480,11 +484,11 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
               fontFamily: ORBITRON, fontWeight: 700, fontSize: 17, letterSpacing: 2,
               color: '#fff', textShadow: done ? `0 0 12px ${CYAN}` : 'none',
             }}>
-              {done ? 'PROGRAM FORGED' : animDone && !apiReady ? 'FINALIZING…' : 'BUILDING YOUR PROGRAM'}
+              {done ? 'PROGRAM FORGED' : waitingForAPI ? 'FINALIZING…' : 'BUILDING YOUR PROGRAM'}
             </div>
             {!done && (
               <div style={{ fontFamily: RAJDHANI, fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 3, letterSpacing: 0.3 }}>
-                {animDone && !apiReady ? 'AI is finalizing your plan' : 'AI designing a program tuned to you'}
+                {waitingForAPI ? 'AI is finalizing your plan' : 'AI designing a program tuned to you'}
               </div>
             )}
           </div>
@@ -500,10 +504,11 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
               {STEPS.map((step, i) => (
                 <StepRow key={i} step={step}
                   status={
-                    animDone && !apiReady && i === STEPS.length - 1 ? 'active'
-                    : i < stepsDisplayCurrent ? 'done'
-                    : i === stepsDisplayCurrent ? 'active'
-                    : 'pending'
+                    waitingForAPI
+                      ? (i === STEPS.length - 1 ? 'active' : 'done')
+                      : i < current ? 'done'
+                      : i === current ? 'active'
+                      : 'pending'
                   }
                 />
               ))}
