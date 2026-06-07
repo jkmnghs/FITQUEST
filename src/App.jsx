@@ -15,6 +15,8 @@ import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 import { EXERCISES } from './data/gameData';
 import { generateProgramFromAssessment } from './utils/programGenerator';
+import AIBuilderScreen from './components/AIBuilderScreen';
+import SyncIndicator from './components/SyncIndicator';
 
 const TrainTab    = lazy(() => import('./components/TrainTab'));
 const FuelTab     = lazy(() => import('./components/NutritionTab'));
@@ -93,6 +95,7 @@ export default function App() {
   const [installDismissed, setInstallDismissed] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [showTour, setShowTour] = useState(false);
+  const [generatingProgram, setGeneratingProgram] = useState(false);
   const contentRef = useRef(null);
 
   const {
@@ -139,14 +142,17 @@ export default function App() {
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (authLoading)  return <><BgFx /><FullScreenLoader label="LOADING..." /></>;
-  if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
-  if (cloudLoading) return <><BgFx /><FullScreenLoader label="SYNCING..." /></>;
+  if (authLoading)       return <SyncIndicator label="LOADING..." />;
+  if (!user)             return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} /></>;
+  if (cloudLoading)      return <SyncIndicator label="SYNCING..." />;
+  if (generatingProgram) return <AIBuilderScreen />;
   if (!state.assessment?.completed) return (
     <><BgFx /><OnboardingScreen onComplete={async (a) => {
+      setGeneratingProgram(true);
       const templates = await generateProgramFromAssessment(a, user?.id);
       completeAssessment(a, fireOnboarding);
       if (templates) updateSetting('dayTemplates', templates);
+      setGeneratingProgram(false);
     }} /></>
   );
 
