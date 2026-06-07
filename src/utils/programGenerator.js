@@ -54,15 +54,27 @@ export async function generateProgramFromAssessment(assessment, userId) {
     strength: 'Strength focus: 4-5 sets, 3-6 reps, long rest 180-300s',
   }[goal] || 'Balanced hypertrophy: 3-4 sets, 8-12 reps';
 
+  const UPPER_LOWER_TYPES = [
+    { title: 'UPPER BODY', muscles: 'chest, back, shoulders, and arms ONLY — bench press, rows, overhead press, pulldowns, curls, tricep work. NO leg or glute exercises.' },
+    { title: 'LOWER BODY', muscles: 'quads, hamstrings, glutes, and calves ONLY — squats, deadlifts, lunges, leg press, leg curls, calf raises. NO upper body exercises.' },
+  ];
+  const PPL_TYPES = [
+    { title: 'PUSH — CHEST + SHOULDERS + TRIS', muscles: 'chest, shoulders, and triceps ONLY — bench press, overhead press, dips, flyes, tricep work. NO back, biceps, or leg exercises.' },
+    { title: 'PULL — BACK + BICEPS',             muscles: 'back, biceps, and rear delts ONLY — rows, pulldowns, pull-ups, curls, face pulls. NO chest, pressing, or leg exercises.' },
+    { title: 'LEGS — QUADS + HAMSTRINGS + GLUTES', muscles: 'legs and glutes ONLY — squats, deadlifts, lunges, leg press, leg curls, calf raises. NO upper body exercises.' },
+  ];
+
   const splitDesc = {
-    full_body: `FULL BODY split — every session trains push, pull, AND legs together. Each day is a complete full-body workout. Title each day "FULL BODY" with a short variation note (e.g. "FULL BODY — STRENGTH FOCUS" or "FULL BODY — HYPERTROPHY").`,
-    upper_lower: numDays >= 4
-      ? `UPPER / LOWER split — alternate upper body days (chest, back, shoulders, arms) and lower body days (quads, hamstrings, glutes, calves). Upper day title: "UPPER BODY", Lower day title: "LOWER BODY". Aim for 2 upper + 2 lower across the ${numDays} days.`
-      : `UPPER / LOWER split — with ${numDays} days, alternate between an upper-body focused day (chest, back, shoulders, arms) and a lower-body focused day (quads, hamstrings, glutes). Titles: "UPPER BODY" and "LOWER BODY".`,
+    full_body: `FULL BODY split — every session trains push, pull, AND legs together. Each day is a complete full-body workout. Title each day "FULL BODY" with a short variation note (e.g. "FULL BODY — STRENGTH FOCUS" or "FULL BODY — HYPERTROPHY"). Vary exercise selection across days — don't repeat the same exercises each session.`,
+    upper_lower: `UPPER / LOWER split — strict muscle group isolation per session. Day assignments:\n${trainingDays.map((d, i) => `  ${d}: Title="${UPPER_LOWER_TYPES[i % 2].title}" — train ${UPPER_LOWER_TYPES[i % 2].muscles}`).join('\n')}\nEach day must ONLY include exercises for its designated muscle group. Do NOT mix upper and lower body exercises within a session.`,
     ppl: numDays >= 3
-      ? `PUSH / PULL / LEGS split — Day 1: Push (chest, shoulders, triceps), Day 2: Pull (back, biceps, rear delts), Day 3: Legs (quads, hamstrings, glutes, calves). Titles: "PUSH — CHEST + SHOULDERS + TRIS", "PULL — BACK + BICEPS", "LEGS — QUADS + HAMSTRINGS + GLUTES". If more than 3 days, repeat the cycle.`
-      : `PUSH / PULL split — with only ${numDays} days, use Day 1: Push (chest, shoulders, triceps) and Day 2: Pull + Legs combined (back, biceps, hamstrings, glutes).`,
+      ? `PUSH / PULL / LEGS split — strict muscle group isolation per session. Day assignments:\n${trainingDays.map((d, i) => `  ${d}: Title="${PPL_TYPES[i % 3].title}" — train ${PPL_TYPES[i % 3].muscles}`).join('\n')}\nEach day must ONLY include exercises for its designated muscle group. Do NOT mix muscle groups within a session.`
+      : `PUSH / PULL split — with only ${numDays} days, use Day 1 (${trainingDays[0]}): Push (chest, shoulders, triceps ONLY) and Day 2 (${trainingDays[1] || ''}): Pull + Legs combined (back, biceps, hamstrings, glutes).`,
   }[effectiveSplit] || `FULL BODY split — train all major muscle groups each session.`;
+
+  const splitIsolationRule = effectiveSplit === 'full_body'
+    ? '- Vary exercise selection across days — don\'t repeat the exact same exercises each session'
+    : '- Each session must ONLY contain exercises for its designated muscle group — no cross-group exercises';
 
   const prompt = `Design a complete ${numDays}-day training program for:
 Goal: ${goal} — ${goalStyle}
@@ -93,7 +105,7 @@ Rules:
 - isBodyweight: true and startKg: 0 for all bodyweight moves
 - isPlank: true only for plank
 - startKg should be realistic for ${level} level
-- Don't repeat the same primary muscle group on consecutive days`;
+${splitIsolationRule}`;
 
   try {
     const pgHeaders = { 'Content-Type': 'application/json' };
