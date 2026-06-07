@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Trophy, Settings, Dumbbell } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Trophy, Settings, Dumbbell, RefreshCw } from 'lucide-react';
 import RankTab from './RankTab';
 import { AchievementsTab, SettingsTab } from './OtherTabs';
 import ProgramEditorTab from './ProgramEditorTab';
@@ -23,8 +23,16 @@ function SectionHeader({ icon: Icon, title }) {
 export default function ProfileTab({
   state, onUpdate, onReset, onResetToday, onBackfillWeek,
   notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete,
-  onSyncFromCloud, lastSyncedAt, syncing,
+  onSyncFromCloud, lastSyncedAt, syncing, onRegenerateProgram,
 }) {
+  const [regenConfirm, setRegenConfirm] = useState(false);
+
+  function handleRegenClick() {
+    if (!regenConfirm) { setRegenConfirm(true); return; }
+    setRegenConfirm(false);
+    onRegenerateProgram?.();
+  }
+
   return (
     <div className="tab-enter">
       {/* Rank */}
@@ -40,6 +48,31 @@ export default function ProfileTab({
         <SectionHeader icon={Dumbbell} title="My Program" />
         <div style={{ padding: '0 var(--space-4)' }}>
           <ProgramEditorTab state={state} updateSetting={onUpdate} />
+          {onRegenerateProgram && (
+            <button
+              onClick={handleRegenClick}
+              onBlur={() => setRegenConfirm(false)}
+              style={{
+                marginTop: 12,
+                width: '100%', padding: '11px 16px',
+                borderRadius: 'var(--radius-md)',
+                border: regenConfirm
+                  ? '1px solid rgba(255,160,0,0.5)'
+                  : '1px solid rgba(0,229,255,0.2)',
+                background: regenConfirm
+                  ? 'rgba(255,160,0,0.08)'
+                  : 'rgba(0,229,255,0.06)',
+                color: regenConfirm ? '#ffa000' : 'var(--color-action)',
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.08em', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                transition: 'all 0.2s',
+              }}
+            >
+              <RefreshCw size={13} />
+              {regenConfirm ? 'TAP AGAIN TO CONFIRM' : 'REGENERATE PROGRAM'}
+            </button>
+          )}
         </div>
       </div>
 

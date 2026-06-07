@@ -1,5 +1,37 @@
 import { EX_CATALOG } from '../data/exerciseCatalog';
 
+// Muscle-group membership for post-processing split validation.
+// 'core' exercises are allowed on any split day.
+const SPLIT_GROUP = {
+  push: new Set(['bench','incbench','incdbench','dbbench','chestdip','cablefly','pecdeck','pushup',
+                 'machohp','ohp','bbohp','dbohp','lateraise','frontraise','reardelt','arnoldpress','cablelat',
+                 'ohtriext','tricpush','cgbench','skullcrush','dipbench']),
+  pull: new Set(['pulldown','cablerow','bbrow','dbrow','dbpullover','facepull','pullup','chinup',
+                 'rdl','deadlift','bbcurl','dbcurl','hammercurl','cablecurl','preachcurl']),
+  legs: new Set(['squat','legpress','legcurl','legext','hipthrust','bulgsplit','calfraise','dbsquat',
+                 'dbsumosq','bwsquat','dbrdl','dblunge']),
+  core: new Set(['cablecrnch','hanglegrise','plank','crunch','rustwist','abrollout','legrise','mtnclimp']),
+};
+
+// Which groups are allowed for each split-day label
+const SPLIT_ALLOWED = {
+  ppl:         { push: ['push','core'], pull: ['pull','core'], legs: ['legs','core'] },
+  upper_lower: { upper: ['push','pull','core'], lower: ['legs','core'] },
+};
+
+function getExerciseGroup(id) {
+  for (const [group, ids] of Object.entries(SPLIT_GROUP)) {
+    if (ids.has(id)) return group;
+  }
+  return null;
+}
+
+function filterToSplitDay(exercises, dayType, split) {
+  const allowed = SPLIT_ALLOWED[split]?.[dayType];
+  if (!allowed) return exercises;
+  return exercises.filter(ex => allowed.includes(getExerciseGroup(ex.id)));
+}
+
 const BARBELL_IDS = new Set(['squat','bench','deadlift','rdl','cgbench','bbohp','bbrow','incbench','skullcrush']);
 const CABLE_IDS   = new Set(['pulldown','cablerow','facepull','cablefly','cablelat','cablecurl','cablecrnch','tricpush','ohtriext']);
 const MACHINE_IDS = new Set(['legpress','legcurl','legext','hipthrust','pecdeck','machohp']);
@@ -130,13 +162,27 @@ ${splitIsolationRule}`;
     if (!match) return null;
 
     const parsed = JSON.parse(match[0]);
+    const pplDayTypes = ['push', 'pull', 'legs'];
+    const ulDayTypes  = ['upper', 'lower'];
     const valid = {};
     for (const [day, prog] of Object.entries(parsed)) {
-      if (trainingDays.includes(day) && Array.isArray(prog.exercises) && prog.exercises.length > 0) {
+      if (!trainingDays.includes(day) || !Array.isArray(prog.exercises) || prog.exercises.length === 0) continue;
+
+      // Strip exercises that belong to the wrong muscle group for this split day
+      let exercises = prog.exercises;
+      if (effectiveSplit === 'ppl') {
+        const dayType = pplDayTypes[trainingDays.indexOf(day) % 3];
+        exercises = filterToSplitDay(exercises, dayType, 'ppl');
+      } else if (effectiveSplit === 'upper_lower') {
+        const dayType = ulDayTypes[trainingDays.indexOf(day) % 2];
+        exercises = filterToSplitDay(exercises, dayType, 'upper_lower');
+      }
+
+      if (exercises.length > 0) {
         valid[day] = {
           title:          prog.title || '',
           sessionMinutes: prog.sessionMinutes || mins,
-          exercises:      prog.exercises,
+          exercises,
         };
       }
     }

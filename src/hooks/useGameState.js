@@ -416,6 +416,7 @@ export function useGameState(user) {
         activeTemplates: _builtTemplates,
         currentDayIndex: _initDayIndex,
         trainingDays: assessment.trainingDays,
+        dayTemplates: null, // always clear so stale split templates never bleed into new program
         liftWeights,
         liftHistory,
         nutritionGoals,
@@ -470,10 +471,14 @@ export function useGameState(user) {
         ...prev,
         programId: program.id,
         activeExercises: buildPersonalizedExercises(program.exercises, prev.assessment),
+        activeTemplates: program.templates
+          ? program.templates.map(t => ({ ...t, exercises: buildPersonalizedExercises(t.exercises, prev.assessment) }))
+          : null,
         sessionsPerWeek: program.sessionsPerWeek,
         liftWeights: mergedWeights,
         liftHistory: mergedHistory,
         assessment: { ...prev.assessment, programId: program.id },
+        dayTemplates: null, // clear stale AI templates so new program's split is shown correctly
       };
       if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
       return newState;
