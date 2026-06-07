@@ -58,7 +58,14 @@ export function useAuth() {
         ...(name ? { data: { full_name: name } } : {}),
       },
     });
-    if (error) setAuthError(error.message);
+    if (error) {
+      const msg = error.message?.toLowerCase() ?? '';
+      if (msg.includes('already registered') || msg.includes('already been registered') || msg.includes('user already exists')) {
+        setAuthError('An account with this email already exists. Try signing in or use "Forgot Password?" to recover access.');
+      } else {
+        setAuthError(error.message);
+      }
+    }
     return !error;
   }
 
