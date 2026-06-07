@@ -204,6 +204,18 @@ export default function App() {
     }} /></>
   );
 
+  async function handleRegenerateProgram() {
+    const assessment = state.assessment;
+    if (!assessment) return;
+    updateSetting('dayTemplates', null);
+    setPendingAssessment(assessment);
+    setApiReady(false);
+    setGeneratingProgram(true);
+    const templates = await generateProgramFromAssessment(assessment, user?.id);
+    if (templates) updateSetting('dayTemplates', templates);
+    setApiReady(true);
+  }
+
   async function handleRequestNotif() {
     const result = await requestNotificationPermission();
     setNotifStatus(result);
@@ -408,6 +420,7 @@ export default function App() {
                       onSyncFromCloud={syncFromCloud}
                       lastSyncedAt={lastSyncedAt}
                       syncing={syncing}
+                      onRegenerateProgram={handleRegenerateProgram}
                     />
                   </LazyTab>
                 )}
