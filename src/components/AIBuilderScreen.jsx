@@ -471,7 +471,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
               <svg width="220" height="220" viewBox="0 0 220 220" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
                 <circle cx="110" cy="110" r="107" fill="none" stroke={`${CYAN}18`} strokeWidth="1" />
                 <circle cx="110" cy="110" r="107" fill="none" stroke={CYAN} strokeWidth="2"
-                  strokeDasharray={`${(smoothPct / 100) * 2 * Math.PI * 107} ${2 * Math.PI * 107}`}
+                  strokeDasharray={`${((waitingForAPI ? Math.min(smoothPct, 98) : smoothPct) / 100) * 2 * Math.PI * 107} ${2 * Math.PI * 107}`}
                   strokeLinecap="round" transform="rotate(-90 110 110)"
                   style={{ filter: `drop-shadow(0 0 4px ${CYAN})`, transition: 'stroke-dasharray 0.4s' }} />
               </svg>
@@ -526,12 +526,12 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
                 NEURAL ENGINE · v4.2
               </span>
               <span style={{ fontFamily: ORBITRON, fontSize: 11, fontWeight: 700, color: CYAN, textShadow: `0 0 8px ${CYAN}` }}>
-                {Math.round(smoothPct)}%
+                {Math.min(Math.round(smoothPct), waitingForAPI ? 98 : 100)}%
               </span>
             </div>
             <div style={{ height: 4, background: `${CYAN}18`, borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
               <div style={{
-                position: 'absolute', inset: 0, width: `${smoothPct}%`,
+                position: 'absolute', inset: 0, width: `${waitingForAPI ? Math.min(smoothPct, 98) : smoothPct}%`,
                 background: `linear-gradient(90deg,${CYAN},${PURPLE})`,
                 boxShadow: `0 0 10px ${CYAN}`, borderRadius: 3,
                 transition: 'width 0.3s',
