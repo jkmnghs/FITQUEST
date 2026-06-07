@@ -2,14 +2,16 @@ import { EX_CATALOG } from '../data/exerciseCatalog';
 
 // Muscle-group membership for post-processing split validation.
 // 'core' exercises are allowed on any split day.
+// rdl + deadlift live in 'legs' so they correctly survive both upper_lower lower-day
+// and PPL leg-day post-processing filters.
 const SPLIT_GROUP = {
   push: new Set(['bench','incbench','incdbench','dbbench','chestdip','cablefly','pecdeck','pushup',
                  'machohp','ohp','bbohp','dbohp','lateraise','frontraise','reardelt','arnoldpress','cablelat',
                  'ohtriext','tricpush','cgbench','skullcrush','dipbench']),
   pull: new Set(['pulldown','cablerow','bbrow','dbrow','dbpullover','facepull','pullup','chinup',
-                 'rdl','deadlift','bbcurl','dbcurl','hammercurl','cablecurl','preachcurl']),
+                 'bbcurl','dbcurl','hammercurl','cablecurl','preachcurl']),
   legs: new Set(['squat','legpress','legcurl','legext','hipthrust','bulgsplit','calfraise','dbsquat',
-                 'dbsumosq','bwsquat','dbrdl','dblunge']),
+                 'dbsumosq','bwsquat','dbrdl','dblunge','rdl','deadlift']),
   core: new Set(['cablecrnch','hanglegrise','plank','crunch','rustwist','abrollout','legrise','mtnclimp']),
 };
 
@@ -78,8 +80,19 @@ export async function generateProgramFromAssessment(assessment, userId) {
       ? (numDays <= 3 ? 'full_body' : numDays === 4 ? 'upper_lower' : 'ppl')
       : splitPref;
 
+  // Build a fast id→group lookup so the catalog can carry explicit group tags.
+  // This removes any ambiguity about which split day each exercise belongs to.
+  const idToGroup = {};
+  for (const [group, ids] of Object.entries(SPLIT_GROUP)) {
+    for (const id of ids) idToGroup[id] = group.toUpperCase();
+  }
+
   const catalog = filterCatalogForEquipment(equipment)
-    .map(e => `${e.id}="${e.name}"${e.isBodyweight ? '[BW,0kg]' : `[${e.startKg}kg]`}`)
+    .map(e => {
+      const weight = e.isBodyweight ? 'BW,0kg' : `${e.startKg}kg`;
+      const group  = idToGroup[e.id] ?? 'CORE';
+      return `${e.id}="${e.name}"[${weight}][${group}]`;
+    })
     .join(', ');
 
   const goalStyle = {
@@ -91,12 +104,12 @@ export async function generateProgramFromAssessment(assessment, userId) {
 
   const UPPER_LOWER_TYPES = [
     { title: 'UPPER BODY', muscles: 'chest, back, shoulders, and arms ONLY — bench press, rows, overhead press, pulldowns, curls, tricep work. NO leg or glute exercises.' },
-    { title: 'LOWER BODY', muscles: 'quads, hamstrings, glutes, and calves ONLY — squats, deadlifts, lunges, leg press, leg curls, calf raises. NO upper body exercises.' },
+    { title: 'LOWER BODY', muscles: 'quads, hamstrings, glutes, and calves ONLY — squats, Romanian deadlifts, conventional deadlifts, lunges, leg press, leg curls, hip thrusts, calf raises. NO upper body exercises.' },
   ];
   const PPL_TYPES = [
-    { title: 'PUSH — CHEST + SHOULDERS + TRIS', muscles: 'chest, shoulders, and triceps ONLY — bench press, overhead press, dips, flyes, tricep work. NO back, biceps, or leg exercises.' },
-    { title: 'PULL — BACK + BICEPS',             muscles: 'back, biceps, and rear delts ONLY — rows, pulldowns, pull-ups, curls, face pulls. NO chest, pressing, or leg exercises.' },
-    { title: 'LEGS — QUADS + HAMSTRINGS + GLUTES', muscles: 'legs and glutes ONLY — squats, deadlifts, lunges, leg press, leg curls, calf raises. NO upper body exercises.' },
+    { title: 'PUSH — CHEST + SHOULDERS + TRIS',    muscles: 'chest, shoulders, and triceps ONLY — bench press, overhead press, dips, flyes, lateral raises, tricep work. NO back, biceps, or leg exercises.' },
+    { title: 'PULL — BACK + BICEPS',                muscles: 'back and biceps ONLY — rows, pulldowns, pull-ups, curls, face pulls, pullovers. NO pressing, triceps, deadlifts, or leg exercises.' },
+    { title: 'LEGS — QUADS + HAMSTRINGS + GLUTES',  muscles: 'legs and glutes ONLY — squats, Romanian deadlifts, conventional deadlifts, lunges, leg press, leg curls, hip thrusts, calf raises. NO upper body exercises.' },
   ];
 
   const splitDesc = {
@@ -149,8 +162,8 @@ ${splitIsolationRule}`;
       method: 'POST',
       headers: pgHeaders,
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2500,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
         system: 'You are a training program generator. Output only valid JSON.',
         messages: [{ role: 'user', content: prompt }],
       }),
