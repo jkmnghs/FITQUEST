@@ -390,10 +390,11 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
     let acc = 0;
     STEPS.forEach((step, i) => {
       acc += step.dur;
+      const elapsed = acc; // capture by value — acc mutates each iteration
       timers.current.push(setTimeout(() => {
         setCurrent(i + 1);
-        setPct(Math.round((acc / TOTAL_DUR) * 100));
-      }, acc));
+        setPct(Math.round((elapsed / TOTAL_DUR) * 100));
+      }, elapsed));
     });
     timers.current.push(setTimeout(() => setAnimDone(true), TOTAL_DUR + 300));
     return () => timers.current.forEach(clearTimeout);
