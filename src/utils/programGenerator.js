@@ -38,10 +38,13 @@ export async function generateProgramFromAssessment(assessment, userId) {
   const splitPref      = assessment.splitPreference || 'full_body';
   const numDays        = trainingDays.length;
 
-  // For "No Preference" or beginners (null), pick the most appropriate split by day count
-  const effectiveSplit = (splitPref === 'no_preference' || splitPref === null)
-    ? (numDays <= 3 ? 'full_body' : numDays === 4 ? 'upper_lower' : 'ppl')
-    : splitPref;
+  // Bodyweight-only users always get full body — no split programs exist for it.
+  // For "No Preference" or null, auto-select split by day count.
+  const effectiveSplit = equipment === 'bodyweight'
+    ? 'full_body'
+    : (splitPref === 'no_preference' || splitPref === null)
+      ? (numDays <= 3 ? 'full_body' : numDays === 4 ? 'upper_lower' : 'ppl')
+      : splitPref;
 
   const catalog = filterCatalogForEquipment(equipment)
     .map(e => `${e.id}="${e.name}"${e.isBodyweight ? '[BW,0kg]' : `[${e.startKg}kg]`}`)

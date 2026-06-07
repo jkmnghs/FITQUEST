@@ -650,9 +650,9 @@ export default function OnboardingScreen({ onComplete }) {
     );
   }
 
-  // ── Step 9: Split Preference (Intermediate/Advanced only) (Phase 3.7) ──
+  // ── Step 9: Split Preference (Intermediate/Advanced, non-bodyweight only) ──
   if (step === 9) {
-    if (!isAdvanced) {
+    if (!isAdvanced || data.equipment === 'bodyweight') {
       setStep(10); return null;
     }
     const splits = [
