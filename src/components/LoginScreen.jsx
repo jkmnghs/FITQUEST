@@ -5,6 +5,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState(null);
   const [signUpDone, setSignUpDone] = useState(false);
@@ -25,6 +26,8 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
 
     if (!email || !password) { setLocalError('Please enter your email and password.'); return; }
     if (mode === 'signup' && !name.trim()) { setLocalError('Please enter your name.'); return; }
+    if (mode === 'signup' && password !== confirmPassword) { setLocalError('Passwords do not match.'); return; }
+    if (mode === 'signup' && password.length < 6) { setLocalError('Password must be at least 6 characters.'); return; }
     setLoading(true);
 
     if (mode === 'signin') {
@@ -81,7 +84,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
           {[['signin', 'SIGN IN'], ['signup', 'CREATE ACCOUNT']].map(([m, label]) => (
             <button
               key={m}
-              onClick={() => { setMode(m); setLocalError(null); setSignUpDone(false); setResetDone(false); }}
+              onClick={() => { setMode(m); setLocalError(null); setSignUpDone(false); setResetDone(false); setConfirmPassword(''); }}
               style={{
                 flex: 1, padding: '10px 4px',
                 border: 'none', cursor: 'pointer',
@@ -247,7 +250,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               />
             </label>
 
-            <label style={{ display: 'block', marginBottom: mode === 'signin' ? 8 : 20 }}>
+            <label style={{ display: 'block', marginBottom: mode === 'signup' ? 16 : mode === 'signin' ? 8 : 20 }}>
               <div style={{
                 fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
@@ -267,6 +270,29 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                 }}
               />
             </label>
+
+            {mode === 'signup' && (
+              <label style={{ display: 'block', marginBottom: 20 }}>
+                <div style={{
+                  fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                  color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
+                }}>CONFIRM PASSWORD</div>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                  style={{
+                    width: '100%', padding: '12px 14px', borderRadius: 10,
+                    border: `1px solid ${confirmPassword && password !== confirmPassword ? 'rgba(255,50,50,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </label>
+            )}
 
             {mode === 'signin' && (
               <div style={{ textAlign: 'right', marginBottom: 16 }}>
