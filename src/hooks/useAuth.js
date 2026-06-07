@@ -62,6 +62,8 @@ export function useAuth() {
       const msg = error.message?.toLowerCase() ?? '';
       if (msg.includes('already registered') || msg.includes('already been registered') || msg.includes('user already exists')) {
         setAuthError('An account with this email already exists. Try signing in or use "Forgot Password?" to recover access.');
+      } else if (msg.includes('rate limit') || msg.includes('email rate')) {
+        setAuthError('Too many attempts. Please wait a few minutes before trying again.');
       } else {
         setAuthError(error.message);
       }
