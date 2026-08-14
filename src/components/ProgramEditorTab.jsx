@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 
 const DAY_ORDER  = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -115,14 +115,33 @@ export default function ProgramEditorTab({ state, updateSetting }) {
 
   const [activeDay, setActiveDay] = useState(trainingDays[0] || 'mon');
 
-  const [drafts, setDrafts] = useState(() => {
-    const existing = state.dayTemplates || {};
+  const buildDrafts = (templates, days) => {
+    const existing = templates || {};
     const init = {};
-    trainingDays.forEach(d => {
+    days.forEach(d => {
       init[d] = existing[d] || { title: '', sessionMinutes: 75, exercises: [] };
     });
     return init;
-  });
+  };
+
+  const [drafts, setDrafts] = useState(() => buildDrafts(state.dayTemplates, trainingDays));
+
+  // The lazy initialiser only ran once. If dayTemplates arrived later (cloud
+  // sync, AI generation) or the training days changed, the editor kept showing
+  // empty days — and SAVE then wrote those empties over the real program.
+  const [dirty, setDirty] = useState(false);
+  const templatesKey = JSON.stringify(state.dayTemplates || {});
+  const daysKey = trainingDays.join(',');
+  const lastSyncedKey = useRef(`${templatesKey}|${daysKey}`);
+
+  useEffect(() => {
+    const key = `${templatesKey}|${daysKey}`;
+    if (key === lastSyncedKey.current) return;
+    lastSyncedKey.current = key;
+    if (dirty) return; // never discard edits the user is in the middle of
+    setDrafts(buildDrafts(state.dayTemplates, trainingDays));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templatesKey, daysKey, dirty]);
 
   const [editingIdx, setEditingIdx] = useState(null);
   const [addSearch, setAddSearch]   = useState('');
@@ -133,6 +152,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
   const exList = day.exercises || [];
 
   function patchDay(field, value) {
+    setDirty(true);
     setDrafts(prev => ({ ...prev, [activeDay]: { ...(prev[activeDay] || {}), [field]: value } }));
   }
 
@@ -193,7 +213,12 @@ export default function ProgramEditorTab({ state, updateSetting }) {
   }
 
   function saveProgram() {
-    updateSetting('dayTemplates', drafts);
+    // Merge rather than replace: `drafts` only covers the current trainingDays,
+    // so a wholesale write silently dropped templates for any other day.
+    const merged = { ...(state.dayTemplates || {}), ...drafts };
+    updateSetting('dayTemplates', merged);
+    lastSyncedKey.current = `${JSON.stringify(merged)}|${daysKey}`;
+    setDirty(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }

@@ -4,128 +4,12 @@ import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeload
 import ExerciseModal from './ExerciseModal';
 import ProgramCompleteModal from './ProgramCompleteModal';
 import { getProgramExercisesForDay } from './OtherTabs';
+import { getPickerCategories } from '../data/exerciseCatalog';
 
-// Full categorized exercise library (gym + home)
-const EXERCISE_LIBRARY = [
-  {
-    category: 'Chest', icon: '🫁',
-    exercises: [
-      { id: 'bench',       name: 'Barbell Bench Press',    startKg: 42.5 },
-      { id: 'incbench',    name: 'Incline Barbell Press',  startKg: 35 },
-      { id: 'decbench',    name: 'Decline Bench Press',    startKg: 45 },
-      { id: 'dbbench',     name: 'DB Bench Press',         startKg: 16 },
-      { id: 'incdbench',   name: 'Incline DB Press',       startKg: 14 },
-      { id: 'cablefly',    name: 'Cable Chest Fly',        startKg: 10 },
-      { id: 'pecdeck',     name: 'Pec Deck',               startKg: 35 },
-      { id: 'chestdip',    name: 'Chest Dip',              startKg: 0, isBodyweight: true },
-      { id: 'pushup',      name: 'Push-up',                startKg: 0, isBodyweight: true },
-      { id: 'widepushup',  name: 'Wide Push-up',           startKg: 0, isBodyweight: true },
-      { id: 'pikepushup',  name: 'Pike Push-up',           startKg: 0, isBodyweight: true },
-    ],
-  },
-  {
-    category: 'Back', icon: '↩️',
-    exercises: [
-      { id: 'pulldown',    name: 'Lat Pulldown',           startKg: 47.5 },
-      { id: 'cablerow',    name: 'Seated Cable Row',       startKg: 40 },
-      { id: 'bbrow',       name: 'Barbell Row',            startKg: 50 },
-      { id: 'dbrow',       name: 'DB Bent-Over Row',       startKg: 14 },
-      { id: 'dbpullover', name: 'DB Pullover',            startKg: 12 },
-      { id: 'singlerow',  name: 'Single-arm DB Row',      startKg: 14 },
-      { id: 'tbarrow',     name: 'T-Bar Row',              startKg: 40 },
-      { id: 'facepull',    name: 'Face Pull',              startKg: 15 },
-      { id: 'strtpull',    name: 'Straight-arm Pulldown',  startKg: 20 },
-      { id: 'pullup',      name: 'Pull-up',                startKg: 0, isBodyweight: true },
-      { id: 'chinup',      name: 'Chin-up',                startKg: 0, isBodyweight: true },
-      { id: 'hingerow',    name: 'Inverted Row',           startKg: 0, isBodyweight: true },
-    ],
-  },
-  {
-    category: 'Legs', icon: '🦵',
-    exercises: [
-      { id: 'squat',       name: 'Barbell Squat',          startKg: 45 },
-      { id: 'deadlift',    name: 'Conventional Deadlift',  startKg: 60 },
-      { id: 'legpress',    name: 'Leg Press',              startKg: 80 },
-      { id: 'rdl',         name: 'Romanian Deadlift',      startKg: 55 },
-      { id: 'legcurl',     name: 'Leg Curl Machine',       startKg: 40 },
-      { id: 'legext',      name: 'Leg Extension',          startKg: 35 },
-      { id: 'hipthrust',   name: 'Barbell Hip Thrust',     startKg: 40 },
-      { id: 'calfraise',   name: 'Standing Calf Raise',    startKg: 20 },
-      { id: 'bulgsplit',   name: 'Bulgarian Split Squat',  startKg: 10 },
-      { id: 'dblunge',     name: 'DB Reverse Lunge',       startKg: 10 },
-      { id: 'dbsquat',     name: 'DB Goblet Squat',        startKg: 16 },
-      { id: 'dbsumosq',   name: 'DB Sumo Squat',          startKg: 16 },
-      { id: 'dbrdl',      name: 'DB Romanian Deadlift',   startKg: 16 },
-      { id: 'bwsquat',     name: 'Bodyweight Squat',       startKg: 0, isBodyweight: true },
-      { id: 'lunge',       name: 'Reverse Lunge',          startKg: 0, isBodyweight: true },
-      { id: 'walklunge',   name: 'Walking Lunge',          startKg: 0, isBodyweight: true },
-      { id: 'stepup',      name: 'Step-up',                startKg: 0, isBodyweight: true },
-      { id: 'glute',       name: 'Glute Bridge',           startKg: 0, isBodyweight: true },
-      { id: 'jumpsquat',   name: 'Jump Squat',             startKg: 0, isBodyweight: true },
-    ],
-  },
-  {
-    category: 'Shoulders', icon: '⚡',
-    exercises: [
-      { id: 'bbohp',       name: 'Barbell Overhead Press', startKg: 30 },
-      { id: 'ohp',         name: 'DB Overhead Press',      startKg: 15 },
-      { id: 'dbohp',       name: 'Seated DB Press',        startKg: 12 },
-      { id: 'arnoldpress', name: 'Arnold Press',           startKg: 10 },
-      { id: 'machohp',     name: 'Machine Shoulder Press', startKg: 30 },
-      { id: 'lateraise',   name: 'DB Lateral Raise',       startKg: 6 },
-      { id: 'cablelat',    name: 'Cable Lateral Raise',    startKg: 5 },
-      { id: 'frontraise',  name: 'DB Front Raise',         startKg: 6 },
-      { id: 'reardelt',    name: 'Rear Delt Fly',          startKg: 6 },
-    ],
-  },
-  {
-    category: 'Arms', icon: '💪',
-    exercises: [
-      { id: 'bbcurl',      name: 'Barbell Bicep Curl',     startKg: 20 },
-      { id: 'dbcurl',      name: 'DB Bicep Curl',          startKg: 10 },
-      { id: 'hammercurl',  name: 'Hammer Curl',            startKg: 10 },
-      { id: 'cablecurl',   name: 'Cable Curl',             startKg: 15 },
-      { id: 'preachcurl',  name: 'Preacher Curl',          startKg: 15 },
-      { id: 'cgbench',     name: 'Close-Grip Bench Press', startKg: 35 },
-      { id: 'tricpush',    name: 'Tricep Pushdown',        startKg: 20 },
-      { id: 'ohtriext',    name: 'Overhead Tricep Ext.',   startKg: 12 },
-      { id: 'skullcrush',  name: 'Skull Crushers',         startKg: 20 },
-      { id: 'dipbench',    name: 'Tricep Dip',             startKg: 0, isBodyweight: true },
-      { id: 'diamondpush', name: 'Diamond Push-up',        startKg: 0, isBodyweight: true },
-    ],
-  },
-  {
-    category: 'Core', icon: '🔥',
-    exercises: [
-      { id: 'plank',       name: 'Plank',                  startKg: 0, isPlank: true },
-      { id: 'sideplank',   name: 'Side Plank',             startKg: 0, isPlank: true },
-      { id: 'hollowbody',  name: 'Hollow Body Hold',       startKg: 0, isPlank: true },
-      { id: 'mtnclimp',    name: 'Mountain Climbers',      startKg: 0, isBodyweight: true },
-      { id: 'abrollout',   name: 'Ab Wheel Rollout',       startKg: 0, isBodyweight: true },
-      { id: 'hanglegrise', name: 'Hanging Leg Raise',      startKg: 0, isBodyweight: true },
-      { id: 'cablecrnch',  name: 'Cable Crunch',           startKg: 20 },
-      { id: 'rustwist',    name: 'Russian Twist',          startKg: 0, isBodyweight: true },
-      { id: 'deadbug',     name: 'Dead Bug',               startKg: 0, isBodyweight: true },
-      { id: 'crunch',      name: 'Crunch',                 startKg: 0, isBodyweight: true },
-      { id: 'biccrnch',    name: 'Bicycle Crunch',         startKg: 0, isBodyweight: true },
-      { id: 'legrise',     name: 'Lying Leg Raise',        startKg: 0, isBodyweight: true },
-      { id: 'vup',         name: 'V-Up',                   startKg: 0, isBodyweight: true },
-      { id: 'superman',    name: 'Superman Hold',          startKg: 0, isBodyweight: true },
-    ],
-  },
-  {
-    category: 'Cardio', icon: '🏃',
-    exercises: [
-      { id: 'burpees',     name: 'Burpees',                startKg: 0, isBodyweight: true },
-      { id: 'jumpjack',    name: 'Jumping Jacks',          startKg: 0, isBodyweight: true },
-      { id: 'highnknee',   name: 'High Knees',             startKg: 0, isBodyweight: true },
-      { id: 'boxjump',     name: 'Box Jump',               startKg: 0, isBodyweight: true },
-      { id: 'ropewave',    name: 'Battle Rope Waves',      startKg: 0, isBodyweight: true },
-    ],
-  },
-];
+// Ceiling from calculateAdherenceXP: 10 (training day) + 8 (RPE) + 20 (overload).
+const MAX_EXERCISE_XP = 38;
 
-export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek }) {
+export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -455,7 +339,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             🧘 DELOAD WEEK — RECOVERY MODE
           </div>
           <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-            80% weight, 2 sets per exercise. This week <strong style={{ color: 'var(--text)' }}>rebuilds your tendons and CNS</strong> — lighter loads now unlock stronger lifts in Weeks 10-12. Don't skip it.
+            80% weight, one less set per exercise. This week <strong style={{ color: 'var(--text)' }}>rebuilds your tendons and CNS</strong> — lighter loads now unlock stronger lifts next block. Don't skip it.
           </div>
         </div>
       )}
@@ -490,7 +374,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 onClick={(e) => {
                   e.stopPropagation();
                   if (window.confirm(`Remove ${ex.name} from your program?`)) {
-                    onDeleteExercise?.(ex.id);
+                    onDeleteExercise?.(ex.id, sessionDayKey);
                     setSwipedId(null);
                   }
                 }}
@@ -578,7 +462,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                   fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--fire2)',
                   background: 'var(--fire-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8
                 }}>
-                  +{isDeload ? 10 : ex.sets * 5 + 10} XP max
+                  +{isDeload ? 10 : MAX_EXERCISE_XP} XP max
                 </div>
               )}
             </div>
@@ -663,7 +547,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           }
           onClose={() => setActiveExId(null)}
           onComplete={(id, sets) => {
-            onCompleteExercise(id, sets);
+            onCompleteExercise(id, sets, sessionDayKey);
             setInProgressSets(prev => { const n = { ...prev }; delete n[id]; return n; });
             setActiveExId(null);
           }}
@@ -682,7 +566,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             const cycleWeek = ((state.currentWeek - 1) % 12) + 1;
             const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
             const isLastSession = cycleWeek === 12 && weekSessions >= sessionsNeeded - 1;
-            onFinishSession();
+            onFinishSession(sessionDayKey);
             if (isLastSession) setTimeout(() => setShowProgramComplete(true), 2000);
           }}
         />,
@@ -725,8 +609,10 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       {swapTargetId && (() => {
         const isAdd = swapTargetId === '__add__';
         const currentIds = new Set(exercises.map(e => e.id));
-        // Flat list from library, annotated with category/icon, deduplicated by id
-        const allExercises = EXERCISE_LIBRARY.flatMap(cat =>
+        // Only what this user's equipment supports — the picker used to offer a
+        // bodyweight-only user a 45 kg barbell squat.
+        const categories = getPickerCategories(state.assessment?.equipment || 'full_gym');
+        const allExercises = categories.flatMap(cat =>
           cat.exercises.map(ex => ({ ...ex, category: cat.category, icon: cat.icon }))
         );
         const filtered = allExercises.filter(ex => {
@@ -770,7 +656,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               />
               {/* Category tabs */}
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10, paddingBottom: 4, flexShrink: 0 }}>
-                {['All', ...EXERCISE_LIBRARY.map(c => c.category)].map(cat => (
+                {['All', ...categories.map(c => c.category)].map(cat => (
                   <button key={cat} onClick={() => setPickerCategory(cat)} style={{
                     padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
                     whiteSpace: 'nowrap', fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
@@ -789,7 +675,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 )}
                 {filtered.map(sub => (
                   <button key={sub.id} onClick={() => {
-                    onSwapExercise?.(isAdd ? '__add__' : swapTargetId, sub);
+                    onSwapExercise?.(isAdd ? '__add__' : swapTargetId, sub, sessionDayKey);
                     setSwapTargetId(null);
                   }} style={{
                     padding: '11px 14px', borderRadius: 11, textAlign: 'left',

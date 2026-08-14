@@ -1,56 +1,86 @@
 /**
- * Exercise Substitution Map — Pain-based exercise swaps (Phase 3.3)
- * Each rule: { region, minSeverity, removeExerciseId, substitute }
+ * Pain- and competency-based exercise substitution.
+ *
+ * Rules name a target exercise *id* and the coaching reason; the prescription
+ * (name, sets, reps, rest, RPE, starting weight) comes from the shared catalog.
+ * Rules used to carry their own inline copies, which drifted: the same id was
+ * "Push-Up" here and "Push-up" in the catalog, "Hip Thrust" vs "Barbell Hip
+ * Thrust", "DB Single-Arm Row" vs "DB Bent-Over Row" — so a card and its own PR
+ * toast could disagree about what the exercise was called.
  */
+
+import { EX_CATALOG_MAP, buildPrescription } from '../data/exerciseCatalog';
 
 const SUBSTITUTION_RULES = [
   // Knee pain
-  { region: 'knees', minSeverity: 'moderate', exerciseId: 'squat',    substitute: { id: 'legpress',  name: 'Leg Press',           sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 80, note: 'Knee-friendly: stop at parallel' } },
-  { region: 'knees', minSeverity: 'moderate', exerciseId: 'bwsquat',  substitute: { id: 'legpress',  name: 'Leg Press',           sets: 3, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 60, note: 'Knee-friendly alternative' } },
-  { region: 'knees', minSeverity: 'moderate', exerciseId: 'lunge',    substitute: { id: 'stepup',    name: 'Step-Up (low box)',   sets: 3, reps: 10, rest: '60 sec', restSec: 60,  rpe: 7, startKg: 0,  note: 'Low box — reduce knee stress', isBodyweight: true } },
-  { region: 'knees', minSeverity: 'moderate', exerciseId: 'dblunge',  substitute: { id: 'stepup',    name: 'Step-Up (low box)',   sets: 3, reps: 10, rest: '60 sec', restSec: 60,  rpe: 7, startKg: 0,  note: 'Low box — reduce knee stress', isBodyweight: true } },
-  { region: 'knees', minSeverity: 'moderate', exerciseId: 'dbsquat',  substitute: { id: 'legpress',  name: 'Leg Press',           sets: 3, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 60, note: 'Knee-friendly alternative' } },
+  { region: 'knees', minSeverity: 'moderate', exerciseId: 'squat',    substitute: 'legpress', note: 'Knee-friendly: stop at parallel' },
+  { region: 'knees', minSeverity: 'moderate', exerciseId: 'bwsquat',  substitute: 'legpress', note: 'Knee-friendly alternative' },
+  { region: 'knees', minSeverity: 'moderate', exerciseId: 'lunge',    substitute: 'stepup',   note: 'Low box — reduce knee stress' },
+  { region: 'knees', minSeverity: 'moderate', exerciseId: 'dblunge',  substitute: 'stepup',   note: 'Low box — reduce knee stress' },
+  { region: 'knees', minSeverity: 'moderate', exerciseId: 'dbsquat',  substitute: 'legpress', note: 'Knee-friendly alternative' },
 
   // Shoulder pain
-  { region: 'shoulders', minSeverity: 'moderate', exerciseId: 'ohp',     substitute: { id: 'landmine', name: 'Landmine Press',       sets: 2, reps: 12, rest: '90 sec', restSec: 90, rpe: 7, startKg: 15, note: 'Shoulder-friendly pressing' } },
-  { region: 'shoulders', minSeverity: 'moderate', exerciseId: 'dbohp',   substitute: { id: 'landmine', name: 'Landmine Press',       sets: 2, reps: 12, rest: '90 sec', restSec: 90, rpe: 7, startKg: 15, note: 'Shoulder-friendly pressing' } },
-  { region: 'shoulders', minSeverity: 'severe',   exerciseId: 'bench',   substitute: { id: 'floorpress', name: 'DB Floor Press',     sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 16, note: 'Reduced shoulder ROM' } },
-  { region: 'shoulders', minSeverity: 'severe',   exerciseId: 'dbbench', substitute: { id: 'floorpress', name: 'DB Floor Press',     sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 16, note: 'Reduced shoulder ROM' } },
-  { region: 'shoulders', minSeverity: 'moderate', exerciseId: 'dipbench',substitute: { id: 'pushup',     name: 'Push-Up',            sets: 3, reps: 12, rest: '60 sec', restSec: 60,  rpe: 7, startKg: 0,  note: 'Less shoulder impingement risk', isBodyweight: true } },
+  { region: 'shoulders', minSeverity: 'moderate', exerciseId: 'ohp',      substitute: 'landmine',   note: 'Shoulder-friendly pressing' },
+  { region: 'shoulders', minSeverity: 'moderate', exerciseId: 'dbohp',    substitute: 'landmine',   note: 'Shoulder-friendly pressing' },
+  { region: 'shoulders', minSeverity: 'severe',   exerciseId: 'bench',    substitute: 'floorpress', note: 'Reduced shoulder ROM' },
+  { region: 'shoulders', minSeverity: 'severe',   exerciseId: 'dbbench',  substitute: 'floorpress', note: 'Reduced shoulder ROM' },
+  { region: 'shoulders', minSeverity: 'moderate', exerciseId: 'dipbench', substitute: 'pushup',     note: 'Less shoulder impingement risk' },
 
   // Lower back pain
-  { region: 'lowerBack', minSeverity: 'moderate', exerciseId: 'rdl',     substitute: { id: 'hipthrust',  name: 'Hip Thrust',        sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8, startKg: 40, note: 'Lower-back-friendly hip hinge' } },
-  { region: 'lowerBack', minSeverity: 'moderate', exerciseId: 'dbrdl',   substitute: { id: 'hipthrust',  name: 'Hip Thrust',        sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8, startKg: 30, note: 'Lower-back-friendly hip hinge' } },
-  { region: 'lowerBack', minSeverity: 'severe',   exerciseId: 'squat',   substitute: { id: 'legpress',   name: 'Leg Press',         sets: 3, reps: 10, rest: '2.5 min', restSec: 150, rpe: 8, startKg: 80, note: 'Removes spinal loading' } },
-  { region: 'lowerBack', minSeverity: 'moderate', exerciseId: 'hingerow',substitute: { id: 'dbrow',      name: 'DB Single-Arm Row', sets: 3, reps: 10, rest: '90 sec',  restSec: 90,  rpe: 7, startKg: 16, note: 'Supported row — no spinal loading' } },
+  { region: 'lowerBack', minSeverity: 'moderate', exerciseId: 'rdl',      substitute: 'hipthrust', note: 'Lower-back-friendly hip hinge' },
+  { region: 'lowerBack', minSeverity: 'moderate', exerciseId: 'dbrdl',    substitute: 'hipthrust', note: 'Lower-back-friendly hip hinge' },
+  { region: 'lowerBack', minSeverity: 'severe',   exerciseId: 'squat',    substitute: 'legpress',  note: 'Removes spinal loading' },
+  { region: 'lowerBack', minSeverity: 'moderate', exerciseId: 'hingerow', substitute: 'dbrow',     note: 'Supported row — no spinal loading' },
 
   // Wrist/elbow pain
-  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'bench',    substitute: { id: 'dbbench_neut', name: 'DB Bench (neutral grip)', sets: 3, reps: 10, rest: '2 min', restSec: 120, rpe: 8, startKg: 16, note: 'Neutral grip reduces wrist strain' } },
-  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'dbbench',  substitute: { id: 'dbbench_neut', name: 'DB Bench (neutral grip)', sets: 3, reps: 10, rest: '2 min', restSec: 120, rpe: 8, startKg: 16, note: 'Neutral grip reduces wrist strain' } },
-  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'ohp',      substitute: { id: 'landmine',     name: 'Landmine Press',          sets: 2, reps: 12, rest: '90 sec', restSec: 90, rpe: 7, startKg: 15, note: 'Neutral wrist position throughout' } },
-  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'dbohp',    substitute: { id: 'landmine',     name: 'Landmine Press',          sets: 2, reps: 12, rest: '90 sec', restSec: 90, rpe: 7, startKg: 15, note: 'Neutral wrist position throughout' } },
-  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'pushup',   substitute: { id: 'floorpress',   name: 'DB Floor Press',          sets: 3, reps: 10, rest: '90 sec', restSec: 90, rpe: 7, startKg: 12, note: 'Neutral grip avoids wrist extension' } },
+  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'bench',   substitute: 'dbbench_neut', note: 'Neutral grip reduces wrist strain' },
+  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'dbbench', substitute: 'dbbench_neut', note: 'Neutral grip reduces wrist strain' },
+  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'ohp',     substitute: 'landmine',     note: 'Neutral wrist position throughout' },
+  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'dbohp',   substitute: 'landmine',     note: 'Neutral wrist position throughout' },
+  { region: 'wrists', minSeverity: 'moderate', exerciseId: 'pushup',  substitute: 'floorpress',   note: 'Neutral grip avoids wrist extension' },
 
   // Hip pain
-  { region: 'hips', minSeverity: 'moderate', exerciseId: 'rdl',      substitute: { id: 'glutebridge', name: 'Glute Bridge',      sets: 3, reps: 12, rest: '90 sec', restSec: 90, rpe: 7, startKg: 0, note: 'Hip-friendly posterior chain', isBodyweight: true } },
-  { region: 'hips', minSeverity: 'moderate', exerciseId: 'dbrdl',    substitute: { id: 'glutebridge', name: 'Glute Bridge',      sets: 3, reps: 12, rest: '90 sec', restSec: 90, rpe: 7, startKg: 0, note: 'Hip-friendly posterior chain', isBodyweight: true } },
-  { region: 'hips', minSeverity: 'moderate', exerciseId: 'lunge',    substitute: { id: 'stepup',      name: 'Step-Up',           sets: 3, reps: 10, rest: '60 sec', restSec: 60, rpe: 7, startKg: 0, note: 'Reduced hip ROM', isBodyweight: true } },
-  { region: 'hips', minSeverity: 'moderate', exerciseId: 'dblunge',  substitute: { id: 'stepup',      name: 'Step-Up',           sets: 3, reps: 10, rest: '60 sec', restSec: 60, rpe: 7, startKg: 0, note: 'Reduced hip ROM', isBodyweight: true } },
-  { region: 'hips', minSeverity: 'moderate', exerciseId: 'squat',    substitute: { id: 'legpress',    name: 'Leg Press',         sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 7, startKg: 70, note: 'Fixed hip angle reduces impingement' } },
-  { region: 'hips', minSeverity: 'moderate', exerciseId: 'bwsquat',  substitute: { id: 'legpress',    name: 'Leg Press',         sets: 3, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 50, note: 'Fixed hip angle reduces impingement' } },
+  { region: 'hips', minSeverity: 'moderate', exerciseId: 'rdl',     substitute: 'glutebridge', note: 'Hip-friendly posterior chain' },
+  { region: 'hips', minSeverity: 'moderate', exerciseId: 'dbrdl',   substitute: 'glutebridge', note: 'Hip-friendly posterior chain' },
+  { region: 'hips', minSeverity: 'moderate', exerciseId: 'lunge',   substitute: 'stepup',      note: 'Reduced hip ROM' },
+  { region: 'hips', minSeverity: 'moderate', exerciseId: 'dblunge', substitute: 'stepup',      note: 'Reduced hip ROM' },
+  { region: 'hips', minSeverity: 'moderate', exerciseId: 'squat',   substitute: 'legpress',    note: 'Fixed hip angle reduces impingement' },
+  { region: 'hips', minSeverity: 'moderate', exerciseId: 'bwsquat', substitute: 'legpress',    note: 'Fixed hip angle reduces impingement' },
 
   // Neck pain — overhead & cervical-loading exercises are the primary concern.
   // OHP/DBOHP → Landmine (NOT flat bench): landmine keeps anterior deltoid as primary target,
   // the diagonal press path eliminates the overhead lockout that forces cervical hyperextension.
   // Swapping to flat bench would train pecs instead of deltoids — wrong muscle group.
-  { region: 'neck', minSeverity: 'moderate', exerciseId: 'ohp',      substitute: { id: 'landmine',   name: 'Landmine Press',      sets: 2, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 15, note: 'Diagonal press — same shoulder target, no overhead cervical extension' } },
-  { region: 'neck', minSeverity: 'moderate', exerciseId: 'dbohp',    substitute: { id: 'landmine',   name: 'Landmine Press',      sets: 2, reps: 12, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 12, note: 'Diagonal press — same shoulder target, no overhead cervical extension' } },
-  { region: 'neck', minSeverity: 'moderate', exerciseId: 'squat',    substitute: { id: 'legpress',   name: 'Leg Press',           sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8, startKg: 80, note: 'Removes bar from traps/cervical spine — same quad stimulus' } },
-  { region: 'neck', minSeverity: 'severe',   exerciseId: 'bench',    substitute: { id: 'floorpress', name: 'DB Floor Press',      sets: 3, reps: 10, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 14, note: 'Same horizontal push pattern, neutral neck throughout' } },
-  { region: 'neck', minSeverity: 'severe',   exerciseId: 'hingerow', substitute: { id: 'dbrow',      name: 'DB Single-Arm Row',   sets: 3, reps: 10, rest: '90 sec', restSec: 90,  rpe: 7, startKg: 16, note: 'Same lat/rhomboid target — supported position avoids neck hyperextension' } },
+  { region: 'neck', minSeverity: 'moderate', exerciseId: 'ohp',      substitute: 'landmine',   note: 'Diagonal press — same shoulder target, no overhead cervical extension' },
+  { region: 'neck', minSeverity: 'moderate', exerciseId: 'dbohp',    substitute: 'landmine',   note: 'Diagonal press — same shoulder target, no overhead cervical extension' },
+  { region: 'neck', minSeverity: 'moderate', exerciseId: 'squat',    substitute: 'legpress',   note: 'Removes bar from traps/cervical spine — same quad stimulus' },
+  { region: 'neck', minSeverity: 'severe',   exerciseId: 'bench',    substitute: 'floorpress', note: 'Same horizontal push pattern, neutral neck throughout' },
+  { region: 'neck', minSeverity: 'severe',   exerciseId: 'hingerow', substitute: 'dbrow',      note: 'Same lat/rhomboid target — supported position avoids neck hyperextension' },
 ];
 
 const SEVERITY_RANK = { none: 0, mild: 1, moderate: 2, severe: 3 };
+
+/** Exposed for tests: every id a rule can target or produce. */
+export function substitutionExerciseIds() {
+  const ids = new Set();
+  for (const r of SUBSTITUTION_RULES) { ids.add(r.exerciseId); ids.add(r.substitute); }
+  for (const swaps of Object.values(COMPETENCY_SWAPS)) {
+    for (const id of Object.values(swaps)) ids.add(id);
+  }
+  return [...ids];
+}
+
+/** Builds the replacement exercise for a rule, from the catalog. */
+function buildSubstitute(substituteId, note) {
+  const entry = EX_CATALOG_MAP[substituteId];
+  const prescription = buildPrescription(substituteId);
+  return {
+    id: substituteId,
+    name: entry?.name ?? substituteId,
+    ...prescription,
+    note: note || prescription.note,
+  };
+}
 
 /**
  * Apply pain-based exercise substitutions to a program.
@@ -67,7 +97,7 @@ export function applySubstitutions(exercises, painRegions) {
     if (SEVERITY_RANK[userSeverity] >= minRequired) {
       const idx = result.findIndex(e => e.id === rule.exerciseId);
       if (idx !== -1) {
-        result[idx] = { ...rule.substitute };
+        result[idx] = buildSubstitute(rule.substitute, rule.note);
       }
     }
   }
@@ -92,42 +122,49 @@ export function applySubstitutions(exercises, painRegions) {
   return result;
 }
 
+// 'never tried' barbell squat → Goblet Squat, etc.
+const COMPETENCY_SWAPS = {
+  squat: {
+    never: 'dbsquat',
+  },
+  deadlift: {
+    never: 'dbrdl',
+    unsure: 'rdl',
+  },
+  pullUp: {
+    never: 'pulldown',
+  },
+};
+
+const COMPETENCY_NOTES = {
+  dbsquat:  'Build squat pattern before barbell',
+  dbrdl:    'Build hinge pattern before barbell',
+  rdl:      'Start light — build form confidence',
+  pulldown: 'Build pulling strength for pull-ups',
+};
+
+// Which exercise ids each movement pattern maps onto
+const COMPETENCY_TARGETS = {
+  squat: ['squat'],
+  deadlift: ['rdl'],
+  pullUp: ['pullup', 'chinup'],
+};
+
 /**
  * Apply movement competency substitutions.
- * 'never tried' barbell squat → Goblet Squat, etc.
  */
 export function applyCompetencySubstitutions(exercises, movementCompetency) {
   if (!movementCompetency || !exercises) return exercises;
 
-  const COMPETENCY_SWAPS = {
-    squat: {
-      never: { id: 'dbsquat', name: 'DB Goblet Squat', sets: 3, reps: 12, rest: '2 min', restSec: 120, rpe: 8, startKg: 16, note: 'Build squat pattern before barbell' },
-    },
-    deadlift: {
-      never: { id: 'dbrdl', name: 'DB Romanian Deadlift', sets: 3, reps: 10, rest: '2 min', restSec: 120, rpe: 8, startKg: 16, note: 'Build hinge pattern before barbell' },
-      unsure: { id: 'rdl', name: 'Romanian Deadlift', sets: 3, reps: 8, rest: '2.5 min', restSec: 150, rpe: 7, startKg: 40, note: 'Start light — build form confidence' },
-    },
-    pullUp: {
-      never: { id: 'pulldown', name: 'Lat Pulldown', sets: 3, reps: 10, rest: '2 min', restSec: 120, rpe: 8, startKg: 40, note: 'Build pulling strength for pull-ups' },
-    },
-  };
-
   let result = [...exercises];
   for (const [movement, level] of Object.entries(movementCompetency)) {
-    const swaps = COMPETENCY_SWAPS[movement];
-    if (!swaps || !swaps[level]) continue;
+    const substituteId = COMPETENCY_SWAPS[movement]?.[level];
+    if (!substituteId) continue;
 
-    // Map movement id to exercise ids that match
-    const exerciseIds = {
-      squat: ['squat'],
-      deadlift: ['rdl'],
-      pullUp: ['pullup', 'chinup'],
-    };
-    const targetIds = exerciseIds[movement] || [];
-    for (const targetId of targetIds) {
+    for (const targetId of COMPETENCY_TARGETS[movement] || []) {
       const idx = result.findIndex(e => e.id === targetId);
       if (idx !== -1) {
-        result[idx] = { ...swaps[level] };
+        result[idx] = buildSubstitute(substituteId, COMPETENCY_NOTES[substituteId]);
       }
     }
   }

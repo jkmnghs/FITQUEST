@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ACHIEVEMENTS, EXERCISES } from '../data/gameData';
 import { authFetch } from '../lib/authFetch';
+import { exercisesForDay, DAY_ORDER } from '../utils/session';
 
 // ─── ACHIEVEMENTS TAB ───
 export function AchievementsTab({ state }) {
@@ -151,7 +152,7 @@ export function SummaryTab({ state }) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           {[
-            { val: `${wp.count}/3`, lbl: 'Sessions', color: 'var(--cyan)' },
+            { val: `${wp.count}/${state.sessionsPerWeek || 3}`, lbl: 'Sessions', color: 'var(--cyan)' },
             { val: `${avgCompletion}%`, lbl: 'Avg Completion', color: 'var(--purple)' },
             { val: weekXP, lbl: 'XP Earned', color: 'var(--fire2)' },
             { val: weightChange, lbl: 'Weight Change', color: 'var(--green)' }
@@ -168,10 +169,10 @@ export function SummaryTab({ state }) {
 
         {/* Highlights */}
         <ul style={{ listStyle: 'none', fontSize: 12, color: 'var(--text2)', lineHeight: 1.8 }}>
-          {wp.count >= 3 && (
+          {wp.count >= (state.sessionsPerWeek || 3) && (
             <li style={{ color: 'var(--green)', paddingLeft: 16, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0 }}>→</span>
-              All 3 sessions completed!
+              All {state.sessionsPerWeek || 3} sessions completed!
             </li>
           )}
           {increases.length > 0 && (
@@ -223,26 +224,11 @@ export function SummaryTab({ state }) {
   );
 }
 
-const _DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const _DAY_ORDER = DAY_ORDER;
 
-// Return exercises for a specific training day key (e.g. 'fri').
-// Falls back through dayTemplates → activeTemplates → activeExercises → EXERCISES.
-export function getProgramExercisesForDay(state, dayKey) {
-  const sortedDays = (state.trainingDays || ['mon', 'wed', 'fri'])
-    .slice()
-    .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b));
-  const idx = Math.max(0, sortedDays.indexOf(dayKey));
-
-  if (state.dayTemplates?.[dayKey]?.exercises?.length > 0) {
-    return state.dayTemplates[dayKey].exercises;
-  }
-  if (state.activeTemplates?.length > 0) {
-    const t = state.activeTemplates[idx % state.activeTemplates.length];
-    if (t?.exercises?.length > 0) return t.exercises;
-  }
-  if (state.activeExercises?.length > 0) return state.activeExercises;
-  return EXERCISES;
-}
+// Kept as a named export for existing callers; the resolution itself lives in
+// utils/session so the display and the mutations can't drift apart.
+export const getProgramExercisesForDay = exercisesForDay;
 
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError }) {

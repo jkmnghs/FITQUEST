@@ -8,7 +8,8 @@ import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutriti
 import { validateState, repairState } from '../utils/stateSchema';
 import { migrateState } from '../utils/stateMigrations';
 import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerciseSubstitutions';
-import { lookupExName } from '../data/exerciseCatalog';
+import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
+import { todayDayKey, exercisesForDay } from '../utils/session';
 
 /**
  * Build a personalized exercise list from a program base by applying
@@ -387,6 +388,35 @@ export function useGameState(user) {
     });
   }, []);
 
+  /**
+   * setState + an immediate (non-debounced) cloud save of the committed result.
+   *
+   * Several mutations used to call cloudSet from *inside* their setState
+   * updater. React may invoke an updater more than once — StrictMode does so on
+   * every render in development — so those writes fired twice and the reducer
+   * stopped being pure. Capturing the result and syncing in an effect keeps the
+   * updater side-effect-free while preserving the "don't wait for the 3s
+   * debounce" behaviour these actions need.
+   */
+  const pendingSyncRef = useRef(null);
+  const [syncTick, setSyncTick] = useState(0);
+
+  const setStateWithSync = useCallback((updater) => {
+    setStateRaw(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      pendingSyncRef.current = next;
+      return next;
+    });
+    setSyncTick(t => t + 1);
+  }, []);
+
+  useEffect(() => {
+    const next = pendingSyncRef.current;
+    if (!next) return;
+    pendingSyncRef.current = null;
+    if (userId) { cancelCloudDebounce(); cloudSet(userId, next); }
+  }, [syncTick, userId]);
+
   const addXP = useCallback((amount, message) => {
     setState(prev => {
       const { xp, totalXp, level, leveledUp } = applyXP(prev, amount);
@@ -413,6 +443,7 @@ export function useGameState(user) {
   }, [showToast, userId]);
 
   // ── completeAssessment ───────────────────────────────────────────────────
+  const pendingAssessmentSave = useRef(null);
   const completeAssessment = useCallback((assessment, onSaved) => {
     const programId       = selectProgram(assessment);
     const program         = getProgramById(programId);
@@ -470,18 +501,21 @@ export function useGameState(user) {
         },
         stateVersion: 2,
       };
-      // Immediate cloud save (not debounced) — assessment completion is critical
-      if (userId) {
-        cancelCloudDebounce();
-        cloudSet(userId, newState).then(() => {
-          if (onSaved) onSaved();
-        });
-      } else if (onSaved) {
-        // No cloud — fire immediately
-        setTimeout(onSaved, 0);
-      }
+      pendingAssessmentSave.current = newState;
       return newState;
     });
+
+    // Cloud save and the onSaved callback run *after* the update commits.
+    // Firing them from inside the updater meant StrictMode's double-invoke sent
+    // two cloud writes and two onboarding agent triggers.
+    const newState = pendingAssessmentSave.current;
+    if (userId && newState) {
+      cancelCloudDebounce();
+      cloudSet(userId, newState).then(() => { if (onSaved) onSaved(); });
+    } else if (onSaved) {
+      setTimeout(onSaved, 0);
+    }
+    pendingAssessmentSave.current = null;
   }, [userId]);
 
   // ── changeProgram ──────────────────────────────────────────────────────
@@ -489,7 +523,7 @@ export function useGameState(user) {
   const changeProgram = useCallback((newProgramId) => {
     const program = getProgramById(newProgramId);
     if (!program) return;
-    setState(prev => {
+    setStateWithSync(prev => {
       // Merge: keep existing weights for exercises that appear in the new program
       const { liftWeights: freshWeights, liftHistory: freshHistory } = buildInitialWeights(program);
       const mergedWeights = { ...freshWeights, ...prev.liftWeights };
@@ -497,7 +531,7 @@ export function useGameState(user) {
       for (const ex of program.exercises) {
         mergedHistory[ex.id] = prev.liftHistory?.[ex.id] || [];
       }
-      const newState = {
+      return {
         ...prev,
         programId: program.id,
         activeExercises: buildPersonalizedExercises(program.exercises, prev.assessment),
@@ -510,88 +544,90 @@ export function useGameState(user) {
         assessment: { ...prev.assessment, programId: program.id },
         dayTemplates: null, // clear stale AI templates so new program's split is shown correctly
       };
-      if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
-      return newState;
     });
     showToast(`Program changed to ${program.name}`);
-  }, [setState, userId, showToast]);
+  }, [setStateWithSync, showToast]);
 
   // ── swapExercise ──────────────────────────────────────────────────────────
-  const swapExercise = useCallback((oldId, newEx) => {
-    setState(prev => {
+  // `sessionDayKey` is the day the UI is actually showing — on a rest-day
+  // override that is the *next* training day, not today. Defaults to today so
+  // existing call sites keep their behaviour.
+  const swapExercise = useCallback((oldId, newEx, sessionDayKey) => {
+    setStateWithSync(prev => {
       const liftWeights = { ...prev.liftWeights };
       if (liftWeights[newEx.id] == null) liftWeights[newEx.id] = newEx.startKg ?? 0;
 
-      const defaults = newEx.isPlank
-        ? { sets: 2, reps: 0,  rest: '60 sec', restSec: 60,  rpe: 0 }
-        : newEx.isBodyweight
-          ? { sets: 3, reps: 12, rest: '60 sec', restSec: 60, rpe: 7 }
-          : { sets: 3, reps: 10, rest: '2 min',  restSec: 120, rpe: 8 };
-
-      // Prefer dayTemplates when that is the active source
-      const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+      const dayKey = sessionDayKey || todayDayKey();
       const dayTemplates = prev.dayTemplates || {};
-      const todayTemplate = dayTemplates[dayKey];
+      const dayTemplate = dayTemplates[dayKey];
 
-      if (todayTemplate?.exercises?.length > 0) {
-        const exList = todayTemplate.exercises;
+      // Swap takes the incoming exercise's own prescription. Carrying the old
+      // one over meant Plank -> Barbell Squat rendered as "3 x 0 reps @ 45kg"
+      // with the plank's coaching note still attached.
+      const replaceAt = (list, idx) => {
+        const previous = list[idx];
+        const sameKind = !!previous.isPlank === !!newEx.isPlank;
+        const prescription = buildPrescription(newEx.id, {
+          preserveSets: sameKind ? previous.sets : undefined,
+        });
+        return { ...prescription, ...newEx, sets: prescription.sets, note: prescription.note };
+      };
+
+      const appended = () => {
+        const prescription = buildPrescription(newEx.id);
+        return { ...prescription, ...newEx, sets: prescription.sets, note: prescription.note };
+      };
+
+      if (dayTemplate?.exercises?.length > 0) {
+        const exList = dayTemplate.exercises;
         let updatedExercises;
         if (oldId === '__add__') {
-          updatedExercises = [...exList, { ...defaults, ...newEx }];
+          updatedExercises = [...exList, appended()];
         } else {
           const idx = exList.findIndex(e => e.id === oldId);
           if (idx === -1) return prev;
           updatedExercises = [...exList];
-          updatedExercises[idx] = { ...updatedExercises[idx], id: newEx.id, name: newEx.name, isPlank: !!newEx.isPlank, isBodyweight: !!newEx.isBodyweight };
+          updatedExercises[idx] = replaceAt(exList, idx);
         }
-        const newState = {
+        return {
           ...prev, liftWeights,
-          dayTemplates: { ...dayTemplates, [dayKey]: { ...todayTemplate, exercises: updatedExercises } },
+          dayTemplates: { ...dayTemplates, [dayKey]: { ...dayTemplate, exercises: updatedExercises } },
         };
-        if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
-        return newState;
       }
 
       // Legacy activeExercises path
       if (oldId === '__add__') {
-        const newState = { ...prev, activeExercises: [...(prev.activeExercises || []), { ...defaults, ...newEx }], liftWeights };
-        if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
-        return newState;
+        return { ...prev, activeExercises: [...(prev.activeExercises || []), appended()], liftWeights };
       }
       const idx = (prev.activeExercises || []).findIndex(e => e.id === oldId);
       if (idx === -1) return prev;
       const updated = [...prev.activeExercises];
-      updated[idx] = { ...updated[idx], id: newEx.id, name: newEx.name, isPlank: !!newEx.isPlank, isBodyweight: !!newEx.isBodyweight };
-      const newState = { ...prev, activeExercises: updated, liftWeights };
-      if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
-      return newState;
+      updated[idx] = replaceAt(prev.activeExercises, idx);
+      return { ...prev, activeExercises: updated, liftWeights };
     });
     showToast(oldId === '__add__' ? `Added ${newEx.name}` : `Swapped to ${newEx.name}`);
-  }, [setState, userId, showToast]);
+  }, [setStateWithSync, showToast]);
 
   // ── deleteExercise ────────────────────────────────────────────────────────
-  const deleteExercise = useCallback((exId) => {
-    setState(prev => {
-      const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+  const deleteExercise = useCallback((exId, sessionDayKey) => {
+    setStateWithSync(prev => {
+      const dayKey = sessionDayKey || todayDayKey();
       const dayTemplates = prev.dayTemplates || {};
-      const todayTemplate = dayTemplates[dayKey];
+      const dayTemplate = dayTemplates[dayKey];
 
-      if (todayTemplate?.exercises?.length > 0) {
-        const updatedExercises = todayTemplate.exercises.filter(e => e.id !== exId);
-        const newState = {
+      if (dayTemplate?.exercises?.length > 0) {
+        return {
           ...prev,
-          dayTemplates: { ...dayTemplates, [dayKey]: { ...todayTemplate, exercises: updatedExercises } },
+          dayTemplates: {
+            ...dayTemplates,
+            [dayKey]: { ...dayTemplate, exercises: dayTemplate.exercises.filter(e => e.id !== exId) },
+          },
         };
-        if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
-        return newState;
       }
-
-      const newState = { ...prev, activeExercises: (prev.activeExercises || []).filter(e => e.id !== exId) };
-      if (userId) { cancelCloudDebounce(); cloudSet(userId, newState); }
-      return newState;
+      return { ...prev, activeExercises: (prev.activeExercises || []).filter(e => e.id !== exId) };
     });
     showToast('Exercise removed');
-  }, [setState, userId, showToast]);
+  }, [setStateWithSync, showToast]);
 
   const addAIEpisodic = useCallback((note) => {
     let nextState;
@@ -609,7 +645,7 @@ export function useGameState(user) {
     setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
   }, [setState, userId]);
 
-  const completeExercise = useCallback((exId, sets) => {
+  const completeExercise = useCallback((exId, sets, sessionDayKey) => {
     let pendingXP = 0;
     let pendingPR = false;
     let pendingReasons = [];
@@ -676,10 +712,9 @@ export function useGameState(user) {
         else overloadSuggestions[exId] = 'deload';
       }
 
-      // 2-for-2 rule: look up exercise from dayTemplates first, then activeExercises
-      const dayKey2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
-      const todayTemplateEx = prev.dayTemplates?.[dayKey2]?.exercises;
-      const ex = (todayTemplateEx || prev.activeExercises || []).find(e => e.id === exId);
+      // 2-for-2 rule: resolve against the session the user is actually logging,
+      // which on a rest-day override is not today's (empty) template.
+      const ex = exercisesForDay(prev, sessionDayKey || todayDayKey()).find(e => e.id === exId);
       const targetReps = ex?.repMax ?? ex?.reps ?? 10;
       const allSetsHitTarget = setsCompleted >= baseSets &&
         sets.filter(s => !s.isExtra && s.done).every(s => (s.reps || 0) >= targetReps);
@@ -747,7 +782,7 @@ export function useGameState(user) {
     }, 50);
   }, [setState, addXP, showToast]);
 
-  const finishSession = useCallback(() => {
+  const finishSession = useCallback((sessionDayKey) => {
     if (isFinishingSession.current) return;
     isFinishingSession.current = true;
     let pendingXP = 0;
@@ -757,12 +792,11 @@ export function useGameState(user) {
       const w = prev.currentWeek;
       const isDeload = isDeloadWeek(w);
 
-      // Resolve the exercises that were actually shown today
-      const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
-      const todayTemplate = prev.dayTemplates?.[dayKey];
-      const exercises = (todayTemplate?.exercises?.length > 0)
-        ? todayTemplate.exercises
-        : (prev.activeExercises || []);
+      // Resolve the exercises that were actually on screen. Scoring completion
+      // against a different list than the user saw is what made the finish
+      // summary disagree with the card list on a rest-day override.
+      const dayKey = sessionDayKey || todayDayKey();
+      const exercises = exercisesForDay(prev, dayKey);
 
       const doneCount = (prev.todayExDone || []).length;
       const totalEx = exercises.length || 7;

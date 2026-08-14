@@ -123,15 +123,23 @@ export function calculateRestDayXP(isTrainingDay, didWorkOut) {
   return { xp: 0, reason: null };
 }
 
+// AI-generated and hand-authored templates can omit fields the UI reads.
+// Without these guards a missing startKg rendered "NaN kg" on the card and a
+// missing `sets` produced an exercise modal with zero rows to log into.
+export const DEFAULT_SETS = 3;
+
 export function getWeightForExercise(ex, week, liftWeights) {
-  const base = liftWeights[ex.id] ?? ex.startKg;
+  const raw = liftWeights?.[ex?.id] ?? ex?.startKg;
+  const base = Number.isFinite(Number(raw)) ? Number(raw) : 0;
   if (isDeloadWeek(week)) return Math.round(base * 0.8 * 2) / 2; // deload: 80%
   return base;
 }
 
 export function getSetsForWeek(ex, week) {
-  if (isDeloadWeek(week)) return Math.max(1, ex.sets - 1); // deload: drop 1 set
-  return ex.sets;
+  const raw = Number(ex?.sets);
+  const sets = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : DEFAULT_SETS;
+  if (isDeloadWeek(week)) return Math.max(1, sets - 1); // deload: drop 1 set
+  return sets;
 }
 
 export function convertWeight(kg, unit) {
