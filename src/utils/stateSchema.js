@@ -109,6 +109,7 @@ export const stateSchema = z.object({
   bestStreak: z.number().int().nonnegative(),
   lastDate: z.string().nullable(),
   currentWeek: z.number().int().min(1).max(999),
+  currentWeekStartDate: z.string().nullable().optional(),
   unit: z.enum(['kg', 'lbs']),
   totalSessions: z.number().int().nonnegative(),
   totalVolume: z.number().nonnegative(),

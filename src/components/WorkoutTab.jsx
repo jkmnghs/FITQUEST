@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 import ProgramCompleteModal from './ProgramCompleteModal';
+import { getProgramExercisesForDay } from './OtherTabs';
 
 // Full categorized exercise library (gym + home)
 const EXERCISE_LIBRARY = [
@@ -124,11 +125,13 @@ const EXERCISE_LIBRARY = [
   },
 ];
 
-export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach }) {
+export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showProgramComplete, setShowProgramComplete] = useState(false);
+  // Which skipped training day (dayKey) the user tapped to make up, or null
+  const [makeUpDay, setMakeUpDay] = useState(null);
   const [inProgressSets, setInProgressSets] = useState({});
   const [showRestWarning, setShowRestWarning] = useState(false);
   const [overrideRestDay, setOverrideRestDay] = useState(false);
@@ -154,8 +157,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 
   // Tell App when any modal/overlay is open so it can hide the tab bar
   useEffect(() => {
-    onModalChange?.(!!activeExId || showFinishConfirm || !!swapTargetId || showProgramSwitcher);
-  }, [activeExId, showFinishConfirm, swapTargetId, showProgramSwitcher]);
+    onModalChange?.(!!activeExId || showFinishConfirm || !!swapTargetId || showProgramSwitcher || !!makeUpDay);
+  }, [activeExId, showFinishConfirm, swapTargetId, showProgramSwitcher, makeUpDay]);
 
   // Reset picker filters whenever the picker opens
   useEffect(() => {
@@ -216,22 +219,21 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
             // Today's day-of-week ordinal (0 = Sun … 6 = Sat)
             const todayOrd = new Date().getDay();
 
-            // Determine when this program week started.
-            // Use the earliest session/date recorded; if none, assume the week started today.
-            // This prevents Mon/Wed from showing as "skipped" when the week just advanced on Fri
-            // and those days are actually next calendar week.
-            const allSessionDates = [
-              ...(wp.dates || []),
-              ...(wp.sessions || []).map(s => s.date).filter(Boolean),
-            ];
-            let weekStartOrd = todayOrd;
-            if (allSessionDates.length > 0) {
-              weekStartOrd = new Date(Math.min(...allSessionDates.map(d => +new Date(d)))).getDay();
-            }
-            const daysAgo = (todayOrd - weekStartOrd + 7) % 7;
+            // When this program week started — persisted once when the week began
+            // (state.currentWeekStartDate) rather than re-inferred from session data.
+            // Inferring it from sessions broke as soon as the first training day of
+            // a week was skipped: with no session yet recorded, the app assumed the
+            // week "started today", pushing earlier skipped days into next week.
             const weekStartDate = new Date();
             weekStartDate.setHours(0, 0, 0, 0);
-            weekStartDate.setDate(weekStartDate.getDate() - daysAgo);
+            if (state.currentWeekStartDate) {
+              const parsed = new Date(state.currentWeekStartDate);
+              if (!isNaN(parsed)) {
+                weekStartDate.setTime(parsed.getTime());
+                weekStartDate.setHours(0, 0, 0, 0);
+              }
+            }
+            const weekStartOrd = weekStartDate.getDay();
             const todayMidnight = new Date();
             todayMidnight.setHours(0, 0, 0, 0);
 
@@ -264,15 +266,20 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               else if (isCur) { borderColor = 'var(--cyan)'; textColor = 'var(--cyan)'; }
 
               return (
-                <div key={dayId} style={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  border: `2px solid ${borderColor}`,
-                  background: bgColor,
-                  color: textColor,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-                  animation: isCur ? 'rankPulse 2s infinite' : 'none'
-                }}>{done ? '✓' : isSkipped ? '✗' : DAY_LABELS[dayId]}</div>
+                <div
+                  key={dayId}
+                  onClick={() => { if (isSkipped && onBackfillWeek) setMakeUpDay(dayId); }}
+                  title={isSkipped ? `Make up ${DAY_LABELS[dayId]}` : undefined}
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    border: `2px solid ${borderColor}`,
+                    background: bgColor,
+                    color: textColor,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                    animation: isCur ? 'rankPulse 2s infinite' : 'none',
+                    cursor: isSkipped && onBackfillWeek ? 'pointer' : 'default'
+                  }}>{done ? '✓' : isSkipped ? '✗' : DAY_LABELS[dayId]}</div>
               );
             });
           })()}
@@ -682,6 +689,28 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         document.body
       )}
 
+      {/* Make up a skipped day */}
+      {makeUpDay && createPortal(
+        <MakeUpDayModal
+          state={state}
+          dayId={makeUpDay}
+          dayLabel={DAY_LABELS[makeUpDay]}
+          onCancel={() => setMakeUpDay(null)}
+          onConfirm={() => {
+            const dayExercises = getProgramExercisesForDay(state, makeUpDay);
+            const customSets = {};
+            const customWeights = {};
+            dayExercises.forEach(ex => {
+              customSets[ex.id] = ex.isPlank ? 2 : 3;
+              customWeights[ex.id] = state.liftWeights?.[ex.id] ?? 0;
+            });
+            onBackfillWeek(state.currentWeek, makeUpDay, 100, customWeights, customSets, 50);
+            setMakeUpDay(null);
+          }}
+        />,
+        document.body
+      )}
+
       {/* Program complete celebration */}
       {showProgramComplete && createPortal(
         <ProgramCompleteModal
@@ -910,6 +939,42 @@ function FinishArea({ state, exercises, onFinish }) {
       }}>
         {allDone && completionPct >= 95 ? 'FINISH SESSION ⚔️ (PERFECT!)' : 'FINISH SESSION ⚔️'}
       </button>
+    </div>
+  );
+}
+
+const FULL_DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+
+function MakeUpDayModal({ state, dayId, onCancel, onConfirm }) {
+  const dayName = FULL_DAY_NAMES[dayId] || dayId;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9998,
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{
+        background: 'var(--bg2)', border: '1px solid var(--card-border)',
+        borderRadius: 18, padding: '24px 20px',
+        width: 'calc(100% - 40px)', maxWidth: 340, textAlign: 'center'
+      }}>
+        <h3 style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Make Up {dayName}?</h3>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.6 }}>
+          You skipped {dayName} this week. Log it as done today (Week {state.currentWeek}) using your current working weights.
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: 12, borderRadius: 12, border: 'none',
+            background: 'rgba(255,255,255,0.06)', color: 'var(--text2)',
+            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+          }}>CANCEL</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, padding: 12, borderRadius: 12, border: 'none',
+            background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+            color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+          }}>MAKE UP ✓</button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -104,6 +104,10 @@ export const DEFAULT_STATE = {
   bestStreak: 0,
   lastDate: null,
   currentWeek: 1,
+  // Calendar date (today()-style string) the current program week began.
+  // Persisted so the UI never has to re-infer "week start" from session data —
+  // that inference broke when the first day of a week was skipped.
+  currentWeekStartDate: null,
   unit: 'kg',
   totalSessions: 0,
   totalVolume: 0,
