@@ -29,7 +29,13 @@ begin
 end;
 $$;
 
+-- Supabase's default privileges grant EXECUTE on new public-schema functions
+-- directly to `anon` and `authenticated`; `revoke ... from public` does not
+-- remove those direct grants, so anon must be revoked explicitly. The function
+-- already fails closed (it raises when auth.uid() is null), but an
+-- unauthenticated caller should not reach a SECURITY DEFINER function at all.
 revoke all on function public.merge_user_state(jsonb) from public;
+revoke execute on function public.merge_user_state(jsonb) from anon;
 grant execute on function public.merge_user_state(jsonb) to authenticated;
 
 -- Server-only: lets the service role patch a specific user's row. Explicitly
