@@ -269,6 +269,7 @@ export default function App() {
     onChangeProgram: changeProgram,
     onSwapExercise: swapExercise,
     onDeleteExercise: deleteExercise,
+    onBackfillWeek: backfillWeek,
     unreadAgentCount,
     onMarkAgentRead: markAgentRead,
     onOpenInbox: pollAgentMessages,

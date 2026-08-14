@@ -107,8 +107,20 @@ function checkDayReset(state) {
     if (daysSinceLast > 3) next.streak = 0;
   }
   // Auto-advance currentWeek if it's already marked complete (e.g. via backfill)
+  let advanced = false;
   while (next.weekProgress?.[next.currentWeek]?.completed && next.currentWeek < 999) {
     next.currentWeek += 1;
+    advanced = true;
+  }
+  // Keep the persisted "week started on" date in sync: reset it whenever the
+  // week actually changes, and backfill it once for state saved before this
+  // field existed (fall back to the earliest recorded session this week, or today).
+  if (advanced || !next.currentWeekStartDate) {
+    const wp = next.weekProgress?.[next.currentWeek];
+    const sessionDates = [...(wp?.dates || []), ...(wp?.sessions || []).map(s => s.date).filter(Boolean)];
+    next.currentWeekStartDate = advanced || sessionDates.length === 0
+      ? t
+      : new Date(Math.min(...sessionDates.map(d => +new Date(d)))).toDateString();
   }
   return next;
 }
@@ -202,6 +214,10 @@ export function useGameState(user) {
           merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
           // Week and checkin count should never regress — take the higher value
           merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
+          // currentWeekStartDate must track whichever side's currentWeek "won" above —
+          // otherwise the date can point at a stale (lower) week after the merge.
+          const weekWinner = (cloudData.currentWeek || 1) >= (localData.currentWeek || 1) ? cloudData : localData;
+          merged.currentWeekStartDate = weekWinner.currentWeekStartDate || merged.currentWeekStartDate || today();
           merged.checkins = Math.max(cloudData.checkins || 0, localData.checkins || 0);
           // Union achievements
           merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
@@ -256,6 +272,7 @@ export function useGameState(user) {
           const localForWeek = storageGet();
           if (localForWeek && (localForWeek.currentWeek || 1) > (merged.currentWeek || 1)) {
             merged.currentWeek = localForWeek.currentWeek;
+            merged.currentWeekStartDate = localForWeek.currentWeekStartDate || today();
           }
           // Populate name from Supabase auth metadata if not already set
           if (!merged.name && user?.user_metadata?.full_name) {
@@ -833,6 +850,7 @@ export function useGameState(user) {
         deloadDone: isDeload && wp.count >= sessionsNeeded ? true : prev.deloadDone,
         weekProgress,
         currentWeek: nextWeek,
+        currentWeekStartDate: nextWeek !== w ? today() : (prev.currentWeekStartDate || today()),
         sessionStartTime: null,
         dailySessionCount: (prev.dailySessionCount || 0) + 1,
         dailyXPEarned: (prev.dailyXPEarned || 0) + pendingXP,
@@ -1076,6 +1094,7 @@ export function useGameState(user) {
         weekProgress: { ...prev.weekProgress, [week]: newWp },
         liftWeights: { ...prev.liftWeights, ...customWeights },
         currentWeek: nextWeek,
+        currentWeekStartDate: nextWeek !== prev.currentWeek ? today() : (prev.currentWeekStartDate || today()),
         backfillLock: { ...prev.backfillLock, [week]: [...prevLockDays, dayKey] },
         totalSessions: prev.totalSessions + 1,
         totalMinutes: prev.totalMinutes + durationMins,

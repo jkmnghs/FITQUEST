@@ -226,7 +226,7 @@ const _DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 // Return exercises for a specific training day key (e.g. 'fri').
 // Falls back through dayTemplates → activeTemplates → activeExercises → EXERCISES.
-function getProgramExercisesForDay(state, dayKey) {
+export function getProgramExercisesForDay(state, dayKey) {
   const sortedDays = (state.trainingDays || ['mon', 'wed', 'fri'])
     .slice()
     .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b));
