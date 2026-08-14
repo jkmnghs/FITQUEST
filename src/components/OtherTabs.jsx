@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ACHIEVEMENTS, EXERCISES } from '../data/gameData';
+import { authFetch } from '../lib/authFetch';
 
 // ─── ACHIEVEMENTS TAB ───
 export function AchievementsTab({ state }) {
@@ -244,13 +245,59 @@ export function getProgramExercisesForDay(state, dayKey) {
 }
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(() => Math.max(1, (state.currentWeek || 1) - 1));
   const [backfillDay, setBackfillDay] = useState(null);
   const [backfillDuration, setBackfillDuration] = useState(50);
   const [backfillWeights, setBackfillWeights] = useState({});
   const [backfillSets, setBackfillSets] = useState({});
+
+  // Account management
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNext, setPwNext] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwNote, setPwNote] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  async function submitPasswordChange() {
+    setPwNote(null);
+    onClearAuthError?.();
+    if (pwNext.length < 6) { setPwNote({ ok: false, text: 'New password must be at least 6 characters.' }); return; }
+    if (pwNext !== pwConfirm) { setPwNote({ ok: false, text: 'New passwords do not match.' }); return; }
+    setPwBusy(true);
+    const ok = await onChangePassword?.(pwCurrent, pwNext);
+    setPwBusy(false);
+    if (ok) {
+      setPwNote({ ok: true, text: 'Password updated.' });
+      setPwCurrent(''); setPwNext(''); setPwConfirm('');
+      setTimeout(() => { setPwOpen(false); setPwNote(null); }, 1800);
+    } else {
+      setPwNote({ ok: false, text: null }); // authError carries the reason
+    }
+  }
+
+  async function submitAccountDelete() {
+    setDeleteError(null);
+    setDeleteBusy(true);
+    try {
+      const res = await authFetch('/api/account-delete', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
+      onReset();   // wipe local + cloud state
+      onSignOut(); // drop the now-orphaned session
+    } catch (e) {
+      setDeleteError(e.message);
+      setDeleteBusy(false);
+    }
+  }
 
   const _sortedTdays = useMemo(() => (
     (state.trainingDays || ['mon', 'wed', 'fri'])
@@ -318,12 +365,98 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 12, wordBreak: 'break-all' }}>
             {userEmail}
           </div>
-          <button onClick={onSignOut} style={{
-            padding: '9px 18px', borderRadius: 10, border: 'none',
-            background: 'rgba(255,23,68,0.12)', color: 'var(--red)',
-            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-            cursor: 'pointer', letterSpacing: 0.5,
-          }}>SIGN OUT</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={onSignOut} style={accountBtn('rgba(255,23,68,0.12)', 'var(--red)')}>SIGN OUT</button>
+            {onChangePassword && (
+              <button
+                onClick={() => { setPwOpen(o => !o); setPwNote(null); onClearAuthError?.(); }}
+                style={accountBtn('rgba(0,229,255,0.12)', 'var(--cyan)')}
+              >{pwOpen ? 'CANCEL' : 'CHANGE PASSWORD'}</button>
+            )}
+          </div>
+
+          {/* Change password */}
+          {pwOpen && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              {[
+                { label: 'Current password', value: pwCurrent, set: setPwCurrent, autoComplete: 'current-password' },
+                { label: 'New password',     value: pwNext,    set: setPwNext,    autoComplete: 'new-password' },
+                { label: 'Confirm new password', value: pwConfirm, set: setPwConfirm, autoComplete: 'new-password' },
+              ].map(f => (
+                <label key={f.label} style={{ display: 'block', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>{f.label}</div>
+                  <input
+                    type="password" value={f.value} autoComplete={f.autoComplete}
+                    onChange={e => f.set(e.target.value)}
+                    style={{ ...inputStyle, width: '100%', textAlign: 'left' }}
+                  />
+                </label>
+              ))}
+              {(pwNote?.text || (pwNote && !pwNote.ok && authError)) && (
+                <div style={{ fontSize: 12, marginBottom: 8, color: pwNote.ok ? 'var(--green)' : 'var(--red)' }}>
+                  {pwNote.text || authError}
+                </div>
+              )}
+              <button
+                onClick={submitPasswordChange}
+                disabled={pwBusy}
+                style={{
+                  width: '100%', padding: 10, border: 'none', borderRadius: 10,
+                  background: pwBusy ? 'rgba(0,229,255,0.15)' : 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+                  color: pwBusy ? 'var(--text3)' : 'var(--bg)',
+                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                  cursor: pwBusy ? 'default' : 'pointer', letterSpacing: 0.5,
+                }}
+              >{pwBusy ? 'UPDATING...' : 'UPDATE PASSWORD'}</button>
+            </div>
+          )}
+
+          {/* Delete account */}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {!deleteOpen ? (
+              <button
+                onClick={() => { setDeleteOpen(true); setDeleteConfirm(''); setDeleteError(null); }}
+                style={{
+                  background: 'none', border: 'none', padding: 0,
+                  color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 9,
+                  fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer',
+                }}
+              >DELETE ACCOUNT</button>
+            ) : (
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--red)', lineHeight: 1.5, marginBottom: 8 }}>
+                  This permanently deletes your account and all training data. It cannot be undone.
+                  Type <strong>DELETE</strong> to confirm.
+                </div>
+                <input
+                  value={deleteConfirm}
+                  onChange={e => setDeleteConfirm(e.target.value)}
+                  placeholder="DELETE"
+                  style={{ ...inputStyle, width: '100%', textAlign: 'left', marginBottom: 8 }}
+                />
+                {deleteError && (
+                  <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}>{deleteError}</div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setDeleteOpen(false)}
+                    style={{ flex: 1, ...accountBtn('rgba(255,255,255,0.06)', 'var(--text2)') }}
+                  >CANCEL</button>
+                  <button
+                    onClick={submitAccountDelete}
+                    disabled={deleteConfirm !== 'DELETE' || deleteBusy}
+                    style={{
+                      flex: 1, padding: '9px 18px', borderRadius: 10, border: 'none',
+                      background: deleteConfirm === 'DELETE' && !deleteBusy ? 'var(--red)' : 'rgba(255,23,68,0.12)',
+                      color: deleteConfirm === 'DELETE' && !deleteBusy ? '#fff' : 'var(--text3)',
+                      fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                      cursor: deleteConfirm === 'DELETE' && !deleteBusy ? 'pointer' : 'not-allowed',
+                    }}
+                  >{deleteBusy ? 'DELETING...' : 'DELETE FOREVER'}</button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -773,6 +906,15 @@ const navBtnStyle = {
   color: 'var(--text2)', fontSize: 18, cursor: 'pointer',
   display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
+
+function accountBtn(background, color) {
+  return {
+    padding: '9px 18px', borderRadius: 10, border: 'none',
+    background, color,
+    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+    cursor: 'pointer', letterSpacing: 0.5,
+  };
+}
 
 const inputStyle = {
   height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)',

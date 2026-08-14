@@ -71,7 +71,7 @@ class ErrorBoundary extends Component {
 }
 
 
-function SetPasswordScreen({ authError, onUpdate }) {
+function SetPasswordScreen({ authError, onUpdate, onCancel }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -117,6 +117,12 @@ function SetPasswordScreen({ authError, onUpdate }) {
           <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'rgba(0,229,255,0.3)' : 'var(--cyan)', color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: loading ? 'none' : '0 0 20px rgba(0,229,255,0.25)' }}>
             {loading ? 'UPDATING...' : 'SET PASSWORD'}
           </button>
+          {/* Escape hatch — a user who lands here from a recovery link and
+              changes their mind was previously stuck on this screen. */}
+          <button type="button" onClick={onCancel}
+            style={{ width: '100%', marginTop: 12, padding: '10px', border: 'none', background: 'transparent', color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, letterSpacing: 1, cursor: 'pointer' }}>
+            CANCEL — SIGN OUT
+          </button>
         </form>
       </div>
     </div>
@@ -124,7 +130,7 @@ function SetPasswordScreen({ authError, onUpdate }) {
 }
 
 export default function App() {
-  const { user, loading: authLoading, authError, signIn, signUp, signOut, resetPassword, updatePassword, passwordRecovery } = useAuth();
+  const { user, loading: authLoading, authError, signIn, signUp, signOut, resetPassword, updatePassword, changePassword, resendConfirmation, clearAuthError, passwordRecovery } = useAuth();
   const [activeTab, setActiveTab] = useState('train');
   const [modalOpen, setModalOpen] = useState(false);
   const [showCycleComplete, setShowCycleComplete] = useState(false);
@@ -182,8 +188,8 @@ export default function App() {
   }, []);
 
   if (authLoading)  return <SyncIndicator label="LOADING..." />;
-  if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} /></>;
-  if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} /></>;
+  if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} onClearAuthError={clearAuthError} onResendConfirmation={resendConfirmation} /></>;
+  if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} onCancel={signOut} /></>;
   if (cloudLoading) return <SyncIndicator label="SYNCING..." />;
   if (generatingProgram) return (
     <AIBuilderScreen
@@ -406,6 +412,9 @@ export default function App() {
                       onImport={importData}
                       userEmail={user?.email}
                       onSignOut={signOut}
+                      onChangePassword={changePassword}
+                      authError={authError}
+                      onClearAuthError={clearAuthError}
                       onShowCycleComplete={() => setShowCycleComplete(true)}
                       onSyncFromCloud={syncFromCloud}
                       lastSyncedAt={lastSyncedAt}

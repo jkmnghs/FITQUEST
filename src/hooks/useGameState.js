@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce } from '../utils/storage';
+import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
@@ -43,12 +43,15 @@ function buildPersonalizedExercises(exercises, assessment) {
 
 // Module-level guard — lives completely outside React, reset only on page reload.
 // Tracks "week_dayKey" strings already backfilled to prevent double-apply on re-render.
-const _initSaved = storageGet();
-const _backfillGuard = new Set(
-  Object.entries(_initSaved?.backfillLock ?? {}).flatMap(([w, val]) =>
-    Array.isArray(val) ? val.map(dk => `${w}_${dk}`) : []
-  )
-);
+const _backfillGuard = new Set();
+
+/** Seed the guard from a state object once we know whose state it is. */
+function hydrateBackfillGuard(saved) {
+  _backfillGuard.clear();
+  for (const [w, val] of Object.entries(saved?.backfillLock ?? {})) {
+    if (Array.isArray(val)) val.forEach(dk => _backfillGuard.add(`${w}_${dk}`));
+  }
+}
 
 function mergeState(saved) {
   const base = JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -143,8 +146,9 @@ function checkQuestReset(state) {
 export function useGameState(user) {
   const userId = user?.id;
   const [state, setStateRaw] = useState(() => {
-    const saved = storageGet();
+    const saved = storageGet(user?.id);
     const merged = saved ? mergeState(saved) : { ...DEFAULT_STATE };
+    hydrateBackfillGuard(saved);
     return checkQuestReset(checkDayReset(merged));
   });
 
@@ -161,8 +165,7 @@ export function useGameState(user) {
 
   // Ref-based synchronous lock for backfill
   const backfillApplied = useRef((() => {
-    const saved = storageGet();
-    const wp = saved?.weekProgress ?? {};
+    const wp = storageGet(user?.id)?.weekProgress ?? {};
     return Object.fromEntries(Object.entries(wp).map(([w, d]) => [w, d.count ?? 0]));
   })());
 
@@ -176,17 +179,27 @@ export function useGameState(user) {
       // On cold start userId is null while auth is still resolving — don't clear
       // localStorage or reset state in that case or onboarding will flash.
       if (prevUserId) {
-        cancelCloudDebounce();
+        // Flush first — cancelling the debounce and then clearing local storage
+        // silently discarded up to 3 seconds of progress on sign-out.
+        flushCloudDebounce();
         setStateRaw({ ...DEFAULT_STATE });
-        storageClear();
+        storageClear(prevUserId);
+        _backfillGuard.clear();
+        backfillApplied.current = {};
       }
       setCloudLoading(false);
       return;
     }
     setCloudLoading(true);
+    // Adopt any pre-namespacing local state into this account's namespace, once.
+    // Only applies when this account has no local state of its own, so it can't
+    // pull a previous user's progress into a different account.
+    migrateLegacyStorage(userId);
+    hydrateBackfillGuard(storageGet(userId));
+
     cloudGet(userId).then(cloudData => {
       if (cloudData && Object.keys(cloudData).length > 0) {
-        const localData = storageGet();
+        const localData = storageGet(userId);
 
         // Phase 5.2: Conflict resolution — merge when both have data
         if (localData && localData.totalSessions > 0 && cloudData.totalSessions > 0) {
@@ -263,13 +276,13 @@ export function useGameState(user) {
             merged.name = user.user_metadata.full_name;
           }
           setStateRaw(merged);
-          storageSet(merged);
+          storageSet(merged, userId);
         } else {
           // Cloud wins over localStorage
           const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
           // If local has a higher week (e.g., claimed reward locally before cloud save landed),
           // keep the higher value so the week never regresses on reload.
-          const localForWeek = storageGet();
+          const localForWeek = storageGet(userId);
           if (localForWeek && (localForWeek.currentWeek || 1) > (merged.currentWeek || 1)) {
             merged.currentWeek = localForWeek.currentWeek;
             merged.currentWeekStartDate = localForWeek.currentWeekStartDate || today();
@@ -279,11 +292,11 @@ export function useGameState(user) {
             merged.name = user.user_metadata.full_name;
           }
           setStateRaw(merged);
-          storageSet(merged);
+          storageSet(merged, userId);
         }
       } else {
         // Cloud is empty — check if localStorage has data to migrate
-        const localData = storageGet();
+        const localData = storageGet(userId);
         if (localData && localData.totalSessions > 0) {
           // Auto-migrate: mark assessment completed so onboarding is skipped
           const migrateData = mergeState(localData);
@@ -293,7 +306,7 @@ export function useGameState(user) {
           const merged = checkQuestReset(checkDayReset(migrateData));
           cloudSet(userId, merged);
           setStateRaw(merged);
-          storageSet(merged);
+          storageSet(merged, userId);
           // Toast shown after cloudLoading resolves
           setTimeout(() => showToast('Progress synced to account ✓'), 800);
         }
@@ -305,7 +318,7 @@ export function useGameState(user) {
 
   // ── Auto-save: localStorage + debounced cloud ─────────────────────────────
   useEffect(() => {
-    storageSet(state);
+    storageSet(state, userId);
     if (userId) {
       const { success, error } = validateState(state);
       if (success) {
@@ -350,7 +363,7 @@ export function useGameState(user) {
   // Save on page hide / unload (synchronous best-effort)
   useEffect(() => {
     const save = () => {
-      storageSet(state);
+      storageSet(state, userId);
       if (userId) { cancelCloudDebounce(); cloudSet(userId, state); }
     };
     window.addEventListener('pagehide', save);
@@ -391,7 +404,7 @@ export function useGameState(user) {
   }, [setState, showToast]);
 
   const resetAll = useCallback(() => {
-    storageClear();
+    storageClear(userId);
     if (userId) cloudClear(userId);
     backfillApplied.current = {};
     _backfillGuard.clear();
@@ -1195,7 +1208,7 @@ export function useGameState(user) {
       }
       setStateRaw(prev => {
         const merged = applyCloudMerge(prev, cloudData);
-        storageSet(merged);
+        storageSet(merged, userId);
         cancelCloudDebounce();
         cloudSet(userId, merged);
         return merged;
@@ -1219,7 +1232,7 @@ export function useGameState(user) {
       return;
     }
     const merged = checkQuestReset(checkDayReset(mergeState(data)));
-    storageSet(merged);
+    storageSet(merged, userId);
     if (userId) { cancelCloudDebounce(); cloudSet(userId, merged); }
     backfillApplied.current = {};
     setStateRaw(merged);
