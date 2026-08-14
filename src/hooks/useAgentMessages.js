@@ -8,9 +8,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { authPostJSON } from '../lib/authFetch';
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
-const AGENT_BASE_URL = '/api/agent';
+// Client triggers go through the JWT-authenticated route. /api/agent itself is
+// gated on AGENT_SECRET for the cron, and that secret must never reach a browser.
+const AGENT_TRIGGER_URL = '/api/agent-trigger';
 
 export function useAgentMessages(userId, state, onProgramSwitch) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -38,15 +41,11 @@ export function useAgentMessages(userId, state, onProgramSwitch) {
     console.log('[Quest Agent] firing trigger:', trigger, 'for userId:', userId);
 
     try {
-      const res = await fetch(AGENT_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-agent-secret': '',
-        },
-        body: JSON.stringify({ trigger, userId }),
-      });
+      // userId is derived server-side from the access token — sending it here
+      // would be advisory at best, and the server ignores it.
+      const res = await authPostJSON(AGENT_TRIGGER_URL, { trigger });
       const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || `Agent trigger failed (${res.status})`);
       console.log('[Quest Agent] trigger result:', json);
       // Poll for new messages — give Claude 5s to finish writing before we read
       setTimeout(() => pollMessagesRef.current?.(), 5000);

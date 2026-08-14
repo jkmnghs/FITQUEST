@@ -87,9 +87,16 @@ describe('validateState — invalid states', () => {
     expect(success).toBe(false);
   });
 
-  it('currentWeek > 52 fails', () => {
-    const { success } = validateState(makeValidState({ currentWeek: 53 }));
+  it('currentWeek beyond the schema maximum fails', () => {
+    // The cap is 999 — programs run in repeating 12-week cycles, so week 53 is
+    // an ordinary value for a user in their fifth cycle.
+    const { success } = validateState(makeValidState({ currentWeek: 1000 }));
     expect(success).toBe(false);
+  });
+
+  it('currentWeek past one cycle is valid', () => {
+    const { success } = validateState(makeValidState({ currentWeek: 53 }));
+    expect(success).toBe(true);
   });
 
   it('invalid pain severity fails', () => {

@@ -1,5 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+
+/** Supabase treats addresses case-insensitively; a stray space fails silently. */
+function normalizeEmail(email) {
+  return (email || '').trim().toLowerCase();
+}
 
 /**
  * Encapsulates all Supabase auth state.
@@ -12,6 +17,12 @@ export function useAuth() {
   const [loading,             setLoading]             = useState(true);
   const [authError,           setAuthError]           = useState(null);
   const [passwordRecovery,    setPasswordRecovery]    = useState(false);
+
+  // The auth listener is registered once, so reading `passwordRecovery` from its
+  // closure always saw the first render's value (false) and the SIGNED_IN reset
+  // below could never fire. A ref gives the callback the live value.
+  const passwordRecoveryRef = useRef(false);
+  passwordRecoveryRef.current = passwordRecovery;
 
   useEffect(() => {
     if (!supabase) {
@@ -26,7 +37,7 @@ export function useAuth() {
       setSession(session);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
-      if (event === 'SIGNED_IN' && passwordRecovery) setPasswordRecovery(false);
+      if (event === 'SIGNED_IN' && passwordRecoveryRef.current) setPasswordRecovery(false);
     });
 
     // getSession reads from localStorage and also handles any in-progress
@@ -39,10 +50,15 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const clearAuthError = useCallback(() => setAuthError(null), []);
+
   async function signIn(email, password) {
     if (!supabase) return false;
     setAuthError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizeEmail(email),
+      password,
+    });
     if (error) setAuthError(error.message);
     return !error;
   }
@@ -51,7 +67,7 @@ export function useAuth() {
     if (!supabase) return false;
     setAuthError(null);
     const { error } = await supabase.auth.signUp({
-      email,
+      email: normalizeEmail(email),
       password,
       options: {
         emailRedirectTo: window.location.origin,
@@ -74,7 +90,7 @@ export function useAuth() {
   async function resetPassword(email) {
     if (!supabase) return false;
     setAuthError(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
       redirectTo: window.location.origin,
     });
     if (error) setAuthError(error.message);
@@ -87,6 +103,38 @@ export function useAuth() {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) { setAuthError(error.message); return false; }
     setPasswordRecovery(false);
+    return true;
+  }
+
+  /** Re-sends the sign-up confirmation email. */
+  async function resendConfirmation(email) {
+    if (!supabase) return false;
+    setAuthError(null);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizeEmail(email),
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (error) setAuthError(error.message);
+    return !error;
+  }
+
+  /**
+   * Changes the password of the signed-in user, verifying the current one first.
+   * Supabase's updateUser does not require the old password, so without this
+   * check an unattended session could be used to lock the owner out.
+   */
+  async function changePassword(currentPassword, newPassword) {
+    if (!supabase) return false;
+    setAuthError(null);
+    const email = session?.user?.email;
+    if (!email) { setAuthError('You must be signed in to change your password.'); return false; }
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (verifyError) { setAuthError('Current password is incorrect.'); return false; }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) { setAuthError(error.message); return false; }
     return true;
   }
 
@@ -107,5 +155,8 @@ export function useAuth() {
     signOut,
     resetPassword,
     updatePassword,
+    changePassword,
+    resendConfirmation,
+    clearAuthError,
   };
 }

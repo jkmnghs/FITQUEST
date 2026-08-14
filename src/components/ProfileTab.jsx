@@ -24,6 +24,7 @@ export default function ProfileTab({
   state, onUpdate, onReset, onResetToday, onBackfillWeek,
   notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete,
   onSyncFromCloud, lastSyncedAt, syncing,
+  onChangePassword, authError, onClearAuthError,
 }) {
   return (
     <div className="tab-enter">
@@ -70,6 +71,9 @@ export default function ProfileTab({
             onSyncFromCloud={onSyncFromCloud}
             lastSyncedAt={lastSyncedAt}
             syncing={syncing}
+            onChangePassword={onChangePassword}
+            authError={authError}
+            onClearAuthError={onClearAuthError}
           />
         </div>
       </div>

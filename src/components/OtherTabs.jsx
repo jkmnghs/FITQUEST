@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ACHIEVEMENTS, EXERCISES } from '../data/gameData';
+import { ACHIEVEMENTS } from '../data/gameData';
+import { authFetch } from '../lib/authFetch';
+import { exercisesForDay, DAY_ORDER } from '../utils/session';
 
 // ─── ACHIEVEMENTS TAB ───
 export function AchievementsTab({ state }) {
@@ -150,7 +152,7 @@ export function SummaryTab({ state }) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           {[
-            { val: `${wp.count}/3`, lbl: 'Sessions', color: 'var(--cyan)' },
+            { val: `${wp.count}/${state.sessionsPerWeek || 3}`, lbl: 'Sessions', color: 'var(--cyan)' },
             { val: `${avgCompletion}%`, lbl: 'Avg Completion', color: 'var(--purple)' },
             { val: weekXP, lbl: 'XP Earned', color: 'var(--fire2)' },
             { val: weightChange, lbl: 'Weight Change', color: 'var(--green)' }
@@ -167,10 +169,10 @@ export function SummaryTab({ state }) {
 
         {/* Highlights */}
         <ul style={{ listStyle: 'none', fontSize: 12, color: 'var(--text2)', lineHeight: 1.8 }}>
-          {wp.count >= 3 && (
+          {wp.count >= (state.sessionsPerWeek || 3) && (
             <li style={{ color: 'var(--green)', paddingLeft: 16, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0 }}>→</span>
-              All 3 sessions completed!
+              All {state.sessionsPerWeek || 3} sessions completed!
             </li>
           )}
           {increases.length > 0 && (
@@ -222,29 +224,13 @@ export function SummaryTab({ state }) {
   );
 }
 
-const _DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-// Return exercises for a specific training day key (e.g. 'fri').
-// Falls back through dayTemplates → activeTemplates → activeExercises → EXERCISES.
-export function getProgramExercisesForDay(state, dayKey) {
-  const sortedDays = (state.trainingDays || ['mon', 'wed', 'fri'])
-    .slice()
-    .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b));
-  const idx = Math.max(0, sortedDays.indexOf(dayKey));
-
-  if (state.dayTemplates?.[dayKey]?.exercises?.length > 0) {
-    return state.dayTemplates[dayKey].exercises;
-  }
-  if (state.activeTemplates?.length > 0) {
-    const t = state.activeTemplates[idx % state.activeTemplates.length];
-    if (t?.exercises?.length > 0) return t.exercises;
-  }
-  if (state.activeExercises?.length > 0) return state.activeExercises;
-  return EXERCISES;
-}
+// Kept as a named export for existing callers; the resolution itself lives in
+// utils/session so the display and the mutations can't drift apart.
+export const getProgramExercisesForDay = exercisesForDay;
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError }) {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(() => Math.max(1, (state.currentWeek || 1) - 1));
   const [backfillDay, setBackfillDay] = useState(null);
@@ -252,10 +238,56 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
   const [backfillWeights, setBackfillWeights] = useState({});
   const [backfillSets, setBackfillSets] = useState({});
 
+  // Account management
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNext, setPwNext] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwNote, setPwNote] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  async function submitPasswordChange() {
+    setPwNote(null);
+    onClearAuthError?.();
+    if (pwNext.length < 6) { setPwNote({ ok: false, text: 'New password must be at least 6 characters.' }); return; }
+    if (pwNext !== pwConfirm) { setPwNote({ ok: false, text: 'New passwords do not match.' }); return; }
+    setPwBusy(true);
+    const ok = await onChangePassword?.(pwCurrent, pwNext);
+    setPwBusy(false);
+    if (ok) {
+      setPwNote({ ok: true, text: 'Password updated.' });
+      setPwCurrent(''); setPwNext(''); setPwConfirm('');
+      setTimeout(() => { setPwOpen(false); setPwNote(null); }, 1800);
+    } else {
+      setPwNote({ ok: false, text: null }); // authError carries the reason
+    }
+  }
+
+  async function submitAccountDelete() {
+    setDeleteError(null);
+    setDeleteBusy(true);
+    try {
+      const res = await authFetch('/api/account-delete', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
+      onReset();   // wipe local + cloud state
+      onSignOut(); // drop the now-orphaned session
+    } catch (e) {
+      setDeleteError(e.message);
+      setDeleteBusy(false);
+    }
+  }
+
   const _sortedTdays = useMemo(() => (
     (state.trainingDays || ['mon', 'wed', 'fri'])
       .slice()
-      .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b))
+      .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
   ), [state.trainingDays]);
 
   // Days already recorded for the selected week (real sessions + backfill)
@@ -318,12 +350,98 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 12, wordBreak: 'break-all' }}>
             {userEmail}
           </div>
-          <button onClick={onSignOut} style={{
-            padding: '9px 18px', borderRadius: 10, border: 'none',
-            background: 'rgba(255,23,68,0.12)', color: 'var(--red)',
-            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-            cursor: 'pointer', letterSpacing: 0.5,
-          }}>SIGN OUT</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={onSignOut} style={accountBtn('rgba(255,23,68,0.12)', 'var(--red)')}>SIGN OUT</button>
+            {onChangePassword && (
+              <button
+                onClick={() => { setPwOpen(o => !o); setPwNote(null); onClearAuthError?.(); }}
+                style={accountBtn('rgba(0,229,255,0.12)', 'var(--cyan)')}
+              >{pwOpen ? 'CANCEL' : 'CHANGE PASSWORD'}</button>
+            )}
+          </div>
+
+          {/* Change password */}
+          {pwOpen && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              {[
+                { label: 'Current password', value: pwCurrent, set: setPwCurrent, autoComplete: 'current-password' },
+                { label: 'New password',     value: pwNext,    set: setPwNext,    autoComplete: 'new-password' },
+                { label: 'Confirm new password', value: pwConfirm, set: setPwConfirm, autoComplete: 'new-password' },
+              ].map(f => (
+                <label key={f.label} style={{ display: 'block', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>{f.label}</div>
+                  <input
+                    type="password" value={f.value} autoComplete={f.autoComplete}
+                    onChange={e => f.set(e.target.value)}
+                    style={{ ...inputStyle, width: '100%', textAlign: 'left' }}
+                  />
+                </label>
+              ))}
+              {(pwNote?.text || (pwNote && !pwNote.ok && authError)) && (
+                <div style={{ fontSize: 12, marginBottom: 8, color: pwNote.ok ? 'var(--green)' : 'var(--red)' }}>
+                  {pwNote.text || authError}
+                </div>
+              )}
+              <button
+                onClick={submitPasswordChange}
+                disabled={pwBusy}
+                style={{
+                  width: '100%', padding: 10, border: 'none', borderRadius: 10,
+                  background: pwBusy ? 'rgba(0,229,255,0.15)' : 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+                  color: pwBusy ? 'var(--text3)' : 'var(--bg)',
+                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                  cursor: pwBusy ? 'default' : 'pointer', letterSpacing: 0.5,
+                }}
+              >{pwBusy ? 'UPDATING...' : 'UPDATE PASSWORD'}</button>
+            </div>
+          )}
+
+          {/* Delete account */}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {!deleteOpen ? (
+              <button
+                onClick={() => { setDeleteOpen(true); setDeleteConfirm(''); setDeleteError(null); }}
+                style={{
+                  background: 'none', border: 'none', padding: 0,
+                  color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 9,
+                  fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer',
+                }}
+              >DELETE ACCOUNT</button>
+            ) : (
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--red)', lineHeight: 1.5, marginBottom: 8 }}>
+                  This permanently deletes your account and all training data. It cannot be undone.
+                  Type <strong>DELETE</strong> to confirm.
+                </div>
+                <input
+                  value={deleteConfirm}
+                  onChange={e => setDeleteConfirm(e.target.value)}
+                  placeholder="DELETE"
+                  style={{ ...inputStyle, width: '100%', textAlign: 'left', marginBottom: 8 }}
+                />
+                {deleteError && (
+                  <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}>{deleteError}</div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setDeleteOpen(false)}
+                    style={{ flex: 1, ...accountBtn('rgba(255,255,255,0.06)', 'var(--text2)') }}
+                  >CANCEL</button>
+                  <button
+                    onClick={submitAccountDelete}
+                    disabled={deleteConfirm !== 'DELETE' || deleteBusy}
+                    style={{
+                      flex: 1, padding: '9px 18px', borderRadius: 10, border: 'none',
+                      background: deleteConfirm === 'DELETE' && !deleteBusy ? 'var(--red)' : 'rgba(255,23,68,0.12)',
+                      color: deleteConfirm === 'DELETE' && !deleteBusy ? '#fff' : 'var(--text3)',
+                      fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                      cursor: deleteConfirm === 'DELETE' && !deleteBusy ? 'pointer' : 'not-allowed',
+                    }}
+                  >{deleteBusy ? 'DELETING...' : 'DELETE FOREVER'}</button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -773,6 +891,15 @@ const navBtnStyle = {
   color: 'var(--text2)', fontSize: 18, cursor: 'pointer',
   display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
+
+function accountBtn(background, color) {
+  return {
+    padding: '9px 18px', borderRadius: 10, border: 'none',
+    background, color,
+    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+    cursor: 'pointer', letterSpacing: 0.5,
+  };
+}
 
 const inputStyle = {
   height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)',

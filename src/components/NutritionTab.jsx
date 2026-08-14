@@ -5,6 +5,7 @@ import { findFoodReference } from '../utils/foodReference';
 import DailySummaryBar from './nutrition/DailySummaryBar';
 import TodaysMealHistory from './nutrition/TodaysMealHistory';
 import { useIsDesktop } from '../hooks/useIsDesktop';
+import { authPostJSON } from '../lib/authFetch';
 
 const API_URL = '/api/nutrition';
 
@@ -127,15 +128,12 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     setError(null);
     setFoods([]);
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: [
+      const res = await authPostJSON(API_URL, {
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
               {
                 type: 'image',
                 source: { type: 'base64', media_type: image.type, data: image.base64 },
@@ -165,8 +163,7 @@ Guidelines:
 - Use "Unknown food" if unidentifiable`,
               },
             ],
-          }],
-        }),
+        }],
       });
 
       if (!res.ok) throw new Error(`API error ${res.status}`);
@@ -271,17 +268,13 @@ Guidelines:
     setAddError(null);
     try {
       // Ask Claude for gram weight + full nutrition
-      const claudeRes = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 256,
-          messages: [{
-            role: 'user',
-            content: `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Realistic serving gram weight.`,
-          }],
-        }),
+      const claudeRes = await authPostJSON(API_URL, {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 256,
+        messages: [{
+          role: 'user',
+          content: `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Realistic serving gram weight.`,
+        }],
       });
       if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
       const claudeData = await claudeRes.json();

@@ -1,19 +1,11 @@
-import { EX_CATALOG } from '../data/exerciseCatalog';
+import { EX_CATALOG_MAP, getExerciseGroup, filterCatalogForEquipment } from '../data/exerciseCatalog';
+import { authPostJSON } from '../lib/authFetch';
 
-// Muscle-group membership for post-processing split validation.
-// 'core' exercises are allowed on any split day.
-// rdl + deadlift live in 'legs' so they correctly survive both upper_lower lower-day
-// and PPL leg-day post-processing filters.
-const SPLIT_GROUP = {
-  push: new Set(['bench','incbench','incdbench','dbbench','chestdip','cablefly','pecdeck','pushup',
-                 'machohp','ohp','bbohp','dbohp','lateraise','frontraise','reardelt','arnoldpress','cablelat',
-                 'ohtriext','tricpush','cgbench','skullcrush','dipbench']),
-  pull: new Set(['pulldown','cablerow','bbrow','dbrow','dbpullover','facepull','pullup','chinup',
-                 'bbcurl','dbcurl','hammercurl','cablecurl','preachcurl']),
-  legs: new Set(['squat','legpress','legcurl','legext','hipthrust','bulgsplit','calfraise','dbsquat',
-                 'dbsumosq','bwsquat','dbrdl','dblunge','rdl','deadlift']),
-  core: new Set(['cablecrnch','hanglegrise','plank','crunch','rustwist','abrollout','legrise','mtnclimp']),
-};
+// Muscle-group membership for post-processing split validation comes from the
+// catalog itself, so a newly added exercise can never be silently dropped for
+// lacking a group tag. 'core' is allowed on any split day; rdl and deadlift are
+// tagged 'legs' so they survive both the upper/lower lower-day and PPL leg-day
+// filters.
 
 // Which groups are allowed for each split-day label
 const SPLIT_ALLOWED = {
@@ -21,11 +13,49 @@ const SPLIT_ALLOWED = {
   upper_lower: { upper: ['push','pull','core'], lower: ['legs','core'] },
 };
 
-function getExerciseGroup(id) {
-  for (const [group, ids] of Object.entries(SPLIT_GROUP)) {
-    if (ids.has(id)) return group;
-  }
-  return null;
+/**
+ * Fill in the fields the UI reads but the model isn't asked for.
+ *
+ * The prompt requests restSec but not the human-readable `rest`, so every
+ * AI-generated card rendered a blank rest tag and "Rest: " in the modal. Missing
+ * sets produced zero logging rows in the exercise modal, and a missing startKg
+ * rendered "NaN kg" on the card.
+ */
+function normalizeGeneratedExercise(raw) {
+  const entry = EX_CATALOG_MAP[raw.id];
+  const restSec = Number(raw.restSec) > 0 ? Math.round(Number(raw.restSec))
+    : entry?.defaults.restSec ?? 120;
+  const sets = Number(raw.sets) > 0 ? Math.round(Number(raw.sets))
+    : entry?.defaults.sets ?? 3;
+  const reps = Number.isFinite(Number(raw.reps)) ? Number(raw.reps)
+    : entry?.defaults.reps ?? 10;
+  const startKg = Number.isFinite(Number(raw.startKg)) ? Number(raw.startKg)
+    : entry?.startKg ?? 0;
+
+  return {
+    ...raw,
+    name: raw.name || entry?.name || raw.id,
+    sets,
+    reps,
+    restSec,
+    rest: raw.rest || formatRest(restSec),
+    rpe: Number.isFinite(Number(raw.rpe)) ? Number(raw.rpe) : entry?.defaults.rpe ?? 8,
+    startKg,
+    isBodyweight: raw.isBodyweight ?? entry?.isBodyweight ?? false,
+    isPlank: raw.isPlank ?? entry?.isPlank ?? false,
+  };
+}
+
+/**
+ * Seconds → the wording used everywhere else in the app: "45 sec", "90 sec",
+ * "2 min", "2.5 min". Mirrors REST_OPTIONS in ProgramEditorTab.
+ */
+export function formatRest(sec) {
+  const s = Number(sec);
+  if (!Number.isFinite(s) || s <= 0) return '—';
+  if (s < 120) return `${Math.round(s)} sec`;
+  const mins = s / 60;
+  return `${Number.isInteger(mins) ? mins : mins.toFixed(1)} min`;
 }
 
 function filterToSplitDay(exercises, dayType, split) {
@@ -33,10 +63,6 @@ function filterToSplitDay(exercises, dayType, split) {
   if (!allowed) return exercises;
   return exercises.filter(ex => allowed.includes(getExerciseGroup(ex.id)));
 }
-
-const BARBELL_IDS = new Set(['squat','bench','deadlift','rdl','cgbench','bbohp','bbrow','incbench','skullcrush']);
-const CABLE_IDS   = new Set(['pulldown','cablerow','facepull','cablefly','cablelat','cablecurl','cablecrnch','tricpush','ohtriext']);
-const MACHINE_IDS = new Set(['legpress','legcurl','legext','hipthrust','pecdeck','machohp']);
 
 export const EQUIPMENT_DESC = {
   full_gym:       'Full gym: barbells, dumbbells, cables, all machines available',
@@ -46,21 +72,15 @@ export const EQUIPMENT_DESC = {
   bodyweight:     'Bodyweight ONLY — zero equipment',
 };
 
-export function filterCatalogForEquipment(equipment) {
-  return EX_CATALOG.filter(e => {
-    if (equipment === 'bodyweight')     return !!e.isBodyweight;
-    if (equipment === 'dumbbells_only') return e.isBodyweight || (!BARBELL_IDS.has(e.id) && !CABLE_IDS.has(e.id) && !MACHINE_IDS.has(e.id));
-    if (equipment === 'dumbbells')      return e.isBodyweight || (!BARBELL_IDS.has(e.id) && !MACHINE_IDS.has(e.id));
-    if (equipment === 'barbell_home')   return e.isBodyweight || (!CABLE_IDS.has(e.id) && !MACHINE_IDS.has(e.id));
-    return true; // full_gym — everything
-  });
-}
+// Re-exported so existing importers (AICoachTab) keep working; the equipment
+// rules now live with the catalog data they describe.
+export { filterCatalogForEquipment };
 
 /**
  * Silently generates a per-day training program using Claude, based on the user's
  * assessment. Returns a dayTemplates object or null on failure.
  */
-export async function generateProgramFromAssessment(assessment, userId) {
+export async function generateProgramFromAssessment(assessment) {
   const trainingDays = assessment.trainingDays || ['mon', 'wed', 'fri'];
   if (!trainingDays.length) return null;
 
@@ -80,18 +100,10 @@ export async function generateProgramFromAssessment(assessment, userId) {
       ? (numDays <= 3 ? 'full_body' : numDays === 4 ? 'upper_lower' : 'ppl')
       : splitPref;
 
-  // Build a fast id→group lookup so the catalog can carry explicit group tags.
-  // This removes any ambiguity about which split day each exercise belongs to.
-  const idToGroup = {};
-  for (const [group, ids] of Object.entries(SPLIT_GROUP)) {
-    for (const id of ids) idToGroup[id] = group.toUpperCase();
-  }
-
   const catalog = filterCatalogForEquipment(equipment)
     .map(e => {
       const weight = e.isBodyweight ? 'BW,0kg' : `${e.startKg}kg`;
-      const group  = idToGroup[e.id] ?? 'CORE';
-      return `${e.id}="${e.name}"[${weight}][${group}]`;
+      return `${e.id}="${e.name}"[${weight}][${(e.group || 'core').toUpperCase()}]`;
     })
     .join(', ');
 
@@ -156,17 +168,11 @@ Rules:
 ${splitIsolationRule}`;
 
   try {
-    const pgHeaders = { 'Content-Type': 'application/json' };
-    if (userId) pgHeaders['x-user-id'] = userId;
-    const res = await fetch('/api/coach', {
-      method: 'POST',
-      headers: pgHeaders,
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: 'You are a training program generator. Output only valid JSON.',
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const res = await authPostJSON('/api/coach', {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: 'You are a training program generator. Output only valid JSON.',
+      messages: [{ role: 'user', content: prompt }],
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -182,7 +188,7 @@ ${splitIsolationRule}`;
       if (!trainingDays.includes(day) || !Array.isArray(prog.exercises) || prog.exercises.length === 0) continue;
 
       // Strip exercises that belong to the wrong muscle group for this split day
-      let exercises = prog.exercises;
+      let exercises = prog.exercises.map(normalizeGeneratedExercise);
       if (effectiveSplit === 'ppl') {
         const dayType = pplDayTypes[trainingDays.indexOf(day) % 3];
         exercises = filterToSplitDay(exercises, dayType, 'ppl');

@@ -368,7 +368,7 @@ function RevealCard({ assessment, onDismiss }) {
 }
 
 // ── Main screen ───────────────────────────────────────────────
-export default function AIBuilderScreen({ assessment, apiReady = false, onDismiss }) {
+export default function AIBuilderScreen({ assessment, apiReady = false, onDismiss, generationFailed = false, onRetry }) {
   const STEPS     = buildSteps(assessment);
   const TOTAL_DUR = STEPS.reduce((s, x) => s + x.dur, 0); // ~9800ms
 
@@ -382,7 +382,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
   // Derived: animation has covered all steps but API hasn't returned yet.
   // Using current >= STEPS.length catches the 300ms gap before animDone fires
   // so the last step never flickers done → active.
-  const waitingForAPI = !apiReady && (animDone || current >= STEPS.length);
+  const waitingForAPI = !apiReady && !generationFailed && (animDone || current >= STEPS.length);
   const done = phase === 'done';
 
   // Kick off step timers once
@@ -403,7 +403,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
 
   // Transition to done ONLY when both animation finished AND API returned
   useEffect(() => {
-    if (animDone && apiReady) {
+    if (animDone && (apiReady || generationFailed)) {
       const t = setTimeout(() => setPhase('done'), 250);
       return () => clearTimeout(t);
     }
@@ -513,6 +513,34 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
                   }
                 />
               ))}
+            </div>
+          ) : generationFailed ? (
+            /* The AI build failed (offline, quota, upstream error). Say so —
+               silently falling through to the generic full-body program left a
+               user who explicitly picked PPL wondering why they got full body. */
+            <div style={{ textAlign: 'center', padding: '20px 8px' }}>
+              <div style={{ fontSize: 34, marginBottom: 12 }}>⚠️</div>
+              <div style={{ fontFamily: ORBITRON, fontSize: 13, fontWeight: 700, color: CYAN, marginBottom: 8, letterSpacing: 1 }}>
+                COULDN'T BUILD YOUR CUSTOM SPLIT
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto 20px' }}>
+                We've started you on a proven program that matches your equipment and schedule.
+                You can retry the custom build, or edit your program any time from the Profile tab.
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {onRetry && (
+                  <button onClick={onRetry} style={{
+                    padding: '11px 20px', borderRadius: 11, border: `1px solid ${CYAN}`,
+                    background: 'transparent', color: CYAN,
+                    fontFamily: ORBITRON, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: 'pointer',
+                  }}>RETRY BUILD</button>
+                )}
+                <button onClick={onDismiss} style={{
+                  padding: '11px 20px', borderRadius: 11, border: 'none',
+                  background: CYAN, color: '#0a0e1a',
+                  fontFamily: ORBITRON, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: 'pointer',
+                }}>CONTINUE</button>
+              </div>
             </div>
           ) : (
             <RevealCard assessment={assessment} onDismiss={onDismiss} />

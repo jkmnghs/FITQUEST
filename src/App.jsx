@@ -13,8 +13,8 @@ import { useAuth } from './hooks/useAuth';
 import { useGameState } from './hooks/useGameState';
 import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
-import { EXERCISES } from './data/gameData';
 import { generateProgramFromAssessment } from './utils/programGenerator';
+import { resolveSession } from './utils/session';
 import AIBuilderScreen from './components/AIBuilderScreen';
 import SyncIndicator from './components/SyncIndicator';
 
@@ -71,7 +71,7 @@ class ErrorBoundary extends Component {
 }
 
 
-function SetPasswordScreen({ authError, onUpdate }) {
+function SetPasswordScreen({ authError, onUpdate, onCancel }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -117,6 +117,12 @@ function SetPasswordScreen({ authError, onUpdate }) {
           <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'rgba(0,229,255,0.3)' : 'var(--cyan)', color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: loading ? 'none' : '0 0 20px rgba(0,229,255,0.25)' }}>
             {loading ? 'UPDATING...' : 'SET PASSWORD'}
           </button>
+          {/* Escape hatch — a user who lands here from a recovery link and
+              changes their mind was previously stuck on this screen. */}
+          <button type="button" onClick={onCancel}
+            style={{ width: '100%', marginTop: 12, padding: '10px', border: 'none', background: 'transparent', color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, letterSpacing: 1, cursor: 'pointer' }}>
+            CANCEL — SIGN OUT
+          </button>
         </form>
       </div>
     </div>
@@ -124,7 +130,7 @@ function SetPasswordScreen({ authError, onUpdate }) {
 }
 
 export default function App() {
-  const { user, loading: authLoading, authError, signIn, signUp, signOut, resetPassword, updatePassword, passwordRecovery } = useAuth();
+  const { user, loading: authLoading, authError, signIn, signUp, signOut, resetPassword, updatePassword, changePassword, resendConfirmation, clearAuthError, passwordRecovery } = useAuth();
   const [activeTab, setActiveTab] = useState('train');
   const [modalOpen, setModalOpen] = useState(false);
   const [showCycleComplete, setShowCycleComplete] = useState(false);
@@ -135,6 +141,7 @@ export default function App() {
   const [generatingProgram, setGeneratingProgram] = useState(false);
   const [apiReady, setApiReady] = useState(false);
   const [pendingAssessment, setPendingAssessment] = useState(null);
+  const [generationFailed, setGenerationFailed] = useState(false);
   const contentRef = useRef(null);
 
   const {
@@ -144,7 +151,7 @@ export default function App() {
     resetAll, resetToday, startSession, backfillWeek,
     addAIHistory, logMeal, deleteMeal, importData,
     completeAssessment, changeProgram, swapExercise, deleteExercise,
-    syncFromCloud, lastSyncedAt, syncing,
+    syncFromCloud, lastSyncedAt, syncing, incrementQuestMessages,
   } = useGameState(user);
 
   const {
@@ -182,27 +189,46 @@ export default function App() {
   }, []);
 
   if (authLoading)  return <SyncIndicator label="LOADING..." />;
-  if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} /></>;
-  if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} /></>;
+  if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} onClearAuthError={clearAuthError} onResendConfirmation={resendConfirmation} /></>;
+  if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} onCancel={signOut} /></>;
   if (cloudLoading) return <SyncIndicator label="SYNCING..." />;
   if (generatingProgram) return (
     <AIBuilderScreen
       assessment={pendingAssessment}
       apiReady={apiReady}
-      onDismiss={() => { setGeneratingProgram(false); setApiReady(false); setPendingAssessment(null); }}
+      generationFailed={generationFailed}
+      onRetry={() => runProgramGeneration(pendingAssessment, { assessmentAlreadySaved: true })}
+      onDismiss={() => { setGeneratingProgram(false); setApiReady(false); setGenerationFailed(false); setPendingAssessment(null); }}
     />
   );
   if (!state.assessment?.completed) return (
-    <><BgFx /><OnboardingScreen onComplete={async (a) => {
-      setPendingAssessment(a);
-      setApiReady(false);
-      setGeneratingProgram(true);
-      const templates = await generateProgramFromAssessment(a, user?.id);
-      completeAssessment(a, fireOnboarding);
-      if (templates) updateSetting('dayTemplates', templates);
-      setApiReady(true); // signals AIBuilderScreen it can transition to reveal
-    }} /></>
+    <><BgFx /><OnboardingScreen onComplete={(a) => runProgramGeneration(a)} /></>
   );
+
+  /**
+   * Builds the personalised split, then commits the assessment.
+   *
+   * A null result means the AI build failed — the user still gets the program
+   * selectProgram picked, but AIBuilderScreen now says so and offers a retry
+   * instead of silently handing a PPL-preferring user a full-body plan.
+   */
+  async function runProgramGeneration(assessment, { assessmentAlreadySaved = false } = {}) {
+    if (!assessment) return;
+    setPendingAssessment(assessment);
+    setApiReady(false);
+    setGenerationFailed(false);
+    setGeneratingProgram(true);
+
+    const templates = await generateProgramFromAssessment(assessment).catch(() => null);
+    if (!assessmentAlreadySaved) completeAssessment(assessment, fireOnboarding);
+
+    if (templates) {
+      updateSetting('dayTemplates', templates);
+      setApiReady(true); // signals AIBuilderScreen it can transition to reveal
+    } else {
+      setGenerationFailed(true);
+    }
+  }
 
   async function handleRequestNotif() {
     const result = await requestNotificationPermission();
@@ -219,49 +245,18 @@ export default function App() {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }
 
-  const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const DAY_ABBR  = { sun: 'SUN', mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT' };
-  const dayKey = DAY_ORDER[new Date().getDay()];
-  const tdays  = state.trainingDays || ['mon', 'wed', 'fri'];
-
-  const isTodayTrainingDay = tdays.includes(dayKey);
-
-  // Today's template (only useful if it's a training day)
-  const todayDayTemplate = state.dayTemplates?.[dayKey];
-
-  // Next training day after today (for rest-day preview)
-  const sortedTdays = [...tdays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
-  const todayOrdinal = DAY_ORDER.indexOf(dayKey);
-  const nextTrainingDayKey = sortedTdays.find(d => DAY_ORDER.indexOf(d) > todayOrdinal) || sortedTdays[0];
-  const nextDayTemplate = state.dayTemplates?.[nextTrainingDayKey];
-
-  // Fallback for users without dayTemplates: pick from activeTemplates by calendar day
-  const todayTdIdx = tdays.indexOf(dayKey);
-  const calendarFallback = (todayTdIdx >= 0 && state.activeTemplates?.length)
-    ? state.activeTemplates[todayTdIdx % state.activeTemplates.length]
-    : state.activeTemplates?.[state.currentDayIndex ?? 0];
-
-  // What exercises to render
-  const displayTemplate = isTodayTrainingDay
-    ? (todayDayTemplate || calendarFallback)
-    : nextDayTemplate;
-  const displayExercises = displayTemplate?.exercises?.length > 0
-    ? displayTemplate.exercises
-    : (isTodayTrainingDay ? (state.activeExercises ?? EXERCISES) : EXERCISES);
-
-  // Session label
-  const currentDayName = isTodayTrainingDay
-    ? (todayDayTemplate?.title ?? calendarFallback?.name ?? null)
-    : (nextDayTemplate
-        ? `NEXT SESSION — ${DAY_ABBR[nextTrainingDayKey]}`
-        : `UPCOMING SESSION`);
+  // One resolution of "what workout is on screen", shared by the display and
+  // every mutation. Each used to derive it independently, which is why swap and
+  // delete silently no-op'd on a rest-day override.
+  const session = resolveSession(state);
 
   const sharedTrainProps = {
     state,
-    exercises: displayExercises,
-    currentDayName,
-    isRestDay: !isTodayTrainingDay,
-    nextTrainingDayKey,
+    exercises: session.exercises,
+    currentDayName: session.title ?? (session.isRestDay ? 'UPCOMING SESSION' : null),
+    isRestDay: session.isRestDay,
+    nextTrainingDayKey: session.nextTrainingDayKey,
+    sessionDayKey: session.dayKey,
     onCompleteExercise: completeExercise,
     onFinishSession: finishSession,
     onStartSession: startSession,
@@ -276,6 +271,7 @@ export default function App() {
     agentMessages,
     onSaveHistory: addAIHistory,
     onSaveProgram: (updatedTemplates) => updateSetting('dayTemplates', updatedTemplates),
+    onQuestMessageSent: incrementQuestMessages,
     userId: user?.id,
   };
 
@@ -405,6 +401,9 @@ export default function App() {
                       onImport={importData}
                       userEmail={user?.email}
                       onSignOut={signOut}
+                      onChangePassword={changePassword}
+                      authError={authError}
+                      onClearAuthError={clearAuthError}
                       onShowCycleComplete={() => setShowCycleComplete(true)}
                       onSyncFromCloud={syncFromCloud}
                       lastSyncedAt={lastSyncedAt}

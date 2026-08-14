@@ -62,6 +62,8 @@ function SessionHistory({ log }) {
   );
 }
 
+const DAY_LABEL = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+
 function NextWorkoutCard({ state }) {
   const [open, setOpen] = useState(false);
 
@@ -99,7 +101,7 @@ function NextWorkoutCard({ state }) {
           flex: 1, fontFamily: 'var(--font-primary)', fontSize: 'var(--text-sm)',
           fontWeight: 600, color: 'var(--color-text-secondary)',
         }}>
-          Next workout: <span style={{ color: 'var(--color-text-primary)' }}>{next.name}</span>
+          Next workout: <span style={{ color: 'var(--color-text-primary)' }}>{next.title || next.name || DAY_LABEL[nextDayKey] || 'Upcoming'}</span>
         </span>
         {open
           ? <ChevronUp size={15} color="var(--color-text-tertiary)" />
@@ -147,11 +149,11 @@ function NextWorkoutCard({ state }) {
 }
 
 export default function TrainTab({
-  state, exercises, currentDayName, isRestDay, nextTrainingDayKey,
+  state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey,
   onCompleteExercise, onFinishSession, onStartSession,
   onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onBackfillWeek,
   unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, onSaveHistory,
-  onSaveProgram, userId,
+  onSaveProgram, onQuestMessageSent, userId,
 }) {
   const [coachOpen, setCoachOpen] = useState(false);
   const phase = getPhase(state.currentWeek);
@@ -242,6 +244,7 @@ export default function TrainTab({
         currentDayName={currentDayName}
         isRestDay={isRestDay}
         nextTrainingDayKey={nextTrainingDayKey}
+        sessionDayKey={sessionDayKey}
         onCompleteExercise={onCompleteExercise}
         onFinishSession={onFinishSession}
         onStartSession={onStartSession}
@@ -279,6 +282,7 @@ export default function TrainTab({
           state={state}
           onSaveHistory={onSaveHistory}
           onSaveProgram={onSaveProgram}
+          onQuestMessageSent={onQuestMessageSent}
           agentMessages={agentMessages}
           userId={userId}
         />

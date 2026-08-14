@@ -6,6 +6,7 @@ import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
+import { authPostJSON } from '../lib/authFetch';
 
 const DAY_FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
@@ -409,7 +410,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
   );
 }
 
-export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose, userId }) {
+export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, isOpen, onClose, userId, onQuestMessageSent }) {
   const [activeMode, setActiveMode] = useState('pep');
   const [showInbox, setShowInbox] = useState(false);
   const [userMessage, setUserMessage] = useState('');
@@ -545,13 +546,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
         requestBody.tool_choice = { type: 'auto' };
       }
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (userId) headers['x-user-id'] = userId;
-      const response = await fetch('/api/coach', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-      });
+      const response = await authPostJSON('/api/coach', requestBody);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -563,6 +558,11 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
         throw new Error(msg);
       }
       const data = await response.json();
+
+      // The server increments the weekly quest quota on its own copy of the
+      // state; mirror it locally so the client's next auto-save agrees instead
+      // of writing a stale count back.
+      onQuestMessageSent?.();
 
       // ── Handle tool_use (Program Builder) — supports multiple days in one response ──
       const toolCalls = (data.content || []).filter(b => b.type === 'tool_use' && b.name === 'save_day_program');

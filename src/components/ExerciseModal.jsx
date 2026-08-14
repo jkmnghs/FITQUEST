@@ -2,26 +2,30 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Lightbulb, Check } from 'lucide-react';
 import { FORM_TIPS } from '../data/gameData';
-import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay } from '../utils/gameLogic';
+import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay, isDeloadWeek, DEFAULT_SETS } from '../utils/gameLogic';
 import RestTimer from './RestTimer';
 
 function makeDefaultSets(ex, count, weightKg) {
-  return Array.from({ length: count }, (_, i) => ({
+  const rows = Math.max(1, Number(count) || 0);
+  const prescribed = Number(ex?.sets) > 0 ? Number(ex.sets) : DEFAULT_SETS;
+  return Array.from({ length: rows }, (_, i) => ({
     idx: i, weightKg, reps: '', rpe: 8, time: '', done: false,
-    isExtra: i >= ex.sets
+    isExtra: i >= prescribed
   }));
 }
 
 export default function ExerciseModal({ exId, exercises, week, unit, liftWeights, todayExDone, todayExDetails, savedSets, onSetsChange, onClose, onComplete }) {
   const ex = (exercises || []).find(e => e.id === exId);
-  if (!ex) { onClose?.(); return null; }
   const baseSets = getSetsForWeek(ex, week);
   const baseWeightKg = getWeightForExercise(ex, week, liftWeights);
   const displayWt = convertWeight(baseWeightKg, unit);
 
   const alreadyDone = todayExDone.includes(exId);
   const det = todayExDetails[exId];
-  const isDeload = week === 9;
+  // Single source of truth for deload weeks. This was hardcoded to `week === 9`
+  // while gameLogic uses 4/8/12, so the card and the modal disagreed about RPE
+  // targets and set counts on every actual deload week.
+  const isDeload = isDeloadWeek(week);
   const formTips = FORM_TIPS[exId] || [];
 
   const [sets, setSets] = useState(() => savedSets || makeDefaultSets(ex, baseSets, displayWt));
@@ -29,10 +33,19 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
   const [tipIdx, setTipIdx] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // The exercise can disappear while the modal is open (cloud poll, midnight
+  // rollover). Closing from an effect keeps every hook above unconditional —
+  // returning early here would change the hook count and crash the render.
+  useEffect(() => {
+    if (!ex) onClose?.();
+  }, [ex, onClose]);
+
   // Report every change back to WorkoutTab so sets survive modal close
   useEffect(() => {
     onSetsChange?.(exId, sets);
   }, [sets]); // eslint-disable-line
+
+  if (!ex) return null;
 
   function addExtraSet() {
     setSets(prev => [

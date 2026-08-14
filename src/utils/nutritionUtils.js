@@ -1,8 +1,10 @@
+import { authFetch } from '../lib/authFetch';
+
 export const PORTION_MULT = { S: 0.75, M: 1.0, L: 1.5 };
 
 export async function searchUSDA(query, claudeCalsPer100g) {
   try {
-    const res = await fetch(`/api/usda?query=${encodeURIComponent(query)}`);
+    const res = await authFetch(`/api/usda?query=${encodeURIComponent(query)}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.foods || data.foods.length === 0) return null;

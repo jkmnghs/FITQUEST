@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPassword }) {
+export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPassword, onClearAuthError, onResendConfirmation }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -10,6 +10,31 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
   const [localError, setLocalError] = useState(null);
   const [signUpDone, setSignUpDone] = useState(false);
   const [resetDone, setResetDone] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendNote, setResendNote] = useState(null);
+
+  // Tick the resend cooldown down so the button re-enables on its own.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  // Clearing both error sources keeps a failed sign-in from following the user
+  // into the Create Account form.
+  function switchMode(next) {
+    setMode(next);
+    setLocalError(null);
+    onClearAuthError?.();
+  }
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    setResendNote(null);
+    const ok = await onResendConfirmation?.(email);
+    setResendNote(ok ? 'Confirmation email sent.' : 'Could not resend — try again shortly.');
+    if (ok) setResendCooldown(60);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -84,7 +109,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
           {[['signin', 'SIGN IN'], ['signup', 'CREATE ACCOUNT']].map(([m, label]) => (
             <button
               key={m}
-              onClick={() => { setMode(m); setLocalError(null); setSignUpDone(false); setResetDone(false); setConfirmPassword(''); }}
+              onClick={() => { switchMode(m); setSignUpDone(false); setResetDone(false); setConfirmPassword(''); setResendNote(null); }}
               style={{
                 flex: 1, padding: '10px 4px',
                 border: 'none', cursor: 'pointer',
@@ -110,7 +135,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               Click it to set a new password.
             </div>
             <button
-              onClick={() => { setMode('signin'); setResetDone(false); }}
+              onClick={() => { switchMode('signin'); setResetDone(false); }}
               style={{
                 marginTop: 20, padding: '10px 20px', borderRadius: 10,
                 border: '1px solid rgba(0,229,255,0.25)',
@@ -170,7 +195,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             >{loading ? 'SENDING...' : 'SEND RESET LINK'}</button>
             <button
               type="button"
-              onClick={() => { setMode('signin'); setLocalError(null); }}
+              onClick={() => switchMode('signin')}
               style={{
                 width: '100%', marginTop: 12, padding: '10px',
                 border: 'none', background: 'transparent',
@@ -192,7 +217,21 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               Click it to activate your account — you'll be signed in automatically.
             </div>
             <button
-              onClick={() => { setMode('signin'); setSignUpDone(false); }}
+              type="button"
+              onClick={handleResend}
+              disabled={resendCooldown > 0}
+              style={{
+                marginTop: 14, background: 'none', border: 'none', padding: 0,
+                color: resendCooldown > 0 ? 'var(--text3)' : 'var(--cyan)',
+                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                cursor: resendCooldown > 0 ? 'default' : 'pointer',
+              }}
+            >{resendCooldown > 0 ? `RESEND IN ${resendCooldown}s` : "DIDN'T GET IT? RESEND"}</button>
+            {resendNote && (
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6 }}>{resendNote}</div>
+            )}
+            <button
+              onClick={() => { switchMode('signin'); setSignUpDone(false); setResendNote(null); }}
               style={{
                 marginTop: 20, padding: '10px 20px', borderRadius: 10,
                 border: '1px solid rgba(0,229,255,0.25)',
@@ -298,7 +337,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               <div style={{ textAlign: 'right', marginBottom: 16 }}>
                 <button
                   type="button"
-                  onClick={() => { setMode('forgot'); setLocalError(null); }}
+                  onClick={() => switchMode('forgot')}
                   style={{
                     background: 'none', border: 'none', padding: 0,
                     color: 'var(--cyan)', fontFamily: 'Orbitron',

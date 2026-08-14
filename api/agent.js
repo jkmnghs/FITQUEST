@@ -143,6 +143,20 @@ const AGENT_TOOLS = [
   },
 ];
 
+/**
+ * Patch only the keys this agent owns into user_profiles.state.
+ *
+ * A full `.update({ state })` would overwrite whatever the browser has written
+ * since we read the row — the shallow-merge RPC leaves the client's keys alone.
+ */
+async function mergeState(supabase, userId, patch) {
+  const { error } = await supabase.rpc('admin_merge_user_state', {
+    p_user_id: userId,
+    p_patch: patch,
+  });
+  if (error) throw new Error(`state merge failed: ${error.message}`);
+}
+
 // ── Tool execution ───────────────────────────────────────────────────────────
 async function executeTool(toolName, input, supabase, agentLog) {
   agentLog.push({ tool: toolName, input, timestamp: new Date().toISOString() });
@@ -174,10 +188,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString().slice(0, 10),
       };
       const aiEpisodic = [...(state.aiEpisodic || []), note];
-      await supabase
-        .from('user_profiles')
-        .update({ state: { ...state, aiEpisodic } })
-        .eq('id', input.userId);
+      await mergeState(supabase, input.userId, { aiEpisodic });
       return { ok: true, noteId: note.id };
     }
 
@@ -198,10 +209,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), msg]; // keep last 50
-      await supabase
-        .from('user_profiles')
-        .update({ state: { ...state, agentMessages } })
-        .eq('id', input.userId);
+      await mergeState(supabase, input.userId, { agentMessages });
       return { ok: true, messageId: msg.id };
     }
 
@@ -230,10 +238,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), nutritionMsg];
-      await supabase
-        .from('user_profiles')
-        .update({ state: { ...state, nutritionGoals, agentMessages } })
-        .eq('id', input.userId);
+      await mergeState(supabase, input.userId, { nutritionGoals, agentMessages });
       return { ok: true, newGoals: nutritionGoals };
     }
 
@@ -254,10 +259,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), deloadMsg];
-      await supabase
-        .from('user_profiles')
-        .update({ state: { ...state, agentMessages, agentDeloadSuggested: true } })
-        .eq('id', input.userId);
+      await mergeState(supabase, input.userId, { agentMessages, agentDeloadSuggested: true });
       return { ok: true };
     }
 
@@ -293,21 +295,15 @@ async function executeTool(toolName, input, supabase, agentLog) {
       };
       const aiEpisodic = [...(state.aiEpisodic || []), switchNote];
 
-      await supabase
-        .from('user_profiles')
-        .update({
-          state: {
-            ...state,
-            agentMessages,
-            aiEpisodic,
-            pendingProgramSwitch: {
-              newProgramId: input.newProgramId,
-              reason: input.reason,
-              proposedAt: new Date().toISOString(),
-            },
-          },
-        })
-        .eq('id', input.userId);
+      await mergeState(supabase, input.userId, {
+        agentMessages,
+        aiEpisodic,
+        pendingProgramSwitch: {
+          newProgramId: input.newProgramId,
+          reason: input.reason,
+          proposedAt: new Date().toISOString(),
+        },
+      });
       return { ok: true, pending: true, newProgram: newProgram.id, message: 'Switch proposed — awaiting user confirmation' };
     }
 
@@ -330,10 +326,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), weightMsg];
-      await supabase
-        .from('user_profiles')
-        .update({ state: { ...state, liftWeights, agentMessages } })
-        .eq('id', input.userId);
+      await mergeState(supabase, input.userId, { liftWeights, agentMessages });
       return { ok: true, newWeight: input.newWeightKg };
     }
 
@@ -510,44 +503,31 @@ PROGRAM SWITCHING — use switch_program when you detect:
 - Frequency mismatch: user consistently misses sessions because program has too many days
 Always send a coach message explaining the switch. Never switch more than once per weekly_review cycle.`;
 
-// ── Main handler ─────────────────────────────────────────────────────────────
-export default async function handler(req, res) {
-  // Auth check — all calls (cron or webhook) must include the secret
-  const secret = process.env.AGENT_SECRET;
-  if (!secret) {
-    return res.status(500).json({ error: 'AGENT_SECRET is not configured' });
-  }
-  const provided = req.headers['x-agent-secret'] || req.query?.secret;
-  if (provided !== secret) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+export const VALID_TRIGGERS = ['post_workout', 'reengagement', 'pr_milestone', 'onboarding', 'weekly_review'];
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  // ── Request body validation ──
-  const validationError = validateAgentRequest(req.body);
-  if (validationError) {
-    return res.status(400).json({ error: validationError });
-  }
-
-  const { trigger, userId } = req.body;
-
-  const validTriggers = ['post_workout', 'reengagement', 'pr_milestone', 'onboarding', 'weekly_review'];
-  if (!validTriggers.includes(trigger)) {
-    return res.status(400).json({ error: `Invalid trigger. Must be one of: ${validTriggers.join(', ')}` });
+/**
+ * Runs one agent turn for a user. Shared by the secret-gated cron handler below
+ * and by api/agent-trigger.js, which authenticates the browser with its Supabase
+ * access token instead — so AGENT_SECRET never has to reach the client.
+ *
+ * Returns { status, body } for the caller to send.
+ */
+export async function runAgent(trigger, userId) {
+  if (!VALID_TRIGGERS.includes(trigger)) {
+    return { status: 400, body: { error: `Invalid trigger. Must be one of: ${VALID_TRIGGERS.join(', ')}` } };
   }
 
   // ── Rate limiting: max 10 agent calls per user per hour ──
   if (!checkAgentRateLimit(userId)) {
-    return res.status(429).json({ error: 'Agent rate limit exceeded. Max 10 calls per hour.' });
+    return { status: 429, body: { error: 'Agent rate limit exceeded. Max 10 calls per hour.' } };
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
+  if (!anthropicKey) return { status: 500, body: { error: 'ANTHROPIC_API_KEY not set' } };
 
   let supabase;
   try { supabase = getSupabase(); }
-  catch (e) { return res.status(500).json({ error: e.message }); }
+  catch (e) { return { status: 500, body: { error: e.message } }; }
 
   const agentLog = [];
   const startTime = new Date().toISOString();
@@ -636,17 +616,45 @@ export default async function handler(req, res) {
       completed_at: endTime,
     }).select(); // .select() is a no-op if the table doesn't exist — fails silently
 
-    return res.status(200).json({
-      ok: true,
-      trigger,
-      userId,
-      toolCallCount: agentLog.length,
-      loops: loopCount,
-      log: agentLog,
-    });
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        trigger,
+        userId,
+        toolCallCount: agentLog.length,
+        loops: loopCount,
+        log: agentLog,
+      },
+    };
 
   } catch (err) {
     console.error('[Quest Agent] Error:', err);
-    return res.status(500).json({ error: err.message });
+    return { status: 500, body: { error: err.message } };
   }
+}
+
+// ── Main handler — machine-to-machine (Vercel cron, n8n) ────────────────────
+// Browser-initiated triggers go through api/agent-trigger.js instead, which
+// authenticates with the user's Supabase token rather than the shared secret.
+export default async function handler(req, res) {
+  const secret = process.env.AGENT_SECRET;
+  if (!secret) {
+    return res.status(500).json({ error: 'AGENT_SECRET is not configured' });
+  }
+  const provided = req.headers['x-agent-secret'] || req.query?.secret;
+  if (provided !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const validationError = validateAgentRequest(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
+  const { trigger, userId } = req.body;
+  const { status, body } = await runAgent(trigger, userId);
+  return res.status(status).json(body);
 }
