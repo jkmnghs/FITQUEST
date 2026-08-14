@@ -144,7 +144,7 @@ export default function App() {
     resetAll, resetToday, startSession, backfillWeek,
     addAIHistory, logMeal, deleteMeal, importData,
     completeAssessment, changeProgram, swapExercise, deleteExercise,
-    syncFromCloud, lastSyncedAt, syncing,
+    syncFromCloud, lastSyncedAt, syncing, incrementQuestMessages,
   } = useGameState(user);
 
   const {
@@ -197,7 +197,7 @@ export default function App() {
       setPendingAssessment(a);
       setApiReady(false);
       setGeneratingProgram(true);
-      const templates = await generateProgramFromAssessment(a, user?.id);
+      const templates = await generateProgramFromAssessment(a);
       completeAssessment(a, fireOnboarding);
       if (templates) updateSetting('dayTemplates', templates);
       setApiReady(true); // signals AIBuilderScreen it can transition to reveal
@@ -276,6 +276,7 @@ export default function App() {
     agentMessages,
     onSaveHistory: addAIHistory,
     onSaveProgram: (updatedTemplates) => updateSetting('dayTemplates', updatedTemplates),
+    onQuestMessageSent: incrementQuestMessages,
     userId: user?.id,
   };
 

@@ -1,4 +1,5 @@
 import { EX_CATALOG } from '../data/exerciseCatalog';
+import { authPostJSON } from '../lib/authFetch';
 
 // Muscle-group membership for post-processing split validation.
 // 'core' exercises are allowed on any split day.
@@ -60,7 +61,7 @@ export function filterCatalogForEquipment(equipment) {
  * Silently generates a per-day training program using Claude, based on the user's
  * assessment. Returns a dayTemplates object or null on failure.
  */
-export async function generateProgramFromAssessment(assessment, userId) {
+export async function generateProgramFromAssessment(assessment) {
   const trainingDays = assessment.trainingDays || ['mon', 'wed', 'fri'];
   if (!trainingDays.length) return null;
 
@@ -156,17 +157,11 @@ Rules:
 ${splitIsolationRule}`;
 
   try {
-    const pgHeaders = { 'Content-Type': 'application/json' };
-    if (userId) pgHeaders['x-user-id'] = userId;
-    const res = await fetch('/api/coach', {
-      method: 'POST',
-      headers: pgHeaders,
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: 'You are a training program generator. Output only valid JSON.',
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const res = await authPostJSON('/api/coach', {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: 'You are a training program generator. Output only valid JSON.',
+      messages: [{ role: 'user', content: prompt }],
     });
     if (!res.ok) return null;
     const data = await res.json();
