@@ -28,12 +28,15 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
   // ── Identity comes from the verified access token, never from the client ──
+  // Authenticate first: an anonymous caller should learn nothing about how the
+  // server is configured.
   const auth = await requireUser(req, res);
   if (!auth) return;
   const { userId, supabase } = auth;
+
+  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
   // ── Rate limiting: max 10 requests/min per verified user ──
   if (!checkRateLimit(userId)) {

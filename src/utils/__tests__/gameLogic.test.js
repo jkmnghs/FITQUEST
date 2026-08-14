@@ -17,6 +17,7 @@ import {
   overtrainingCheck,
   isDeloadWeek,
   calculateRestDayXP,
+  DAILY_XP_CAP,
 } from '../gameLogic';
 
 // ---------------------------------------------------------------------------
@@ -171,9 +172,9 @@ describe('calculateSessionXP', () => {
     expect(xp).toBe(Math.round((50 + 30) * 0.1)); // 8
   });
 
-  it('daily XP never exceeds 150', () => {
+  it('daily XP never exceeds the cap', () => {
     const xp = calculateSessionXP({ setsCompleted: 50 }, 1);
-    expect(xp).toBeLessThanOrEqual(150);
+    expect(xp).toBeLessThanOrEqual(DAILY_XP_CAP);
   });
 });
 
@@ -181,13 +182,15 @@ describe('calculateSessionXP', () => {
 // calculateAdherenceXP (Phase 2.2)
 // ---------------------------------------------------------------------------
 describe('calculateAdherenceXP', () => {
-  it('prescribed session on target RPE with overload = 90 XP', () => {
+  it('prescribed session on target RPE with overload = 38 XP', () => {
     const { xp, reasons } = calculateAdherenceXP(
       { matchesPrescribedDay: true, avgRPE: 7, overloadAchieved: true },
       { completedSessions: 1 },
       { sessionsPerWeek: 3 }
     );
-    expect(xp).toBe(90); // 40 + 20 + 30
+    // Per-exercise award: 10 (training day) + 8 (RPE) + 20 (overload).
+    // Session-level bonuses are added separately in finishSession.
+    expect(xp).toBe(38);
     expect(reasons.length).toBe(3);
   });
 
@@ -206,7 +209,7 @@ describe('calculateAdherenceXP', () => {
       { completedSessions: 5 }, // 5 sessions when prescribed is 3
       { sessionsPerWeek: 3 }
     );
-    expect(xp).toBe(Math.round(90 * 0.1)); // 9
+    expect(xp).toBe(Math.round(38 * 0.1)); // 4
     expect(reasons).toContainEqual(expect.stringContaining('reduced'));
   });
 

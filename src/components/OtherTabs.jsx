@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ACHIEVEMENTS, EXERCISES } from '../data/gameData';
+import { ACHIEVEMENTS } from '../data/gameData';
 import { authFetch } from '../lib/authFetch';
 import { exercisesForDay, DAY_ORDER } from '../utils/session';
 
@@ -224,7 +224,6 @@ export function SummaryTab({ state }) {
   );
 }
 
-const _DAY_ORDER = DAY_ORDER;
 
 // Kept as a named export for existing callers; the resolution itself lives in
 // utils/session so the display and the mutations can't drift apart.
@@ -288,7 +287,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
   const _sortedTdays = useMemo(() => (
     (state.trainingDays || ['mon', 'wed', 'fri'])
       .slice()
-      .sort((a, b) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b))
+      .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
   ), [state.trainingDays]);
 
   // Days already recorded for the selected week (real sessions + backfill)
