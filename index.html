@@ -29,7 +29,12 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Two families only. Rajdhani was dropped: it duplicated Inter's role
+         rather than adding a level to the hierarchy.
+         Weight ranges rather than a fixed list — the UI uses 600 and 800, which
+         the old `wght@400;700;900` request did not include, so the browser was
+         synthesising them. -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Inter:wght@400..700&display=swap" rel="stylesheet" />
     <title>FitQuest — AI-Powered Fitness Training</title>
   </head>
   <body>

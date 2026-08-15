@@ -556,7 +556,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           border: '1px solid rgba(0,229,255,0.2)',
           borderRadius: 12, padding: '12px 16px', marginBottom: 14
         }}>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', marginBottom: 5, letterSpacing: 0.8 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', marginBottom: 5, letterSpacing: 0.8 }}>
             🧘 DELOAD WEEK — RECOVERY MODE
           </div>
           <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
@@ -833,7 +833,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           width: '100%', padding: '11px 0', marginBottom: 10, borderRadius: 13,
           border: '1px dashed rgba(0,229,255,0.25)',
           background: 'rgba(0,229,255,0.04)', color: 'var(--cyan)',
-          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
           cursor: 'pointer', letterSpacing: 1, display: 'flex', alignItems: 'center',
           justifyContent: 'center', gap: 7,
         }}
@@ -853,7 +853,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 
       {/* Already done or not current week */}
       {!activeRestDay && isCurrentWeek && todaySessionFinished && (
-        <div style={{ textAlign: 'center', padding: 16, fontFamily: 'Orbitron', fontSize: 11, color: 'var(--green)', letterSpacing: 1 }}>
+        <div style={{ textAlign: 'center', padding: 16, fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--green)', letterSpacing: 1 }}>
           ✓ SESSION COMPLETE — GREAT WORK!
         </div>
       )}
@@ -984,7 +984,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               }}
             >
               {/* Header */}
-              <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 4 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 4 }}>
                 {isAdd ? 'ADD EXERCISE' : `SWAP — ${exercises.find(e => e.id === swapTargetId)?.name}`}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>
@@ -1007,7 +1007,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 {['All', ...categories.map(c => c.category)].map(cat => (
                   <button key={cat} onClick={() => setPickerCategory(cat)} style={{
                     padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                    whiteSpace: 'nowrap', fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                    whiteSpace: 'nowrap', fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                     letterSpacing: 0.5, flexShrink: 0,
                     background: pickerCategory === cat ? 'rgba(0,229,255,0.18)' : 'rgba(255,255,255,0.05)',
                     color: pickerCategory === cat ? 'var(--cyan)' : 'var(--text3)',
@@ -1039,9 +1039,14 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 ))}
               </div>
               <button onClick={() => setSwapTargetId(null)} style={{
-                margin: '10px 0 28px', width: '100%', padding: 10, borderRadius: 10, border: 'none',
-                background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
-                fontFamily: 'Orbitron', fontSize: 9, cursor: 'pointer', flexShrink: 0,
+                // Bottom gap was a flat 28px, which on a home-indicator phone
+                // left the button sitting in the swipe-up area.
+                margin: '10px 0 calc(var(--safe-area-bottom) + 16px)',
+                width: '100%', minHeight: 'var(--tap-target)', padding: 12,
+                borderRadius: 'var(--radius-md)', border: 'none',
+                background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)',
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.05em', cursor: 'pointer', flexShrink: 0,
               }}>CANCEL</button>
             </div>
           </div>
@@ -1071,7 +1076,7 @@ function Tag({ type, children }) {
 function Badge({ color, bg, border, children }) {
   return (
     <span style={{
-      fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
+      fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700,
       padding: '2px 6px', borderRadius: 4, letterSpacing: 0.3,
       color, background: bg, border: `1px solid ${border}`
     }}>{children}</span>
@@ -1107,7 +1112,7 @@ function FinishArea({ state, exercises, onFinish }) {
               }} />
               <div style={{ flex: 1, color: done ? 'var(--text)' : 'var(--text2)' }}>{e.name}</div>
               <div style={{
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
                 color: done ? 'var(--green)' : 'var(--text3)'
               }}>
                 {done && det ? `${det.setsCompleted}/${det.setsPrescribed}` : '—'}
@@ -1120,7 +1125,7 @@ function FinishArea({ state, exercises, onFinish }) {
       {/* Score */}
       <div style={{ textAlign: 'center', margin: '10px 0 14px' }}>
         <div style={{
-          fontFamily: 'Orbitron', fontSize: 28, fontWeight: 900,
+          fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900,
           color: completionPct >= 95 ? 'var(--green)' : completionPct >= 70 ? 'var(--cyan)' : 'var(--fire2)'
         }}>{completionPct}%</div>
         <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
@@ -1133,7 +1138,7 @@ function FinishArea({ state, exercises, onFinish }) {
         background: allDone && completionPct >= 95
           ? 'linear-gradient(135deg, var(--green), #00c853)'
           : 'linear-gradient(135deg, var(--fire), var(--fire2))',
-        fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
+        fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
         color: 'var(--bg)', letterSpacing: 0.8, cursor: 'pointer',
         boxShadow: allDone ? '0 4px 18px var(--green-glow)' : '0 4px 18px var(--fire-glow)'
       }}>
@@ -1158,7 +1163,7 @@ function MakeUpDayModal({ state, dayId, onCancel, onConfirm }) {
         borderRadius: 18, padding: '24px 20px',
         width: 'calc(100% - 40px)', maxWidth: 340, textAlign: 'center'
       }}>
-        <h3 style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Make Up {dayName}?</h3>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Make Up {dayName}?</h3>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.6 }}>
           You skipped {dayName} this week. Log it as done today (Week {state.currentWeek}) using your current working weights.
         </div>
@@ -1166,12 +1171,12 @@ function MakeUpDayModal({ state, dayId, onCancel, onConfirm }) {
           <button onClick={onCancel} style={{
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: 'var(--text2)',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
           }}>CANCEL</button>
           <button onClick={onConfirm} style={{
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-            color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+            color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
           }}>MAKE UP ✓</button>
         </div>
       </div>
@@ -1196,7 +1201,7 @@ function FinishConfirmModal({ state, exercises, onCancel, onConfirm }) {
         borderRadius: 18, padding: '24px 20px',
         width: 'calc(100% - 40px)', maxWidth: 340, textAlign: 'center'
       }}>
-        <h3 style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Finish Today's Session?</h3>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Finish Today's Session?</h3>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>{done}/{total} exercises completed</p>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
           This will lock in your session for Week {currentWeek}.
@@ -1206,12 +1211,12 @@ function FinishConfirmModal({ state, exercises, onCancel, onConfirm }) {
           <button onClick={onCancel} style={{
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: 'var(--text2)',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
           }}>CANCEL</button>
           <button onClick={onConfirm} style={{
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-            color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+            color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
           }}>FINISH ⚔️</button>
         </div>
       </div>

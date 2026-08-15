@@ -549,7 +549,7 @@ Guidelines:
                   border: '1px solid var(--color-border-medium)',
                   borderRadius: 'var(--radius-md)',
                   color: 'var(--color-text-primary)',
-                  fontFamily: 'Inter, sans-serif', fontSize: 14,
+                  fontFamily: 'var(--font-primary)', fontSize: 14,
                   outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -624,7 +624,7 @@ Guidelines:
             width: '100%', padding: '14px', marginTop: 12,
             border: 'none', borderRadius: 12,
             background: 'linear-gradient(135deg, var(--cyan), var(--purple))',
-            color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 12,
+            color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 12,
             fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
             WebkitTapHighlightColor: 'transparent',
           }}
@@ -733,12 +733,12 @@ Guidelines:
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div style={{ flex: 1, paddingRight: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
+                        <span style={{ fontFamily: 'var(--font-primary)', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>
                           {food.name}
                         </span>
                         {food.source && (
                           <span style={{
-                            fontSize: 9, fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 0.5,
+                            fontSize: 9, fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: 0.5,
                             borderRadius: 4, padding: '1px 5px',
                             ...(food.source === 'reference'
                               ? { color: 'var(--cyan)',   background: 'rgba(0,229,255,0.08)',  border: '1px solid rgba(0,229,255,0.3)'  }
@@ -767,7 +767,7 @@ Guidelines:
                               width: 52, background: 'rgba(0,229,255,0.1)',
                               border: '1px solid var(--cyan)', borderRadius: 5,
                               color: 'var(--cyan)', fontSize: 11, padding: '1px 4px',
-                              fontFamily: 'Rajdhani', textAlign: 'center',
+                              fontFamily: 'var(--font-primary)', textAlign: 'center',
                             }}
                           />
                         ) : (
@@ -803,8 +803,8 @@ Guidelines:
                               padding: 0,
                             }}
                           >
-                            <span style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700 }}>{p}</span>
-                            <span style={{ fontFamily: 'Rajdhani', fontSize: 9, opacity: 0.8 }}>{previewG}g</span>
+                            <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700 }}>{p}</span>
+                            <span style={{ fontFamily: 'var(--font-primary)', fontSize: 9, opacity: 0.8 }}>{previewG}g</span>
                           </button>
                         );
                       })}
@@ -837,7 +837,7 @@ Guidelines:
                                   display: 'flex', alignItems: 'center', gap: 8,
                                   width: '100%', padding: '11px 14px', border: 'none',
                                   background: 'transparent', color: 'var(--red)',
-                                  fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600,
+                                  fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600,
                                   cursor: 'pointer', textAlign: 'left',
                                 }}
                               ><span>🗑️</span> Delete</button>
@@ -885,11 +885,11 @@ Guidelines:
                               style={{
                                 width: '100%', background: 'transparent', border: 'none',
                                 color: m.color, fontSize: 14, fontWeight: 700,
-                                fontFamily: 'Rajdhani', textAlign: 'center', outline: 'none',
+                                fontFamily: 'var(--font-primary)', textAlign: 'center', outline: 'none',
                               }}
                             />
                           ) : (
-                            <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'Rajdhani' }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: 'var(--font-primary)' }}>
                               {m.value}g
                             </div>
                           )}
@@ -933,7 +933,7 @@ Guidelines:
                       border: '1px solid var(--color-border-medium)',
                       borderRadius: 'var(--radius-md)',
                       color: 'var(--color-text-primary)',
-                      fontFamily: 'Inter, sans-serif', fontSize: 14,
+                      fontFamily: 'var(--font-primary)', fontSize: 14,
                       outline: 'none', boxSizing: 'border-box',
                     }}
                   />
@@ -991,7 +991,7 @@ Guidelines:
                 { label: 'Fat',     value: totals.fat,     color: 'var(--color-warning)' },
               ].map(m => (
                 <div key={m.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: m.color, fontFamily: 'Inter, sans-serif' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: m.color, fontFamily: 'var(--font-primary)' }}>
                     {Math.round(m.value)}g
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{m.label}</div>

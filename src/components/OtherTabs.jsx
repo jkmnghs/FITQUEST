@@ -55,7 +55,7 @@ export function LogTab({ state }) {
   return (
     <div>
       <div style={{
-        fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
+        fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
         color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
       }}>RECENT ACTIVITY • {allLogs.length} entries</div>
 
@@ -84,7 +84,7 @@ export function LogTab({ state }) {
                 </div>
               </div>
               <div style={{
-                fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700, color: 'var(--green2)',
+                fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700, color: 'var(--green2)',
                 background: 'var(--green-glow)', padding: '4px 8px', borderRadius: 6
               }}>+{l.xp}</div>
             </div>
@@ -93,7 +93,7 @@ export function LogTab({ state }) {
             <button onClick={() => setShowCount(c => c + 30)} style={{
               width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 12, background: 'rgba(255,255,255,0.03)',
-              color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 11,
+              color: 'var(--text3)', fontFamily: 'var(--font-display)', fontSize: 11,
               fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5
             }}>
               LOAD MORE ({allLogs.length - showCount} remaining)
@@ -136,7 +136,7 @@ export function SummaryTab({ state }) {
       {/* Week selector */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 14 }}>
         <button onClick={() => setViewWeek(v => Math.max(1, v - 1))} style={navBtnStyle}>‹</button>
-        <span style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)', minWidth: 80, textAlign: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--cyan)', minWidth: 80, textAlign: 'center' }}>
           WEEK {w}
         </span>
         <button onClick={() => setViewWeek(v => Math.min(state.currentWeek, v + 1))} style={navBtnStyle}>›</button>
@@ -147,7 +147,7 @@ export function SummaryTab({ state }) {
         background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
         border: '1px solid rgba(0,229,255,0.12)', borderRadius: 16, padding: 18, marginBottom: 16
       }}>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 14 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 14 }}>
           WEEK {w} RECAP
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
@@ -161,7 +161,7 @@ export function SummaryTab({ state }) {
               textAlign: 'center', padding: 10,
               background: 'rgba(255,255,255,0.03)', borderRadius: 10
             }}>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 18, fontWeight: 800, color: item.color }}>{item.val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: item.color }}>{item.val}</div>
               <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{item.lbl}</div>
             </div>
           ))}
@@ -200,7 +200,7 @@ export function SummaryTab({ state }) {
           background: 'var(--card)', border: '1px solid var(--card-border)',
           borderRadius: 14, padding: '14px 16px', backdropFilter: 'blur(20px)'
         }}>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--text2)', letterSpacing: 1, marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text2)', letterSpacing: 1, marginBottom: 10 }}>
             SESSION BREAKDOWN
           </div>
           {sessions.map((sess, i) => (
@@ -213,7 +213,7 @@ export function SummaryTab({ state }) {
                 <div style={{ fontSize: 11, color: 'var(--text3)' }}>{sess.date}</div>
               </div>
               <div style={{
-                fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
                 color: sess.completion >= 95 ? 'var(--green)' : sess.completion >= 70 ? 'var(--cyan)' : 'var(--fire2)'
               }}>{sess.completion}%</div>
             </div>
@@ -342,7 +342,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           backdropFilter: 'blur(20px)',
         }}>
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
           }}>ACCOUNT</div>
           <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 12, wordBreak: 'break-all' }}>
@@ -387,7 +387,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                   width: '100%', padding: 10, border: 'none', borderRadius: 10,
                   background: pwBusy ? 'rgba(0,229,255,0.15)' : 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
                   color: pwBusy ? 'var(--text3)' : 'var(--bg)',
-                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                   cursor: pwBusy ? 'default' : 'pointer', letterSpacing: 0.5,
                 }}
               >{pwBusy ? 'UPDATING...' : 'UPDATE PASSWORD'}</button>
@@ -401,7 +401,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 onClick={() => { setDeleteOpen(true); setDeleteConfirm(''); setDeleteError(null); }}
                 style={{
                   background: 'none', border: 'none', padding: 0,
-                  color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 9,
+                  color: 'var(--text3)', fontFamily: 'var(--font-display)', fontSize: 9,
                   fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer',
                 }}
               >DELETE ACCOUNT</button>
@@ -432,7 +432,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                       flex: 1, padding: '9px 18px', borderRadius: 10, border: 'none',
                       background: deleteConfirm === 'DELETE' && !deleteBusy ? 'var(--red)' : 'rgba(255,23,68,0.12)',
                       color: deleteConfirm === 'DELETE' && !deleteBusy ? '#fff' : 'var(--text3)',
-                      fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                      fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
                       cursor: deleteConfirm === 'DELETE' && !deleteBusy ? 'pointer' : 'not-allowed',
                     }}
                   >{deleteBusy ? 'DELETING...' : 'DELETE FOREVER'}</button>
@@ -479,7 +479,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             style={{
               width: '100%', padding: 10, border: 'none', borderRadius: 10,
               background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
               color: 'var(--bg)', letterSpacing: 0.5, cursor: 'pointer',
               boxShadow: '0 4px 18px var(--cyan-glow)',
             }}
@@ -503,7 +503,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <label style={{ fontSize: 14, fontWeight: 600 }}>Push Notifications</label>
           <div style={{
-            fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700,
+            fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 700,
             color: notifStatus === 'granted' ? 'var(--green)' : notifStatus === 'denied' ? 'var(--red)' : 'var(--text3)'
           }}>
             {notifStatus === 'granted' ? 'ENABLED' : notifStatus === 'denied' ? 'BLOCKED' : 'OFF'}
@@ -516,7 +516,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           <button onClick={onRequestNotif} style={{
             width: '100%', padding: 10, border: 'none', borderRadius: 10,
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--bg)', cursor: 'pointer', letterSpacing: 0.5
           }}>ENABLE NOTIFICATIONS</button>
         )}
@@ -593,7 +593,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                     style={{
                       padding: '7px 14px', borderRadius: 8, border: 'none',
                       cursor: isDone ? 'not-allowed' : 'pointer',
-                      fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+                      fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
                       background: isDone
                         ? 'rgba(0,230,118,0.12)'
                         : isSelected
@@ -614,7 +614,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           {backfillDay && !alreadyDone && <>
             <div style={{
               fontSize: 12, fontWeight: 600, color: 'var(--cyan)',
-              marginBottom: 8, fontFamily: 'Orbitron',
+              marginBottom: 8, fontFamily: 'var(--font-display)',
             }}>
               {DAY_FULL[backfillDay]} session
             </div>
@@ -623,7 +623,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             <div style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <div style={{ fontSize: 11, color: 'var(--text3)' }}>Session duration</div>
-                <div style={{ fontSize: 11, fontFamily: 'Orbitron', fontWeight: 700, color: 'var(--cyan)' }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--cyan)' }}>
                   {backfillDuration} min
                 </div>
               </div>
@@ -642,7 +642,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 50px', gap: 6, marginBottom: 4 }}>
               {['Exercise', state.unit.toUpperCase(), 'Sets (0=skip)'].map(h => (
-                <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'Orbitron', fontWeight: 600 }}>{h}</div>
+                <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{h}</div>
               ))}
             </div>
             {programExercises.map(ex => (
@@ -671,7 +671,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             {/* Completion preview */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--text3)' }}>Completion (auto)</div>
-              <div style={{ fontSize: 12, fontFamily: 'Orbitron', fontWeight: 700,
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-display)', fontWeight: 700,
                 color: pct >= 95 ? 'var(--green)' : pct >= 70 ? 'var(--cyan)' : 'var(--fire2)' }}>
                 {doneCount}/{programExercises.length} &nbsp;{pct}%
               </div>
@@ -699,7 +699,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
               background: canApply
                 ? 'linear-gradient(135deg, var(--purple2), var(--purple))'
                 : 'rgba(255,255,255,0.08)',
-              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
               color: canApply ? '#fff' : 'var(--text3)',
               letterSpacing: 0.5, cursor: canApply ? 'pointer' : 'not-allowed',
             }}
@@ -766,7 +766,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                   ? 'rgba(0,229,255,0.1)'
                   : 'linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.08))',
                 border: '1px solid rgba(0,229,255,0.3)',
-                fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                 color: syncing ? 'var(--text3)' : 'var(--cyan)',
                 cursor: syncing ? 'default' : 'pointer', letterSpacing: 0.5,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -799,7 +799,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             style={{
               flex: 1, padding: 10, border: 'none', borderRadius: 10,
               background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
               color: 'var(--bg)', cursor: 'pointer', letterSpacing: 0.5
             }}
           >EXPORT</button>
@@ -807,7 +807,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             flex: 1, padding: 10, borderRadius: 10, textAlign: 'center',
             border: '1px solid rgba(255,255,255,0.15)',
             background: 'rgba(255,255,255,0.04)',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text2)', cursor: 'pointer', letterSpacing: 0.5
           }}>
             IMPORT
@@ -862,7 +862,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           width: '100%', padding: 12, marginTop: 8,
           border: '2px solid var(--gold)', borderRadius: 13,
           background: 'rgba(255,214,0,0.06)', color: 'var(--gold)',
-          fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
           cursor: 'pointer', letterSpacing: 0.8
         }}
       >RESET TODAY'S SESSION</button>
@@ -881,7 +881,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           width: '100%', padding: 12, marginTop: 8,
           border: '2px solid var(--red)', borderRadius: 13,
           background: 'rgba(255,23,68,0.06)', color: 'var(--red)',
-          fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
           cursor: 'pointer', letterSpacing: 0.8
         }}
       >RESET ALL PROGRESS</button>
@@ -916,7 +916,7 @@ function accountBtn(background, color) {
   return {
     padding: '9px 18px', borderRadius: 10, border: 'none',
     background, color,
-    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+    fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
     cursor: 'pointer', letterSpacing: 0.5,
   };
 }
@@ -924,6 +924,6 @@ function accountBtn(background, color) {
 const inputStyle = {
   height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(255,255,255,0.04)', color: 'var(--text)',
-  fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600,
+  fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600,
   textAlign: 'center', width: 110, padding: '0 8px'
 };

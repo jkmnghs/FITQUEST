@@ -25,12 +25,12 @@ export default function RankTab({ state }) {
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'Orbitron', fontSize: 48, fontWeight: 900,
+            fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 900,
             color: rank.color, textShadow: `0 0 40px ${rank.color}60`
           }}>{rank.l}</div>
         </div>
 
-        <div style={{ fontFamily: 'Orbitron', fontSize: 20, fontWeight: 700, color: rank.color, marginBottom: 4 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: rank.color, marginBottom: 4 }}>
           {rank.name}
         </div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 6 }}>
@@ -50,7 +50,7 @@ export default function RankTab({ state }) {
                 <div style={{
                   width: 52, height: 52, borderRadius: 12,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Orbitron', fontSize: 18, fontWeight: 800,
+                  fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800,
                   border: `2px solid ${isLocked ? 'var(--text3)' : r.color}`,
                   color: isLocked ? 'var(--text3)' : r.color,
                   background: isLocked ? 'rgba(255,255,255,0.02)' : `${r.color}15`,
@@ -72,7 +72,7 @@ export default function RankTab({ state }) {
         background: 'var(--card)', border: '1px solid var(--card-border)',
         borderRadius: 14, padding: '14px 16px', backdropFilter: 'blur(20px)'
       }}>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 11, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 12 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 12 }}>
           RANK PROGRESS
         </div>
         {[
@@ -84,7 +84,7 @@ export default function RankTab({ state }) {
           <div key={row.label} style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 12, color: 'var(--text2)' }}>{row.label}</span>
-              <span style={{ fontFamily: 'Orbitron', fontSize: 11, color: row.color, fontWeight: 700 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: row.color, fontWeight: 700 }}>
                 {row.value}/{row.target}
               </span>
             </div>
@@ -105,7 +105,7 @@ export default function RankTab({ state }) {
 function SectionTitle({ children }) {
   return (
     <div style={{
-      fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
+      fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
       color: 'var(--text2)', letterSpacing: 1.5,
       marginBottom: 12, textTransform: 'uppercase'
     }}>{children}</div>

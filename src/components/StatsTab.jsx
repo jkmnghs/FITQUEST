@@ -86,7 +86,7 @@ export default function StatsTab({ state }) {
                 <span style={{ fontWeight: 700 }}>{convWt > 0 ? `${convWt} ${unit}` : '—'}</span>
                 {gain > 0.1 && <span style={{ color: 'var(--green)' }}>+{gain.toFixed(1)}</span>}
                 {pr && <span style={{
-                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700, padding: '2px 5px',
+                  fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700, padding: '2px 5px',
                   borderRadius: 4, background: 'rgba(255,214,0,0.12)', color: 'var(--gold)',
                   border: '1px solid rgba(255,214,0,0.25)'
                 }}>PR</span>}
@@ -113,7 +113,7 @@ function StatCard({ icon, value, label, color }) {
       borderRadius: 14, padding: 14, textAlign: 'center', backdropFilter: 'blur(20px)'
     }}>
       <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontFamily: 'Orbitron', fontSize: 22, fontWeight: 800, marginBottom: 2, color }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 2, color }}>{value}</div>
       <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, letterSpacing: 0.4 }}>{label}</div>
     </div>
   );
@@ -188,7 +188,7 @@ function WeightChart({ checkins, unit }) {
           { val: `${rate >= 0 ? '+' : ''}${rate.toFixed(2)}/wk`, lbl: 'Rate', color: rateColor }
         ].map((s, i) => (
           <div key={i} style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
             <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
           </div>
         ))}
@@ -264,7 +264,7 @@ function WaistChart({ checkins }) {
           { val: `${change >= 0 ? '+' : ''}${change.toFixed(1)}cm`, lbl: 'Change', color: changeColor }
         ].map((s, i) => (
           <div key={i} style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
             <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
           </div>
         ))}
@@ -302,7 +302,7 @@ function PRSection({ prs, unit, liftWeights }) {
                   <div style={{ fontSize: 13, color: 'var(--text2)' }}>{name}</div>
                   <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>Week {pr.week} • {pr.date}</div>
                 </div>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
                   {convertWeight(pr.weight, unit)} {unit}
                 </div>
               </div>
@@ -387,7 +387,7 @@ function SleepChart({ checkins }) {
           { val: '7h', lbl: 'Target', color: 'var(--green)' },
         ].map((s, i) => (
           <div key={i} style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: s.color }}>{s.val}</div>
             <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
           </div>
         ))}
@@ -399,7 +399,7 @@ function SleepChart({ checkins }) {
 function MiniTag({ color, bg, border, children }) {
   return (
     <span style={{
-      fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
+      fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700,
       padding: '2px 5px', borderRadius: 4, letterSpacing: 0.3,
       color, background: bg, border: `1px solid ${border}`
     }}>{children}</span>
@@ -409,7 +409,7 @@ function MiniTag({ color, bg, border, children }) {
 function SectionTitle({ children }) {
   return (
     <div style={{
-      fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
+      fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
       color: 'var(--text2)', letterSpacing: 1.5,
       marginBottom: 12, textTransform: 'uppercase'
     }}>{children}</div>

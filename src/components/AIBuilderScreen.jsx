@@ -4,8 +4,8 @@ const NAVY   = '#0a1628';
 const NAVY2  = '#111827';
 const CYAN   = '#00e5ff';
 const PURPLE = '#a855f7';
-const ORBITRON = '"Orbitron", "SF Mono", monospace';
-const RAJDHANI = '"Rajdhani", Inter, system-ui, sans-serif';
+const ORBITRON = 'var(--font-display)';
+const RAJDHANI = 'var(--font-primary)';
 
 // ── Derive readable labels from assessment values ─────────────
 const GOAL_LABEL = {
@@ -433,7 +433,9 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
     <HUDBg>
       <div style={{
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-        padding: 'max(64px, env(safe-area-inset-top, 20px)) 20px max(24px, env(safe-area-inset-bottom, 10px))',
+        // Routed through the shared tokens so the insets stay consistent with
+        // the rest of the app (and can be overridden for testing).
+        padding: 'max(64px, var(--safe-area-top)) 20px max(24px, var(--safe-area-bottom))',
       }}>
 
         {/* top label */}

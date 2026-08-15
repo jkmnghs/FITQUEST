@@ -88,7 +88,7 @@ export default function DailySummaryBar({ dayTotals, goals, mealCount }) {
                   textTransform: 'uppercase',
                 }}>{m.label}</span>
                 <span style={{
-                  fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'var(--font-primary)', fontSize: 11, fontWeight: 700,
                   color: over ? 'var(--color-destructive)' : m.color,
                 }}>
                   {Math.round(val)}g

@@ -74,19 +74,19 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
     <div style={{
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg)', padding: '24px 20px',
-      fontFamily: 'Rajdhani, sans-serif',
+      background: 'var(--bg)', padding: 'calc(var(--safe-area-top) + 24px) 20px calc(var(--safe-area-bottom) + 24px)',
+      fontFamily: 'var(--font-primary)',
     }}>
       {/* Logo / title */}
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{
-          fontFamily: 'Orbitron', fontSize: 28, fontWeight: 900,
+          fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900,
           color: 'var(--cyan)', letterSpacing: 2,
           textShadow: '0 0 20px rgba(0,229,255,0.4)',
           marginBottom: 4,
         }}>FITQUEST</div>
         <div style={{
-          fontSize: 12, color: 'var(--text3)', fontFamily: 'Orbitron',
+          fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-display)',
           letterSpacing: 1.5,
         }}>YOUR GAMIFIED FITNESS COACH</div>
       </div>
@@ -113,7 +113,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               style={{
                 flex: 1, padding: '10px 4px',
                 border: 'none', cursor: 'pointer',
-                fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
                 letterSpacing: 0.5,
                 background: mode === m ? 'rgba(0,229,255,0.12)' : 'transparent',
                 color: mode === m ? 'var(--cyan)' : 'var(--text3)',
@@ -127,7 +127,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>📧</div>
             <div style={{
-              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: 'var(--cyan)', marginBottom: 8,
             }}>CHECK YOUR EMAIL</div>
             <div style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.6 }}>
@@ -140,7 +140,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                 marginTop: 20, padding: '10px 20px', borderRadius: 10,
                 border: '1px solid rgba(0,229,255,0.25)',
                 background: 'transparent', color: 'var(--cyan)',
-                fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
                 cursor: 'pointer',
               }}
             >BACK TO SIGN IN</button>
@@ -148,12 +148,12 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
         ) : mode === 'forgot' ? (
           <form onSubmit={handleSubmit}>
             <div style={{
-              fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
               color: 'var(--text2)', marginBottom: 20, lineHeight: 1.6,
             }}>Enter your email and we'll send you a link to reset your password.</div>
             <label style={{ display: 'block', marginBottom: 20 }}>
               <div style={{
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
               }}>EMAIL</div>
               <input
@@ -166,7 +166,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                   width: '100%', padding: '12px 14px', borderRadius: 10,
                   border: '1px solid rgba(255,255,255,0.1)',
                   background: 'rgba(255,255,255,0.05)',
-                  color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                  color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
                   outline: 'none', boxSizing: 'border-box',
                   WebkitTextFillColor: 'var(--text)',
                 }}
@@ -187,7 +187,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                 borderRadius: 12, border: 'none',
                 background: loading ? 'rgba(0,229,255,0.3)' : 'var(--cyan)',
                 color: 'var(--bg)',
-                fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 1, cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
                 boxShadow: loading ? 'none' : '0 0 20px rgba(0,229,255,0.25)',
@@ -199,7 +199,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               style={{
                 width: '100%', marginTop: 12, padding: '10px',
                 border: 'none', background: 'transparent',
-                color: 'var(--text3)', fontFamily: 'Orbitron',
+                color: 'var(--text3)', fontFamily: 'var(--font-display)',
                 fontSize: 9, fontWeight: 700, letterSpacing: 1,
                 cursor: 'pointer',
               }}
@@ -209,7 +209,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>📧</div>
             <div style={{
-              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: 'var(--cyan)', marginBottom: 8,
             }}>CHECK YOUR EMAIL</div>
             <div style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.6 }}>
@@ -223,7 +223,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               style={{
                 marginTop: 14, background: 'none', border: 'none', padding: 0,
                 color: resendCooldown > 0 ? 'var(--text3)' : 'var(--cyan)',
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
                 cursor: resendCooldown > 0 ? 'default' : 'pointer',
               }}
             >{resendCooldown > 0 ? `RESEND IN ${resendCooldown}s` : "DIDN'T GET IT? RESEND"}</button>
@@ -236,7 +236,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                 marginTop: 20, padding: '10px 20px', borderRadius: 10,
                 border: '1px solid rgba(0,229,255,0.25)',
                 background: 'transparent', color: 'var(--cyan)',
-                fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
                 cursor: 'pointer',
               }}
             >GO TO SIGN IN</button>
@@ -246,7 +246,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             {mode === 'signup' && (
               <label style={{ display: 'block', marginBottom: 16 }}>
                 <div style={{
-                  fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                   color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
                 }}>YOUR NAME</div>
                 <input
@@ -260,7 +260,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                     width: '100%', padding: '12px 14px', borderRadius: 10,
                     border: '1px solid rgba(255,255,255,0.1)',
                     background: 'rgba(255,255,255,0.05)',
-                    color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                    color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
                     outline: 'none', boxSizing: 'border-box',
                     WebkitTextFillColor: 'var(--text)',
                   }}
@@ -269,7 +269,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             )}
             <label style={{ display: 'block', marginBottom: 16 }}>
               <div style={{
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
               }}>EMAIL</div>
               <input
@@ -282,7 +282,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                   width: '100%', padding: '12px 14px', borderRadius: 10,
                   border: '1px solid rgba(255,255,255,0.1)',
                   background: 'rgba(255,255,255,0.05)',
-                  color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                  color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
                   outline: 'none', boxSizing: 'border-box',
                   WebkitTextFillColor: 'var(--text)',
                 }}
@@ -291,7 +291,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
 
             <label style={{ display: 'block', marginBottom: mode === 'signup' ? 16 : mode === 'signin' ? 8 : 20 }}>
               <div style={{
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
               }}>PASSWORD</div>
               <input
@@ -304,7 +304,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                   width: '100%', padding: '12px 14px', borderRadius: 10,
                   border: '1px solid rgba(255,255,255,0.1)',
                   background: 'rgba(255,255,255,0.05)',
-                  color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                  color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
                   outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -313,7 +313,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             {mode === 'signup' && (
               <label style={{ display: 'block', marginBottom: 20 }}>
                 <div style={{
-                  fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                   color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
                 }}>CONFIRM PASSWORD</div>
                 <input
@@ -326,7 +326,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                     width: '100%', padding: '12px 14px', borderRadius: 10,
                     border: `1px solid ${confirmPassword && password !== confirmPassword ? 'rgba(255,50,50,0.5)' : 'rgba(255,255,255,0.1)'}`,
                     background: 'rgba(255,255,255,0.05)',
-                    color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+                    color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
                     outline: 'none', boxSizing: 'border-box',
                   }}
                 />
@@ -340,7 +340,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                   onClick={() => switchMode('forgot')}
                   style={{
                     background: 'none', border: 'none', padding: 0,
-                    color: 'var(--cyan)', fontFamily: 'Orbitron',
+                    color: 'var(--cyan)', fontFamily: 'var(--font-display)',
                     fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
                     cursor: 'pointer', opacity: 0.8,
                   }}
@@ -364,7 +364,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                 borderRadius: 12, border: 'none',
                 background: loading ? 'rgba(0,229,255,0.3)' : 'var(--cyan)',
                 color: 'var(--bg)',
-                fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 1, cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
                 boxShadow: loading ? 'none' : '0 0 20px rgba(0,229,255,0.25)',

@@ -60,7 +60,7 @@ function OptionBtn({ selected, onClick, children }) {
         border: selected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
         background: selected ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
         color: selected ? 'var(--cyan)' : 'var(--text)',
-        fontSize: 15, fontFamily: 'Rajdhani', fontWeight: 600,
+        fontSize: 15, fontFamily: 'var(--font-primary)', fontWeight: 600,
         textAlign: 'left', cursor: 'pointer',
         display: 'flex', alignItems: 'center', gap: 12,
         transition: 'all 0.15s',
@@ -86,7 +86,7 @@ function CheckBtn({ selected, onClick, children }) {
         border: selected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
         background: selected ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
         color: selected ? 'var(--cyan)' : 'var(--text)',
-        fontSize: 14, fontFamily: 'Rajdhani', fontWeight: 600,
+        fontSize: 14, fontFamily: 'var(--font-primary)', fontWeight: 600,
         cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
         transition: 'all 0.15s',
       }}
@@ -111,11 +111,11 @@ function StepHeader({ step, total, title }) {
         marginBottom: 8,
       }}>
         <div style={{
-          fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
           color: 'var(--text3)', letterSpacing: 1.5,
         }}>STEP {step} OF {total}</div>
         <div style={{
-          fontFamily: 'Orbitron', fontSize: 9, color: 'var(--cyan)',
+          fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--cyan)',
         }}>{Math.round(pct)}%</div>
       </div>
       <div style={{
@@ -129,7 +129,7 @@ function StepHeader({ step, total, title }) {
         }} />
       </div>
       <div style={{
-        fontFamily: 'Orbitron', fontSize: 16, fontWeight: 700,
+        fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700,
         color: 'var(--text)', lineHeight: 1.3,
       }}>{title}</div>
     </div>
@@ -140,7 +140,7 @@ function NumInput({ label, value, onChange, placeholder, unit, isText, error }) 
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{
-        fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+        fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
         color: error ? 'var(--fire2)' : 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
       }}>{label}{unit && <span style={{ marginLeft: 4 }}>({unit})</span>}</div>
       <input
@@ -152,7 +152,7 @@ function NumInput({ label, value, onChange, placeholder, unit, isText, error }) 
           width: '100%', padding: '11px 14px', borderRadius: 10,
           border: error ? '1.5px solid var(--fire2)' : '1px solid rgba(255,255,255,0.1)',
           background: error ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.05)',
-          color: 'var(--text)', fontSize: 15, fontFamily: 'Rajdhani',
+          color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
           outline: 'none', boxSizing: 'border-box',
           transition: 'border-color 0.2s',
         }}
@@ -204,7 +204,7 @@ function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, 
           flex: 1, padding: '13px', borderRadius: 12,
           border: '1px solid rgba(255,255,255,0.1)',
           background: 'transparent', color: 'var(--text2)',
-          fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
           cursor: 'pointer',
         }}>← BACK</button>
       )}
@@ -213,7 +213,7 @@ function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, 
         border: 'none',
         background: nextDisabled ? 'rgba(0,229,255,0.2)' : 'var(--cyan)',
         color: nextDisabled ? 'rgba(0,229,255,0.5)' : 'var(--bg)',
-        fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+        fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
         cursor: nextDisabled ? 'not-allowed' : 'pointer',
         boxShadow: nextDisabled ? 'none' : '0 0 20px rgba(0,229,255,0.2)',
         transition: 'all 0.2s',
@@ -228,7 +228,7 @@ function RadioRow({ options, value, onChange }) {
       {options.map(opt => (
         <button key={opt} onClick={() => onChange(opt)} style={{
           padding: '6px 10px', borderRadius: 8, fontSize: 11,
-          fontFamily: 'Rajdhani', fontWeight: 600, cursor: 'pointer',
+          fontFamily: 'var(--font-primary)', fontWeight: 600, cursor: 'pointer',
           border: value === opt ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
           background: value === opt ? 'rgba(0,229,255,0.1)' : 'transparent',
           color: value === opt ? 'var(--cyan)' : 'var(--text3)',
@@ -291,11 +291,12 @@ export default function OnboardingScreen({ onComplete }) {
       <div style={{
         minHeight: '100dvh', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)', padding: 32, textAlign: 'center',
+        background: 'var(--bg)', textAlign: 'center',
+        padding: 'calc(var(--safe-area-top) + 32px) 32px calc(var(--safe-area-bottom) + 32px)',
       }}>
         <div style={{ fontSize: 36, marginBottom: 24 }}>⚡</div>
         <div style={{
-          fontFamily: 'Orbitron', fontSize: 16, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700,
           color: 'var(--cyan)', letterSpacing: 2, marginBottom: 8,
         }}>BUILDING YOUR PROGRAM</div>
         <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 32 }}>
@@ -357,7 +358,7 @@ export default function OnboardingScreen({ onComplete }) {
   if (step === 1) {
     const anyYes = data.parqAnswers.some(Boolean);
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={1} total={TOTAL_STEPS} title="Health & Safety Screening" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6 }}>
@@ -386,7 +387,7 @@ export default function OnboardingScreen({ onComplete }) {
                     color: data.parqAnswers[i] === val
                       ? (val ? 'var(--red)' : 'var(--cyan)')
                       : 'var(--text3)',
-                    fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+                    fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
                     cursor: 'pointer', minWidth: 40,
                   }}>{label}</button>
                 ))}
@@ -418,7 +419,7 @@ export default function OnboardingScreen({ onComplete }) {
       { id: 'strength', label: 'Get Stronger',          sub: 'Focus on strength and performance' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={2} total={TOTAL_STEPS} title="What's Your Main Goal?" />
           {goals.map(g => (
@@ -443,7 +444,7 @@ export default function OnboardingScreen({ onComplete }) {
       { id: 'advanced',     label: 'Advanced',      sub: '2+ years of consistent training' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={3} total={TOTAL_STEPS} title="What's Your Fitness Level?" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
@@ -467,7 +468,7 @@ export default function OnboardingScreen({ onComplete }) {
   if (step === 4) {
     const competencyLevels = ['confident', 'unsure', 'never'];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={4} total={TOTAL_STEPS} title="Movement Competency" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6 }}>
@@ -495,7 +496,7 @@ export default function OnboardingScreen({ onComplete }) {
   // ── Step 5: Estimated Current Lifts (Intermediate/Advanced only) (Phase 3.2) ──
   if (step === 5) {
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={5} total={TOTAL_STEPS} title="Your Current Lifts" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
@@ -519,7 +520,7 @@ export default function OnboardingScreen({ onComplete }) {
   if (step === 6) {
     const hasSevere = Object.values(data.painRegions).some(v => v === 'severe');
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={6} total={TOTAL_STEPS} title="Pain & Limitations" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 20, lineHeight: 1.6 }}>
@@ -549,7 +550,7 @@ export default function OnboardingScreen({ onComplete }) {
           )}
           <div style={{ marginTop: 16 }}>
             <div style={{
-              fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
               color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
             }}>ADDITIONAL NOTES (optional)</div>
             <textarea
@@ -561,7 +562,7 @@ export default function OnboardingScreen({ onComplete }) {
                 width: '100%', padding: '10px 14px', borderRadius: 10,
                 border: '1px solid rgba(255,255,255,0.1)',
                 background: 'rgba(255,255,255,0.05)',
-                color: 'var(--text)', fontSize: 14, fontFamily: 'Rajdhani',
+                color: 'var(--text)', fontSize: 14, fontFamily: 'var(--font-primary)',
                 outline: 'none', resize: 'none', boxSizing: 'border-box', lineHeight: 1.5,
               }}
             />
@@ -582,11 +583,11 @@ export default function OnboardingScreen({ onComplete }) {
       { val: 90, label: '90 min', sub: 'Extended' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={7} total={TOTAL_STEPS} title="Your Training Schedule" />
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>DAYS PER WEEK</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
@@ -597,13 +598,13 @@ export default function OnboardingScreen({ onComplete }) {
                 border: data.daysPerWeek === d ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
                 background: data.daysPerWeek === d ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
                 color: data.daysPerWeek === d ? 'var(--cyan)' : 'var(--text)',
-                fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
                 cursor: 'pointer',
               }}>{d}</button>
             ))}
           </div>
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>SESSION LENGTH</div>
           {lengthOpts.map(l => (
@@ -632,7 +633,7 @@ export default function OnboardingScreen({ onComplete }) {
       { id: 'bodyweight',     label: 'Bodyweight Only',       sub: 'No equipment — home or outdoors' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={8} total={TOTAL_STEPS} title="What Equipment Do You Have?" />
           {eqs.map(eq => (
@@ -662,7 +663,7 @@ export default function OnboardingScreen({ onComplete }) {
       { id: 'no_preference', label: 'No Preference', sub: 'Choose for me based on my schedule' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={9} total={TOTAL_STEPS} title="Training Split Preference" />
           {splits.map(s => (
@@ -693,7 +694,7 @@ export default function OnboardingScreen({ onComplete }) {
     }
 
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={10} total={TOTAL_STEPS} title="Your Body Stats" />
           <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.5 }}>
@@ -707,7 +708,7 @@ export default function OnboardingScreen({ onComplete }) {
 
           <div style={{ marginBottom: fe.sex ? 6 : 14 }}>
             <div style={{
-              fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
               color: fe.sex ? 'var(--fire2)' : 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
             }}>BIOLOGICAL SEX</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -717,7 +718,7 @@ export default function OnboardingScreen({ onComplete }) {
                   border: data.sex === val ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
                   background: data.sex === val ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
                   color: data.sex === val ? 'var(--cyan)' : 'var(--text)',
-                  fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                 }}>{label}</button>
               ))}
             </div>
@@ -762,11 +763,11 @@ export default function OnboardingScreen({ onComplete }) {
       { id: 'very_high', label: 'Very High', sub: 'Feeling overwhelmed most days' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={11} total={TOTAL_STEPS} title="Lifestyle & Recovery" />
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>DAILY ACTIVITY LEVEL</div>
           {activityOpts.map(a => (
@@ -778,7 +779,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>TYPICAL SLEEP</div>
           {sleepOpts.map(s => (
@@ -787,7 +788,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>STRESS LEVEL</div>
           {stressOpts.map(s => (
@@ -828,11 +829,11 @@ export default function OnboardingScreen({ onComplete }) {
       { id: 'varies', label: 'Varies / no routine' },
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={12} total={TOTAL_STEPS} title="Dietary Context" />
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>DIETARY RESTRICTIONS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 20 }}>
@@ -843,7 +844,7 @@ export default function OnboardingScreen({ onComplete }) {
             ))}
           </div>
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>TRACKING EXPERIENCE</div>
           {trackOpts.map(t => (
@@ -852,7 +853,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>MEALS PER DAY</div>
           {mealOpts.map(m => (
@@ -886,11 +887,11 @@ export default function OnboardingScreen({ onComplete }) {
       'Doctor recommended',
     ];
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)', overflowY: 'auto' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)', overflowY: 'auto' }}>
         <Card>
           <StepHeader step={13} total={TOTAL_STEPS} title="Your Motivation" />
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>HAVE YOU STARTED AND STOPPED BEFORE?</div>
           {quitReasons.map(r => (
@@ -899,7 +900,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>YOUR #1 REASON FOR TRAINING</div>
           {motivations.map(m => (
@@ -928,7 +929,7 @@ export default function OnboardingScreen({ onComplete }) {
     }
 
     return (
-      <div style={{ minHeight: '100dvh', padding: '32px 20px', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
         <Card>
           <StepHeader step={14} total={TOTAL_STEPS} title="Pick Your Training Days" />
           <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 16 }}>
@@ -945,7 +946,7 @@ export default function OnboardingScreen({ onComplete }) {
                   border: isSelected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
                   background: isSelected ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.03)',
                   color: isSelected ? 'var(--cyan)' : (disabled ? 'rgba(255,255,255,0.2)' : 'var(--text2)'),
-                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                   cursor: disabled ? 'not-allowed' : 'pointer',
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center', gap: 2,

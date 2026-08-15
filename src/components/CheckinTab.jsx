@@ -90,7 +90,7 @@ export default function CheckinTab({ state, onSubmit }) {
         {submitted ? (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>
               CHECK-IN SAVED! {thisWeekCheckin ? 'UPDATED' : '+25 XP'}
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function CheckinTab({ state, onSubmit }) {
               background: showOverwrite
                 ? 'linear-gradient(135deg, var(--fire), var(--fire2))'
                 : 'linear-gradient(135deg, var(--purple2), var(--purple))',
-              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: '#fff', letterSpacing: 0.5, marginTop: 6, cursor: 'pointer'
             }}>
               {showOverwrite ? 'OVERWRITE CHECK-IN' : thisWeekCheckin ? 'UPDATE CHECK-IN' : 'SAVE CHECK-IN (+25 XP)'}
@@ -173,7 +173,7 @@ export default function CheckinTab({ state, onSubmit }) {
         {/* Score */}
         <div style={{
           padding: '12px 0', textAlign: 'center',
-          fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
           color: checkedCount >= 5 ? 'var(--green)' : checkedCount >= 3 ? 'var(--cyan)' : 'var(--text3)'
         }}>
           {checkedCount}/{CHECKLIST_ITEMS.length} completed
@@ -198,7 +198,7 @@ export default function CheckinTab({ state, onSubmit }) {
                   <div style={{ fontSize: 13, fontWeight: 600 }}>Week {ci.week}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)' }}>{ci.date}</div>
                 </div>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--cyan)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--cyan)' }}>
                   {ci.weight} {state.unit}
                   {ci.waist > 0 && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>{ci.waist}cm</span>}
                   {ci.sleep > 0 && <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6 }}>😴 {ci.sleep}h</span>}
@@ -224,7 +224,7 @@ function InputRow({ label, value, onChange, placeholder, unit, inputMode, step, 
           flex: 1, height: 36, borderRadius: 9,
           border: '1px solid rgba(255,255,255,0.08)',
           background: 'rgba(255,255,255,0.04)',
-          color: 'var(--text)', fontFamily: 'Rajdhani', fontSize: 14,
+          color: 'var(--text)', fontFamily: 'var(--font-primary)', fontSize: 14,
           fontWeight: 600, textAlign: 'center', padding: '0 8px'
         }}
       />
@@ -236,7 +236,7 @@ function InputRow({ label, value, onChange, placeholder, unit, inputMode, step, 
 function SectionTitle({ children, style }) {
   return (
     <div style={{
-      fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
+      fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
       color: 'var(--text2)', letterSpacing: 1.5,
       marginBottom: 12, textTransform: 'uppercase', ...style
     }}>{children}</div>

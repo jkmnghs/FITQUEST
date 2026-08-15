@@ -348,7 +348,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text3)' }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 11, letterSpacing: 1 }}>NO MESSAGES YET</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: 1 }}>NO MESSAGES YET</div>
         <div style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
           Quest will message you automatically after workouts, milestones, and on Mondays.
         </div>
@@ -364,7 +364,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
         <button onClick={onMarkAllRead} style={{
           width: '100%', padding: '8px', borderRadius: 10, border: 'none',
           background: 'rgba(0,229,255,0.06)', color: 'var(--cyan)',
-          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
           cursor: 'pointer', marginBottom: 12,
         }}>MARK ALL READ</button>
       )}
@@ -388,7 +388,7 @@ function AgentInbox({ messages, onMarkAllRead }) {
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <div style={{
-                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700,
                   color: msg.read ? 'var(--text3)' : 'var(--cyan)', letterSpacing: 1,
                   textTransform: 'uppercase',
                 }}>{msg.trigger?.replace(/_/g, ' ') || 'QUEST'}{!msg.read && <span style={{ marginLeft: 6, color: 'var(--cyan)' }}>● NEW</span>}</div>
@@ -634,7 +634,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <span style={{ fontSize: 22 }}>🤖</span>
         <div>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
             AI COACH
           </div>
           <div style={{ fontSize: 11, color: 'var(--text3)' }}>
@@ -657,7 +657,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
               border: showInbox ? '1px solid rgba(179,136,255,0.4)' : '1px solid rgba(255,255,255,0.1)',
               background: showInbox ? 'rgba(179,136,255,0.1)' : 'rgba(255,255,255,0.04)',
               color: showInbox ? 'var(--purple)' : 'var(--text3)',
-              fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+              fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer',
               transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
             }}>
             📬 INBOX
@@ -674,7 +674,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
             background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
             color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
-            fontSize: 10, fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+            fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer',
             transition: 'all 0.2s'
           }}>{copyLabel}</button>
           {messages.length > 0 && (
@@ -682,7 +682,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
               padding: '4px 10px', borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.1)',
               background: 'rgba(255,255,255,0.04)',
-              color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
+              color: 'var(--text3)', fontSize: 10, fontFamily: 'var(--font-display)',
               fontWeight: 700, cursor: 'pointer'
             }}>CLEAR</button>
           )}
@@ -695,7 +695,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
             background: activeMode === m.id ? m.bg : 'transparent',
             color: activeMode === m.id ? m.color : 'var(--text3)',
-            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
             letterSpacing: 0.3, transition: 'all 0.2s',
             display: 'flex', alignItems: 'center', gap: 5
           }}>
@@ -733,7 +733,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       background: 'var(--card)', border: '1px solid var(--card-border)',
       borderRadius: 14, padding: 14, backdropFilter: 'blur(20px)'
     }}>
-      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'var(--font-primary)', lineHeight: 1.5 }}>
         {getInputHint(activeMode)}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -747,7 +747,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             flex: 1, height: 42, borderRadius: 10,
             border: '1px solid rgba(255,255,255,0.1)',
             background: 'rgba(255,255,255,0.04)',
-            color: 'var(--text)', fontFamily: 'Rajdhani',
+            color: 'var(--text)', fontFamily: 'var(--font-primary)',
             fontSize: 14, fontWeight: 600, padding: '0 12px'
           }}
         />
@@ -759,7 +759,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
             color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
             fontSize: cooldownLeft > 0 ? 11 : 18,
-            fontFamily: 'Orbitron', fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontWeight: 700,
             cursor: (loading || cooldownLeft > 0) ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'all 0.2s', flexShrink: 0
@@ -780,8 +780,8 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             padding: '4px 10px', borderRadius: 8, flexShrink: 0,
             border: '1px solid rgba(255,255,255,0.08)',
             background: 'rgba(255,255,255,0.03)',
-            color: 'var(--text3)', fontSize: 10, fontFamily: 'Orbitron',
-            fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
+            color: 'var(--text3)', fontSize: 12, fontFamily: 'var(--font-primary)',
+            fontWeight: 600, cursor: 'pointer',
             whiteSpace: 'nowrap',
             transition: 'all 0.2s'
           }}>{q}</button>
@@ -794,34 +794,46 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
   if (isOpen && onClose) {
     return createPortal(
       <div
+        className="fq-sheet-backdrop"
         onClick={onClose}
         style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
+          zIndex: 9999,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
         }}
       >
         <div
+          className="fq-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label="AI Coach"
           onClick={e => e.stopPropagation()}
           style={{
-            position: 'fixed',
-            bottom: 0, left: 0, right: 0,
-            maxHeight: '90vh',
             background: 'rgba(15,21,40,0.96)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
             border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: '20px 20px 0 0',
             boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
             display: 'flex', flexDirection: 'column',
-            animation: 'slideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both',
+            overscrollBehavior: 'contain',
           }}
         >
-          {/* Drag handle + close — never scrolls */}
+          {/* Drag handle + close — never scrolls.
+              The handle was laid out with space-between against the close
+              button, which parked it against the left edge instead of centring
+              it. It is now positioned independently of the button. */}
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            position: 'relative',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
             padding: '12px 16px 0', flexShrink: 0,
           }}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} />
+            <div
+              className="fq-sheet__handle"
+              style={{
+                position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+                width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)',
+              }}
+            />
             <button
               onClick={onClose}
               aria-label="Close AI Coach"
@@ -855,7 +867,12 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
               )}
             </div>
 
-            <div style={{ padding: '0 16px' }}>
+            <div style={{
+              padding: '0 16px',
+              // The inbox has no sticky input beneath it, so without this its
+              // last message sat under the home indicator.
+              paddingBottom: showInbox ? 'calc(var(--safe-area-bottom) + 16px)' : 0,
+            }}>
               {showInbox
                 ? <AgentInbox messages={agentMessages || []} onMarkAllRead={onMarkAgentRead} />
                 : messagesSection
@@ -867,7 +884,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
               <div style={{
                 position: 'sticky', bottom: 0,
                 padding: '8px 16px',
-                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+                paddingBottom: 'calc(var(--safe-area-bottom) + 16px)',
                 background: 'rgba(15,21,40,0.96)',
               }}>
                 {inputSection}
@@ -908,7 +925,7 @@ function ModePrompt({ mode, state }) {
       borderRadius: 14, marginBottom: 14
     }}>
       <div style={{ fontSize: 32, marginBottom: 10 }}>{mode.icon}</div>
-      <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: mode.color, marginBottom: 6 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: mode.color, marginBottom: 6 }}>
         {mode.label.toUpperCase()}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
@@ -931,7 +948,7 @@ function ExerciseList({ exercises }) {
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
             background: 'rgba(255,255,255,0.05)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)',
+            fontFamily: 'var(--font-display)', fontSize: 8, color: 'var(--text3)',
           }}>{i + 1}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{ex.name}</div>
@@ -983,12 +1000,12 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
             borderBottom: '1px solid rgba(255,255,255,0.06)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, color: isSaved ? 'var(--green)' : '#b3ff5e', letterSpacing: 1 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, color: isSaved ? 'var(--green)' : '#b3ff5e', letterSpacing: 1 }}>
               {isSaved
                 ? `✓ SAVED — ${inputs.map(t => (DAY_FULL[t.day] || t.day || '').toUpperCase()).join(' · ')}`
                 : `${isMultiDay ? `${inputs.length}-DAY` : (DAY_FULL[inputs[0]?.day] || inputs[0]?.day || '?').toUpperCase()} PROGRAM PROPOSAL`}
             </div>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--text3)' }}>{totalExercises} exercises</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--text3)' }}>{totalExercises} exercises</div>
           </div>
 
           {/* Day sections */}
@@ -1002,7 +1019,7 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
                     borderTop: di > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
-                    <div style={{ fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, color: '#b3ff5e', letterSpacing: 1 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, color: '#b3ff5e', letterSpacing: 1 }}>
                       {dayLabel.toUpperCase()}
                     </div>
                     {t.title && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t.title}</div>}
@@ -1021,7 +1038,7 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
               <button onClick={() => onConfirm(msg)} style={{
                 width: '100%', padding: '10px', borderRadius: 10, border: 'none',
                 background: 'linear-gradient(135deg, #b3ff5e, #69e04a)',
-                color: '#0a1a0a', fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+                color: '#0a1a0a', fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
                 cursor: 'pointer', letterSpacing: 1,
               }}>
                 {isMultiDay ? `✓ SAVE ALL ${inputs.length} DAYS TO MY PROGRAM` : '✓ SAVE TO MY PROGRAM'}

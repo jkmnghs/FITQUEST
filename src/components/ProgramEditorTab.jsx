@@ -37,13 +37,13 @@ function repLabel(ex) {
 const inputSt = {
   width: '100%', background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
-  color: 'var(--text1)', fontFamily: 'Rajdhani', fontSize: 14,
+  color: 'var(--text1)', fontFamily: 'var(--font-primary)', fontSize: 14,
   padding: '8px 10px', outline: 'none', boxSizing: 'border-box',
 };
 const selectSt = { ...inputSt, cursor: 'pointer', appearance: 'none', paddingRight: 6 };
 
 function FieldLabel({ children }) {
-  return <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'Orbitron', letterSpacing: 1, marginBottom: 4 }}>{children}</div>;
+  return <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--font-display)', letterSpacing: 1, marginBottom: 4 }}>{children}</div>;
 }
 
 function ExForm({ ex, onChange, onDone }) {
@@ -101,7 +101,7 @@ function ExForm({ ex, onChange, onDone }) {
         <button onClick={onDone} style={{
           marginTop: 10, padding: '7px 16px', borderRadius: 8, border: 'none',
           background: 'rgba(0,229,255,0.12)', color: 'var(--cyan)',
-          fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
+          fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
         }}>DONE</button>
       )}
     </div>
@@ -258,7 +258,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
               border: `1px solid ${active ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
               background: active ? 'rgba(0,229,255,0.12)' : 'transparent',
               color: active ? 'var(--cyan)' : 'var(--text3)',
-              fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700, letterSpacing: 1,
+              fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: 1,
               cursor: 'pointer', WebkitTapHighlightColor: 'transparent', position: 'relative',
             }}>
               {DAY_SHORT[d]}
@@ -319,11 +319,15 @@ export default function ProgramEditorTab({ state, updateSetting }) {
                 width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
                 background: 'rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, color: 'var(--text3)',
+                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, color: 'var(--text3)',
               }}>{idx + 1}</div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {/* Four 38px action buttons leave this column ~130px on a
+                    393px phone, which truncated "Romanian Deadlift" and
+                    "DB Overhead Press" mid-word. Wrapping costs a line only
+                    on the long names; ellipsis cost information on every one. */}
+                <div style={{ fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 700, color: 'var(--text1)', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
                   {ex.name}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
@@ -360,7 +364,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           width: '100%', padding: '13px', marginBottom: 16,
           border: '1px dashed rgba(0,229,255,0.25)', borderRadius: 12,
           background: 'rgba(0,229,255,0.03)', color: 'var(--cyan)',
-          fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
           letterSpacing: 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
         }}>
           + ADD EXERCISE
@@ -371,7 +375,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           border: '1px solid rgba(0,229,255,0.2)', borderRadius: 14,
           background: 'rgba(0,229,255,0.03)',
         }}>
-          <div style={{ fontFamily: 'Orbitron', fontSize: 9, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 10 }}>
             SEARCH EXERCISE LIBRARY
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -387,7 +391,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
             <button onClick={useCustomName} style={{
               padding: '0 14px', borderRadius: 8, border: 'none',
               background: 'rgba(0,229,255,0.15)', color: 'var(--cyan)',
-              fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
             }}>USE</button>
           </div>
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -398,7 +402,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
                 background: 'rgba(255,255,255,0.04)', textAlign: 'left',
                 WebkitTapHighlightColor: 'transparent',
               }}>
-                <span style={{ fontFamily: 'Rajdhani', fontSize: 14, fontWeight: 600, color: 'var(--text1)' }}>{s.name}</span>
+                <span style={{ fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600, color: 'var(--text1)' }}>{s.name}</span>
                 <span style={{ fontSize: 11, color: 'var(--text3)' }}>{s.isBodyweight ? 'BW' : `${s.startKg}kg`}</span>
               </button>
             ))}
@@ -406,7 +410,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           <button onClick={() => setAddForm(null)} style={{
             marginTop: 10, padding: '7px 14px', borderRadius: 8, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
-            fontFamily: 'Orbitron', fontSize: 9, cursor: 'pointer',
+            fontFamily: 'var(--font-display)', fontSize: 9, cursor: 'pointer',
           }}>CANCEL</button>
         </div>
       ) : (
@@ -416,7 +420,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           background: 'rgba(0,229,255,0.03)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontFamily: 'Rajdhani', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>{addForm.name}</div>
+            <div style={{ fontFamily: 'var(--font-primary)', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>{addForm.name}</div>
             <button onClick={() => setAddForm('searching')} style={{
               padding: '3px 8px', borderRadius: 6, border: 'none',
               background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
@@ -432,13 +436,13 @@ export default function ProgramEditorTab({ state, updateSetting }) {
             <button onClick={confirmAdd} style={{
               flex: 1, padding: '11px', borderRadius: 10, border: 'none',
               background: 'linear-gradient(135deg, var(--cyan), var(--purple))',
-              color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
+              color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
               cursor: 'pointer', letterSpacing: 1,
             }}>ADD TO {DAY_SHORT[activeDay]}</button>
             <button onClick={() => setAddForm(null)} style={{
               padding: '11px 16px', borderRadius: 10, border: 'none',
               background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
-              fontFamily: 'Orbitron', fontSize: 9, cursor: 'pointer',
+              fontFamily: 'var(--font-display)', fontSize: 9, cursor: 'pointer',
             }}>CANCEL</button>
           </div>
         </div>
@@ -450,7 +454,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           flex: 1, padding: '14px', borderRadius: 12, border: saved ? '1px solid var(--green)' : 'none',
           background: saved ? 'rgba(0,230,118,0.15)' : 'linear-gradient(135deg, var(--cyan), var(--purple))',
           color: saved ? 'var(--green)' : 'var(--bg)',
-          fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
           cursor: 'pointer', letterSpacing: 1, transition: 'all 0.3s',
         }}>
           {saved ? '✓ SAVED' : 'SAVE PROGRAM'}
@@ -460,7 +464,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
             padding: '14px 18px', borderRadius: 12,
             border: '1px solid rgba(255,50,68,0.2)',
             background: 'rgba(255,50,68,0.07)', color: 'var(--red)',
-            fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
             cursor: 'pointer', letterSpacing: 1, flexShrink: 0,
           }}>CLEAR DAY</button>
         )}

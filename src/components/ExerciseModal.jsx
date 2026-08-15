@@ -313,7 +313,7 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
 
           {/* Header */}
           <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700 }}>{ex.name}</h2>
+            <h2 style={{ fontFamily: 'var(--font-primary)', fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>{ex.name}</h2>
             <button onClick={onClose} aria-label="Close" style={{
               width: 32, height: 32, borderRadius: 8, border: 'none',
               background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-tertiary)',
@@ -349,7 +349,7 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
               // Already completed
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
                 <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
-                <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>
                   COMPLETED
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text2)' }}>
@@ -482,12 +482,12 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
         {['#', unit.toUpperCase(), 'REPS', 'RPE', ''].map((h, i) => (
-          <span key={i} style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600, letterSpacing: 0.5 }}>{h}</span>
+          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600, letterSpacing: 0.5 }}>{h}</span>
         ))}
       </div>
       {sets.map((s, i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 3fr 3fr 2fr 36px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-          <span style={{ fontFamily: 'Orbitron', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>
             {i + 1}{s.isExtra ? '+' : ''}
           </span>
           <input
@@ -555,7 +555,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
         {['#', 'SECONDS', 'TIMER', ''].map((h, i) => (
-          <span key={i} style={{ fontFamily: 'Orbitron', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>{h}</span>
+          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>{h}</span>
         ))}
       </div>
       {sets.map((s, i) => {
@@ -563,7 +563,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
         const elapsed = isRunning ? activeTimer.elapsed : null;
         return (
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 56px 36px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-            <span style={{ fontFamily: 'Orbitron', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center' }}>
               {i + 1}{s.isExtra ? '+' : ''}
             </span>
             <input
@@ -577,7 +577,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
               border: `1px solid ${isRunning ? 'rgba(255,109,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
               background: isRunning ? 'rgba(255,109,0,0.12)' : 'rgba(255,255,255,0.04)',
               color: isRunning ? 'var(--fire2)' : 'var(--text3)',
-              fontFamily: 'Orbitron', fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer',
               animation: isRunning ? 'timerPulse 1.2s ease-in-out infinite' : 'none'
             }}>
               {isRunning ? `${elapsed}s` : '▶'}
@@ -609,7 +609,7 @@ function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConf
         borderRadius: 18, padding: '24px 20px',
         width: 'calc(100% - 40px)', maxWidth: 340, textAlign: 'center'
       }}>
-        <h3 style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Complete Exercise?</h3>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Complete Exercise?</h3>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>{exName}</p>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.6 }}>
           {doneCount}/{totalSets} sets checked
@@ -619,12 +619,12 @@ function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConf
           <button onClick={onCancel} style={{
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: 'var(--text2)',
-            fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
           }}>CANCEL</button>
           <button onClick={onConfirm} style={{
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-            color: 'var(--bg)', fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700
+            color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
           }}>COMPLETE</button>
         </div>
       </div>

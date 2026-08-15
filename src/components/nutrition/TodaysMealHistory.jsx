@@ -5,7 +5,7 @@ export default function TodaysMealHistory({ todayMeals, onDeleteMeal }) {
 
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ fontFamily: 'Orbitron', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 12 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: 'var(--text3)', letterSpacing: 1, marginBottom: 12 }}>
         TODAY'S MEALS
       </div>
       {todayMeals.map((meal, i) => (
@@ -17,14 +17,14 @@ export default function TodaysMealHistory({ todayMeals, onDeleteMeal }) {
           justifyContent: 'space-between', alignItems: 'center', gap: 8,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'Rajdhani', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--font-primary)', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {meal.foods.map(f => f.name).join(', ').substring(0, 40)}
               {meal.foods.map(f => f.name).join(', ').length > 40 ? '...' : ''}
             </div>
             <div style={{ fontSize: 10, color: 'var(--text3)' }}>{meal.dateStr}</div>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>
               {meal.totals.calories}
             </div>
             <div style={{ fontSize: 9, color: 'var(--text3)' }}>kcal</div>

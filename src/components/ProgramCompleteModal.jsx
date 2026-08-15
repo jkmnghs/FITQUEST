@@ -24,7 +24,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
         maxHeight: '90dvh', overflowY: 'auto',
       }}>
         <div style={{ fontSize: 48, marginBottom: 10 }}>🏆</div>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 17, fontWeight: 900, color: 'var(--cyan)', marginBottom: 6, letterSpacing: 1 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 900, color: 'var(--cyan)', marginBottom: 6, letterSpacing: 1 }}>
           CYCLE {cycle} COMPLETE
         </div>
         <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.7 }}>
@@ -38,7 +38,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
             { val: `${(state.totalVolume / 1000).toFixed(1)}k`, lbl: `Vol (${state.unit})` }
           ].map(s => (
             <div key={s.lbl} style={{ background: 'rgba(0,229,255,0.06)', borderRadius: 10, padding: '10px 4px' }}>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 15, fontWeight: 800, color: 'var(--cyan)' }}>{s.val}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800, color: 'var(--cyan)' }}>{s.val}</div>
               <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{s.lbl}</div>
             </div>
           ))}
@@ -52,7 +52,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
             <button onClick={handleContinue} style={{
               width: '100%', padding: 13, border: 'none', borderRadius: 12, marginBottom: 10,
               background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: 'var(--bg)', letterSpacing: 0.8, cursor: 'pointer',
               boxShadow: '0 4px 20px var(--cyan-glow)'
             }}>
@@ -61,7 +61,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
             <button onClick={() => setPicking(true)} style={{
               width: '100%', padding: 13, border: '1px solid rgba(179,136,255,0.4)', borderRadius: 12,
               background: 'rgba(179,136,255,0.08)',
-              fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: 'var(--purple)', letterSpacing: 0.8, cursor: 'pointer',
             }}>
               SWITCH PROGRAM
@@ -87,7 +87,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
                     : 'rgba(255,255,255,0.03)',
                 }}
               >
-                <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: p.id === currentProgramId ? 'var(--cyan)' : 'var(--text)', marginBottom: 2 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: p.id === currentProgramId ? 'var(--cyan)' : 'var(--text)', marginBottom: 2 }}>
                   {p.name} {p.id === currentProgramId ? '(current)' : ''}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.4 }}>{p.description}</div>
@@ -96,7 +96,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
             <button onClick={() => setPicking(false)} style={{
               marginTop: 4, background: 'none', border: 'none',
               color: 'var(--text3)', fontSize: 12, cursor: 'pointer',
-              fontFamily: 'Orbitron',
+              fontFamily: 'var(--font-display)',
             }}>← BACK</button>
           </>
         )}

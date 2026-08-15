@@ -3,10 +3,19 @@
 :root {
   color-scheme: dark;
 
-  /* ── Typography ── */
-  --font-display: 'Orbitron', sans-serif;
+  /* ── Typography ──
+     Two faces, one job each:
+       --font-display : Orbitron. The HUD voice — headings, stat numbers,
+                        button labels, anything uppercase and letterspaced.
+       --font-primary : Inter. Everything a person reads as prose — body copy,
+                        exercise names, form fields, descriptions.
+
+     Rajdhani used to be a third face, but it was doing --font-primary's job
+     (inputs, food names, onboarding labels) on a subset of screens rather than
+     expressing a distinct level in the hierarchy. Collapsing it into Inter
+     removes an inconsistency and one webfont download. */
+  --font-display: 'Orbitron', system-ui, sans-serif;
   --font-primary: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-condensed: 'Rajdhani', 'Inter', sans-serif;
 
   /* Fluid type — scales between a 320px phone and a 430px phone, then holds.
      Prevents the 320px iPhone SE / Galaxy A-series squeeze without blowing

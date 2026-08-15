@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 
 const NAVY   = '#0a1628';
 const CYAN   = '#00e5ff';
-const ORBITRON = '"Orbitron", "SF Mono", monospace';
-const RAJDHANI = '"Rajdhani", Inter, system-ui, sans-serif';
+const ORBITRON = 'var(--font-display)';
+const RAJDHANI = 'var(--font-primary)';
 
 const SUBLABELS = {
   'LOADING...':  'Checking your session',

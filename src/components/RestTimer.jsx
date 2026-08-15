@@ -132,29 +132,29 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
 
       <div style={{ display: 'flex', gap: 12 }}>
         <button onClick={onSkip} style={{
-          padding: '12px 28px', borderRadius: 12,
+          padding: '12px 28px', minHeight: 'var(--tap-target)', borderRadius: 'var(--radius-lg)',
           background: 'rgba(255,255,255,0.06)',
           border: '1px solid rgba(255,255,255,0.1)',
-          color: 'var(--text2)', fontFamily: 'Orbitron, sans-serif',
+          color: 'var(--text2)', fontFamily: 'var(--font-display)',
           fontSize: 12, fontWeight: 700, letterSpacing: 0.5
         }}>SKIP</button>
 
         {!isDone && (
           <button onClick={add30} style={{
-            padding: '12px 28px', borderRadius: 12,
+            padding: '12px 28px', minHeight: 'var(--tap-target)', borderRadius: 'var(--radius-lg)',
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.1)',
-            color: 'var(--text2)', fontFamily: 'Orbitron, sans-serif',
+            color: 'var(--text2)', fontFamily: 'var(--font-display)',
             fontSize: 12, fontWeight: 700, letterSpacing: 0.5
           }}>+30s</button>
         )}
 
         {isDone && (
           <button onClick={onDone} style={{
-            padding: '12px 28px', borderRadius: 12,
+            padding: '12px 28px', minHeight: 'var(--tap-target)', borderRadius: 'var(--radius-lg)',
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
             border: 'none', color: 'var(--bg)',
-            fontFamily: 'Orbitron, sans-serif',
+            fontFamily: 'var(--font-display)',
             fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
             boxShadow: '0 4px 18px var(--cyan-glow)'
           }}>NEXT SET →</button>
