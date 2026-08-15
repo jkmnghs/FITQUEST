@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   xpForLevel,
   xpToLevel,
+  removeXP,
   getRank,
   getPhase,
   applyXP,
@@ -671,5 +672,44 @@ describe('formatElapsed', () => {
 
   it('pads seconds with leading zero', () => {
     expect(formatElapsed(Date.now() - 9000)).toBe('00:09');
+  });
+});
+
+describe('removeXP', () => {
+  it('exactly undoes an applyXP award', () => {
+    let state = { xp: 0, totalXp: 0, level: 1 };
+    for (const award of [40, 95, 120, 60, 250, 30, 500, 75]) {
+      const before = { ...state };
+      const up = applyXP(state, award);
+      const down = removeXP({ xp: up.xp, totalXp: up.totalXp, level: up.level }, award);
+      expect(down).toEqual(before);
+      state = { xp: up.xp, totalXp: up.totalXp, level: up.level };
+    }
+  });
+
+  it('walks back down through a level-up', () => {
+    const base = { xp: 0, totalXp: 1000, level: 5 };
+    const award = xpForLevel(5) + 25;           // guaranteed to level up
+    const up = applyXP(base, award);
+    expect(up.level).toBe(6);
+    expect(removeXP(up, award)).toEqual(base);
+  });
+
+  it('does not restate a level that totalXp alone would not produce', () => {
+    // Accounts created under the previous XP curve hold pairs the current
+    // curve would never generate. Removing 0 must be a no-op for them.
+    const legacy = { xp: 40, totalXp: 3120, level: 6 };
+    expect(removeXP(legacy, 0)).toEqual(legacy);
+  });
+
+  it('floors at level 1 rather than going negative', () => {
+    expect(removeXP({ xp: 10, totalXp: 10, level: 1 }, 9999)).toEqual({ xp: 0, totalXp: 0, level: 1 });
+  });
+
+  it('treats junk amounts as zero', () => {
+    const state = { xp: 30, totalXp: 500, level: 3 };
+    expect(removeXP(state, undefined)).toEqual(state);
+    expect(removeXP(state, NaN)).toEqual(state);
+    expect(removeXP(state, -50)).toEqual(state);
   });
 });

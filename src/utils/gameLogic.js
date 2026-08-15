@@ -37,6 +37,32 @@ export function xpToLevel(targetLevel) {
   return total;
 }
 
+/**
+ * Exact inverse of applyXP: takes back an award that was already banked.
+ *
+ * Deliberately relative to the caller's current level rather than recomputed
+ * from totalXp. The XP curve has changed at least once (see "New exponential
+ * XP curve" above), so an account created under the old curve can hold a
+ * level and a totalXp that the current curve would never produce together.
+ * Re-deriving level from totalXp would silently restate those users' rank —
+ * in testing a level 6 / 3120 XP account jumped to level 14 on the first
+ * reset. Unwinding only what was added leaves that history untouched.
+ */
+export function removeXP(state, amount) {
+  let { xp, totalXp, level } = state;
+  const remove = Math.max(0, Math.round(Number(amount) || 0));
+  totalXp = Math.max(0, (totalXp || 0) - remove);
+  xp = (xp || 0) - remove;
+  // Mirror of applyXP's level-up loop: it consumed xpForLevel(level) to climb,
+  // so descending gives the same amount back.
+  while (xp < 0 && level > 1) {
+    level--;
+    xp += xpForLevel(level);
+  }
+  if (xp < 0) xp = 0;
+  return { xp, totalXp, level };
+}
+
 // ── Daily XP Cap ──
 // 500 allows a competitive bodybuilder completing 7-8 exercises to earn meaningful XP
 // throughout the full session without hitting the cap mid-workout.

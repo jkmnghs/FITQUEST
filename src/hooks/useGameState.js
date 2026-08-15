@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -989,11 +989,105 @@ export function useGameState(user) {
         activeExercises = prev.dayTemplates[todayKey].exercises;
       }
 
+      // ── Roll back a session that was already banked today ──
+      //
+      // This used to clear only the scratch fields (todayExDone,
+      // todaySessionFinished), leaving weekProgress untouched. The day stayed
+      // green in the week strip while the Train tab offered the session again,
+      // and finishing it a second time counted it twice — which could complete
+      // the week early and advance currentWeek off a single real session.
+      const todayStr = today();
+      const weekProgress = { ...prev.weekProgress };
+      let rolledBack = null;
+
+      // Search for the week holding today's session rather than assuming
+      // prev.currentWeek: when a session completes a week, currentWeek has
+      // already advanced past the week that session belongs to.
+      for (const key of Object.keys(weekProgress)) {
+        const wp = weekProgress[key];
+        const idx = (wp?.sessions || []).findIndex(s => s.date === todayStr);
+        if (idx === -1) continue;
+
+        const session = wp.sessions[idx];
+        const dayKey = session.dayKey || todayKey;
+
+        // Remove one occurrence only — the same weekday legitimately appears
+        // in other weeks, and dates/completedDays are parallel history.
+        const completedDays = [...(wp.completedDays || [])];
+        const dayIdx = completedDays.lastIndexOf(dayKey);
+        if (dayIdx !== -1) completedDays.splice(dayIdx, 1);
+
+        const dates = [...(wp.dates || [])];
+        const dateIdx = dates.lastIndexOf(todayStr);
+        if (dateIdx !== -1) dates.splice(dateIdx, 1);
+
+        const count = Math.max(0, (wp.count || 0) - 1);
+        const sessionsNeeded = prev.sessionsPerWeek || 3;
+
+        weekProgress[key] = {
+          ...wp,
+          sessions: wp.sessions.filter((_, i) => i !== idx),
+          completedDays,
+          dates,
+          count,
+          completed: count >= sessionsNeeded,
+        };
+        rolledBack = { week: Number(key), dayKey, wasCompleted: !!wp.completed };
+        // Let the day be re-recorded; the guard is what makes backfill refuse
+        // a day it has already seen this session.
+        _backfillGuard.delete(`${key}_${dayKey}`);
+        break;
+      }
+
+      // backfillLock is the persisted half of that guard — without clearing it
+      // too, hydrateBackfillGuard would re-block the day on the next reload.
+      let backfillLock = prev.backfillLock;
+      if (rolledBack) {
+        const locked = prev.backfillLock?.[rolledBack.week];
+        if (Array.isArray(locked) && locked.includes(rolledBack.dayKey)) {
+          backfillLock = {
+            ...prev.backfillLock,
+            [rolledBack.week]: locked.filter(d => d !== rolledBack.dayKey),
+          };
+        }
+      }
+
+      // If finishing that session is what advanced the week, come back to it.
+      let currentWeek = prev.currentWeek;
+      let currentWeekStartDate = prev.currentWeekStartDate;
+      if (rolledBack && rolledBack.wasCompleted && !weekProgress[rolledBack.week].completed
+          && prev.currentWeek > rolledBack.week) {
+        currentWeek = rolledBack.week;
+        // finishSession stamps currentWeekStartDate = today when it advances,
+        // so the week we are returning to began roughly a week before that.
+        // Only the start-of-week anchor for skipped-day maths depends on this.
+        if (currentWeekStartDate) {
+          const back = new Date(currentWeekStartDate);
+          if (!isNaN(back)) {
+            back.setDate(back.getDate() - 7);
+            currentWeekStartDate = back.toISOString().slice(0, 10);
+          }
+        }
+      }
+
+      // XP granted today is tracked exactly by dailyXPEarned (both
+      // completeExercise and finishSession add the post-cap amount, and the
+      // day rollover zeroes it), so it can be removed without guessing.
+      const dailyEarned = prev.dailyXPEarned || 0;
+      const { xp, totalXp, level } = removeXP(prev, dailyEarned);
+
       return {
         ...prev,
         todayExDone: [], todayExDetails: {},
         todaySessionFinished: false, sessionStartTime: null,
         currentDayIndex, activeExercises,
+        weekProgress, currentWeek, currentWeekStartDate, backfillLock,
+        totalSessions: Math.max(0, (prev.totalSessions || 0) - (rolledBack ? 1 : 0)),
+        perfectWeeks: Math.max(0, (prev.perfectWeeks || 0)
+          - (rolledBack?.wasCompleted && !weekProgress[rolledBack.week].completed ? 1 : 0)),
+        totalXp, level, xp, dailyXPEarned: 0,
+        // Today's entries describe work that no longer exists.
+        log: (prev.log || []).filter(l => l.date !== todayStr),
       };
     });
     showToast("Today's session cleared!");
