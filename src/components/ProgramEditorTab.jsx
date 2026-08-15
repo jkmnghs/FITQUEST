@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { EX_CATALOG } from '../data/exerciseCatalog';
+import { useConfirm } from './ui/ConfirmDialog';
 
 const DAY_ORDER  = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_FULL   = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
@@ -108,6 +109,7 @@ function ExForm({ ex, onChange, onDone }) {
 }
 
 export default function ProgramEditorTab({ state, updateSetting }) {
+  const { confirm, confirmDialog } = useConfirm();
   const trainingDays = useMemo(() => {
     const raw = state.trainingDays?.length ? state.trainingDays : (state.assessment?.trainingDays || ['mon', 'wed', 'fri']);
     return raw.filter(d => DAY_ORDER.includes(d)).sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
@@ -223,8 +225,14 @@ export default function ProgramEditorTab({ state, updateSetting }) {
     setTimeout(() => setSaved(false), 2500);
   }
 
-  function clearDay() {
-    if (!window.confirm(`Clear all exercises for ${DAY_FULL[activeDay]}?`)) return;
+  async function clearDay() {
+    const ok = await confirm({
+      title: `Clear ${DAY_FULL[activeDay]}?`,
+      message: 'Every exercise on this day is removed. You can rebuild it by hand or ask the AI Coach to design it.',
+      confirmLabel: 'CLEAR DAY',
+      destructive: true,
+    });
+    if (!ok) return;
     patchDay('exercises', []);
     setEditingIdx(null);
     setAddForm(null);
@@ -232,14 +240,11 @@ export default function ProgramEditorTab({ state, updateSetting }) {
 
   return (
     <div style={{ paddingBottom: 24 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontFamily: 'Orbitron', fontSize: 14, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1 }}>
-          MY PROGRAM
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
-          Set custom exercises for each training day. The Workout tab will auto-load today's session.
-        </div>
+      {confirmDialog}
+      {/* The "MY PROGRAM" title that used to sit here is now supplied by
+          ProfileTab's SectionHeader — printing it here too showed it twice. */}
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.5 }}>
+        Set custom exercises for each training day. The Train tab auto-loads today's session.
       </div>
 
       {/* Day tabs */}
@@ -331,10 +336,10 @@ export default function ProgramEditorTab({ state, updateSetting }) {
               </div>
 
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                <button onClick={() => setEditingIdx(isEditing ? null : idx)} style={actionBtn(isEditing ? 'var(--cyan)' : null)} title="Edit">✎</button>
-                <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} style={actionBtn()} title="Move up">↑</button>
-                <button onClick={() => moveExercise(idx, 1)} disabled={idx === exList.length - 1} style={actionBtn()} title="Move down">↓</button>
-                <button onClick={() => deleteExercise(idx)} style={actionBtn('rgba(255,50,68,0.7)')} title="Delete">✕</button>
+                <button onClick={() => setEditingIdx(isEditing ? null : idx)} style={actionBtn(isEditing ? 'var(--cyan)' : null)} title="Edit" aria-label={`Edit ${ex.name}`}>✎</button>
+                <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} style={actionBtn()} title="Move up" aria-label={`Move ${ex.name} up`}>↑</button>
+                <button onClick={() => moveExercise(idx, 1)} disabled={idx === exList.length - 1} style={actionBtn()} title="Move down" aria-label={`Move ${ex.name} down`}>↓</button>
+                <button onClick={() => deleteExercise(idx)} style={actionBtn('rgba(255,50,68,0.7)')} title="Delete" aria-label={`Delete ${ex.name}`}>✕</button>
               </div>
             </div>
 
@@ -474,10 +479,13 @@ export default function ProgramEditorTab({ state, updateSetting }) {
 
 function actionBtn(color) {
   return {
-    width: 28, height: 28, borderRadius: 7, border: 'none',
+    // Four of these sit side by side on every exercise row. At 28px they were
+    // under the 44px touch guideline and easy to mis-hit — deleting an
+    // exercise when you meant to reorder it.
+    width: 38, height: 38, borderRadius: 'var(--radius-md)', border: 'none',
     background: 'rgba(255,255,255,0.06)',
-    color: color || 'var(--text3)', fontSize: 13,
+    color: color || 'var(--text3)', fontSize: 15,
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    WebkitTapHighlightColor: 'transparent', padding: 0,
+    WebkitTapHighlightColor: 'transparent', padding: 0, flexShrink: 0,
   };
 }

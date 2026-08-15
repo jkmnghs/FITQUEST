@@ -1,14 +1,26 @@
 {
-  "name": "FitQuest — Jake's Recomp",
+  "id": "/",
+  "name": "FitQuest — AI-Powered Fitness Training",
   "short_name": "FitQuest",
+  "description": "Your AI-powered 12-week training companion. Track workouts, get personalized coaching, and level up your fitness.",
   "start_url": "/",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
   "display": "standalone",
-  "orientation": "portrait",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
   "background_color": "#0a0e1a",
   "theme_color": "#0a0e1a",
+  "categories": ["health", "fitness", "lifestyle"],
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "shortcuts": [
+    { "name": "Start today's workout", "short_name": "Train", "url": "/?tab=train" },
+    { "name": "Log a meal", "short_name": "Fuel", "url": "/?tab=fuel" },
+    { "name": "See progress", "short_name": "Progress", "url": "/?tab=progress" }
   ]
 }

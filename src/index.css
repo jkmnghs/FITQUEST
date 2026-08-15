@@ -1,17 +1,24 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
+  color-scheme: dark;
+
   /* ── Typography ── */
   --font-display: 'Orbitron', sans-serif;
-  --font-primary: 'Inter', sans-serif;
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 15px;
-  --text-md: 17px;
-  --text-lg: 20px;
-  --text-xl: 24px;
-  --text-2xl: 30px;
-  --text-3xl: 38px;
+  --font-primary: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-condensed: 'Rajdhani', 'Inter', sans-serif;
+
+  /* Fluid type — scales between a 320px phone and a 430px phone, then holds.
+     Prevents the 320px iPhone SE / Galaxy A-series squeeze without blowing
+     the layout up on larger screens. */
+  --text-xs:   clamp(10px, 2.7vw, 11px);
+  --text-sm:   clamp(12px, 3.2vw, 13px);
+  --text-base: clamp(14px, 3.7vw, 15px);
+  --text-md:   clamp(15px, 4.2vw, 17px);
+  --text-lg:   clamp(18px, 5vw,   20px);
+  --text-xl:   clamp(21px, 6vw,   24px);
+  --text-2xl:  clamp(26px, 7.5vw, 30px);
+  --text-3xl:  clamp(32px, 9.5vw, 38px);
 
   /* ── Colors: Backgrounds ── */
   --color-bg-primary: #0a0e1a;
@@ -62,11 +69,17 @@
 
   /* ── Layout ── */
   --app-max-width: 430px;
-  --nav-height: 56px;
+  --content-max: 560px;
+  --rail-width: 232px;
+  --nav-height: 58px;
   --header-height-full: 72px;
   --header-height-collapsed: 44px;
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  /* Minimum comfortable touch target (Apple HIG 44pt / Material 48dp) */
+  --tap-target: 44px;
 
   /* ── Transitions ── */
   --transition-fast: 0.1s ease;
@@ -74,8 +87,8 @@
   --transition-slow: 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --transition-spring: 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.0);
 
-  /* ── Breakpoints ── */
-  --bp-mobile: 480px;
+  /* ── Breakpoints (documentation only — media queries need literals) ── */
+  --bp-mobile: 600px;
   --bp-tablet: 768px;
   --bp-desktop: 1024px;
 
@@ -111,7 +124,11 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--bg);
+  /* Stops the whole page rubber-banding behind the app on iOS, and kills
+     Chrome-on-Android pull-to-refresh inside the installed PWA. */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -120,7 +137,9 @@ body {
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Noise texture overlay */
@@ -178,6 +197,10 @@ body::after {
   from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
 /* ── AI Builder / Sync Indicator animations ── */
 @keyframes fitq-spin-cw    { from { transform: rotate(0deg) }   to { transform: rotate(360deg) } }
 @keyframes fitq-think      { 0%,100% { opacity: .3; transform: translateY(0) }   50% { opacity: 1; transform: translateY(-2px) } }
@@ -214,14 +237,22 @@ body::after {
 .d3 { animation-delay: 0.15s; }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
 ::-webkit-scrollbar-thumb { background: var(--color-surface-2); border-radius: 2px; }
 
 /* Input reset */
-input, select, button { font-family: inherit; }
+input, select, button, textarea { font-family: inherit; }
 button { cursor: pointer; }
 input:focus, select:focus { outline: none; }
+
+/* iOS zooms the whole page when a focused field is under 16px. Every text-entry
+   control therefore has a 16px floor; visual sizing is done with padding. */
+input[type="text"], input[type="number"], input[type="email"],
+input[type="password"], input[type="search"], input[type="tel"],
+select, textarea {
+  font-size: max(16px, 1em);
+}
 
 /* Tab animation helper */
 .tab-enter { animation: tabEnter 0.2s ease-out both; }
@@ -239,84 +270,253 @@ input:focus, select:focus { outline: none; }
   border-radius: var(--radius-md);
 }
 
-/* Focus states */
+/* Focus states — keyboard only, so touch users never see a stray ring */
 *:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* ── Desktop & Tablet Adaptive Frame ── */
-.desktop-wrapper {
-  width: 100vw;
-  min-height: 100vh;
+/* ═══════════════════════════════════════════════════════════════════
+   App shell
+   Phones      : full-bleed, bottom tab bar
+   Tablets     : centred column on a gradient field, bottom tab bar
+   Desktop     : left navigation rail + centred content column
+   ═══════════════════════════════════════════════════════════════════ */
+
+.fq-shell {
   display: flex;
+  width: 100%;
+  /* 100dvh tracks the *visible* viewport, so the tab bar is not pushed under
+     the iOS Safari address bar the way it was with 100vh. The 100vh line is a
+     fallback for browsers without dynamic viewport units. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+.fq-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: var(--color-bg-primary);
+  padding-top: var(--safe-area-top);
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
+}
+
+/* The scrolling content region. `contain` keeps momentum scrolling from
+   chaining to the page behind it on iOS. */
+.fq-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Content is capped at a comfortable column width and centred, so a tablet or
+   a maximised desktop window does not stretch cards to 1400px. */
+.fq-column {
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+}
+
+/* ── Bottom tab bar (phones + tablets) ── */
+.fq-tabbar {
+  position: relative;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  height: calc(var(--nav-height) + var(--safe-area-bottom));
+  padding-bottom: var(--safe-area-bottom);
+  background: var(--color-surface-2);
+  border-top: 1px solid var(--color-border-subtle);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+}
+
+.fq-tabbar__btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 60px;
-  background: linear-gradient(135deg, #060a14 0%, #0a0e1a 40%, #0d1225 100%);
-  overflow: hidden;
+  gap: 3px;
+  padding: 6px 4px;
+  min-height: var(--tap-target);
+  border: none;
+  background: transparent;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.desktop-branding { display: none; }
+/* ── Desktop navigation rail ── */
+.fq-rail { display: none; }
 
-@media (min-width: 481px) {
-  .phone-frame {
-    width: 430px;
-    height: min(95vh, 920px);
-    border-radius: 40px;
-    border: 3px solid rgba(255,255,255,0.08);
-    box-shadow:
-      0 0 80px rgba(0,229,255,0.06),
-      0 20px 60px rgba(0,0,0,0.5),
-      inset 0 0 0 1px rgba(255,255,255,0.04);
-    overflow: hidden;
-    position: relative;
-    flex-shrink: 0;
+.fq-rail__btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 11px var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+.fq-rail__btn:hover { background: rgba(255,255,255,0.04); color: var(--color-text-secondary); }
+.fq-rail__btn[aria-selected="true"] {
+  background: var(--color-action-muted);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+@media (min-width: 600px) {
+  .fq-shell {
+    background: linear-gradient(135deg, #060a14 0%, #0a0e1a 40%, #0d1225 100%);
+    padding: clamp(0px, 2.5vh, 28px) clamp(0px, 3vw, 40px);
+    gap: clamp(0px, 3vw, 44px);
+    justify-content: center;
+    align-items: center;
   }
+  .fq-app {
+    width: 100%;
+    max-width: 460px;
+    height: 100%;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-border-medium);
+    box-shadow:
+      0 0 80px rgba(0,229,255,0.05),
+      0 20px 60px rgba(0,0,0,0.45);
+    overflow: hidden;
+    flex: 0 1 460px;
+  }
+  .fq-column { max-width: var(--content-max); }
 }
 
-@media (min-width: 769px) {
-  .desktop-branding {
+/* Desktop: swap the bottom bar for a persistent rail. Below this width the
+   rail would eat too much of the content column to be worth it. */
+@media (min-width: 1024px) {
+  .fq-shell { justify-content: center; gap: clamp(20px, 3vw, 48px); }
+  .fq-rail {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 12px;
-    max-width: 300px;
+    gap: var(--space-2);
+    width: var(--rail-width);
+    flex-shrink: 0;
+    align-self: stretch;
+    max-height: 100%;
+    padding: var(--space-5) var(--space-3);
+    overflow-y: auto;
   }
-  .desktop-logo {
-    font-family: var(--font-display);
-    font-size: 42px;
-    font-weight: 900;
-    color: var(--color-action);
-    text-shadow: 0 0 40px rgba(0,229,255,0.15);
-    letter-spacing: 0.08em;
-    margin: 0;
+  .fq-app {
+    flex: 0 1 620px;
+    max-width: 620px;
   }
-  .desktop-tagline {
-    font-family: var(--font-primary);
-    font-size: 16px;
-    color: var(--color-text-secondary);
-    margin: 0;
-  }
-  .desktop-hint {
-    font-family: var(--font-primary);
-    font-size: 13px;
-    color: var(--color-text-tertiary);
-    font-style: italic;
-    margin: 0;
-  }
+  .fq-tabbar { display: none; }
+  .fq-column { max-width: var(--content-max); }
 }
 
-@media (max-width: 480px) {
-  .desktop-wrapper {
-    display: block;
-    background: none;
+/* Short viewports — a phone held in landscape, or a small desktop window.
+   Without this the ≥600px rule reserves 28px of vertical padding and a
+   border on a 380px-tall viewport, squeezing the content to nothing. */
+@media (max-height: 560px) and (min-width: 600px) {
+  .fq-shell { padding-top: 0; padding-bottom: 0; }
+  .fq-app { border-radius: 0; border: none; height: 100%; }
+}
+
+/* Landscape phones: reclaim vertical space from the chrome. */
+@media (orientation: landscape) and (max-height: 480px) {
+  :root { --nav-height: 48px; }
+}
+
+/* ── Bottom sheet → centred dialog ──
+   On a phone a sheet rising from the bottom edge is right; on a desktop it
+   reads as a browser artefact. Same markup, different anchoring. */
+.fq-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.fq-sheet {
+  width: 100%;
+  max-width: 460px;
+  max-height: 92dvh;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 1024px) {
+  .fq-sheet-backdrop { align-items: center; padding: var(--space-6); }
+  .fq-sheet {
+    max-height: 86dvh;
+    border-radius: var(--radius-xl);
+    animation: popIn 0.2s cubic-bezier(0.2, 0.9, 0.3, 1) both;
   }
-  .phone-frame {
-    width: 100%;
-    height: 100vh;
-    border-radius: 0;
-    border: none;
-    box-shadow: none;
+  /* The drag handle means nothing once the sheet stops being draggable. */
+  .fq-sheet__handle { display: none; }
+}
+
+/* ── Shared surfaces ── */
+.fq-card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* Anything interactive gets a real touch target even when it looks small. */
+.fq-hit {
+  position: relative;
+}
+.fq-hit::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  width: 100%; height: 100%;
+}
+
+/* Press feedback for touch devices that have no hover state */
+.fq-press { transition: transform var(--transition-fast), opacity var(--transition-fast); }
+.fq-press:active { transform: scale(0.97); opacity: 0.9; }
+
+/* Horizontal scrollers (category chips, week strip) — hide the bar on mobile
+   but keep the snap so the content still feels intentional. */
+.fq-hscroll {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.fq-hscroll::-webkit-scrollbar { display: none; }
+
+/* ── Motion preferences ──
+   Users who ask their OS for reduced motion get a still app: no orb drift, no
+   pulsing rings, no slide-up sheets. Opacity fades are kept short rather than
+   removed so state changes are still legible. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

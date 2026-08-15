@@ -2,16 +2,19 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ACHIEVEMENTS } from '../data/gameData';
 import { authFetch } from '../lib/authFetch';
 import { exercisesForDay, DAY_ORDER } from '../utils/session';
+import { useConfirm } from './ui/ConfirmDialog';
 
 // ─── ACHIEVEMENTS TAB ───
 export function AchievementsTab({ state }) {
   return (
     <div>
+      {/* ProfileTab supplies the "Achievements" heading; only the count is
+          additional information worth repeating here. */}
       <div style={{
-        fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
-        color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
+        fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
+        color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', marginBottom: 12
       }}>
-        ACHIEVEMENTS • {state.achDone.length}/{ACHIEVEMENTS.length}
+        {state.achDone.length}/{ACHIEVEMENTS.length} UNLOCKED
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {ACHIEVEMENTS.map(a => {
@@ -128,10 +131,7 @@ export function SummaryTab({ state }) {
 
   return (
     <div>
-      <div style={{
-        fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
-        color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
-      }}>WEEKLY SUMMARY</div>
+      {/* Title supplied by ProgressTab's SectionHeader — see RankTab. */}
 
       {/* Week selector */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 14 }}>
@@ -231,6 +231,7 @@ export const getProgramExercisesForDay = exercisesForDay;
 
 // ─── SETTINGS TAB ───
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError }) {
+  const { confirm, confirmDialog } = useConfirm();
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(() => Math.max(1, (state.currentWeek || 1) - 1));
   const [backfillDay, setBackfillDay] = useState(null);
@@ -331,10 +332,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
   useEffect(() => { setBackfillDay(null); }, [backfillW]);
   return (
     <div>
-      <div style={{
-        fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
-        color: 'var(--text2)', letterSpacing: 1.5, marginBottom: 12
-      }}>SETTINGS</div>
+      {/* Title supplied by ProfileTab's SectionHeader — see RankTab. */}
 
       {/* Account section */}
       {userEmail && (
@@ -822,14 +820,25 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                   try {
                     const data = JSON.parse(ev.target.result);
                     if (data && typeof data === 'object' && typeof data.level === 'number' && typeof data.currentWeek === 'number' && Array.isArray(data.log)) {
-                      if (window.confirm('Replace all current progress with this backup?')) {
-                        onImport(data);
-                      }
+                      confirm({
+                        title: 'Restore from backup?',
+                        message: 'This replaces all current progress with the contents of this file. It cannot be undone.',
+                        confirmLabel: 'RESTORE',
+                        destructive: true,
+                      }).then(ok => { if (ok) onImport(data); });
                     } else {
-                      alert('Invalid backup file.');
+                      confirm({
+                        title: 'Invalid backup file',
+                        message: "That file doesn't look like a FitQuest backup.",
+                        confirmLabel: 'OK', cancelLabel: 'DISMISS',
+                      });
                     }
                   } catch {
-                    alert('Could not read file. Make sure it\'s a valid FitQuest backup.');
+                    confirm({
+                      title: "Couldn't read that file",
+                      message: 'Make sure you picked the .json backup FitQuest exported.',
+                      confirmLabel: 'OK', cancelLabel: 'DISMISS',
+                    });
                   }
                 };
                 reader.readAsText(file);
@@ -843,7 +852,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       {/* Reset Today */}
       <button
         onClick={() => {
-          if (window.confirm("Clear today's session so you can re-test exercises?")) onResetToday();
+          confirm({
+            title: "Clear today's session?",
+            message: 'Your logged sets for today are discarded so you can re-run the session. Past weeks are untouched.',
+            confirmLabel: 'CLEAR',
+          }).then(ok => { if (ok) onResetToday(); });
         }}
         style={{
           width: '100%', padding: 12, marginTop: 8,
@@ -857,7 +870,12 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       {/* Reset */}
       <button
         onClick={() => {
-          if (window.confirm('Reset ALL progress? This cannot be undone!')) onReset();
+          confirm({
+            title: 'Reset ALL progress?',
+            message: 'Every session, lift, streak and achievement is erased and you start again from Week 1. This cannot be undone — export a backup first if you might want it back.',
+            confirmLabel: 'ERASE EVERYTHING',
+            destructive: true,
+          }).then(ok => { if (ok) onReset(); });
         }}
         style={{
           width: '100%', padding: 12, marginTop: 8,
@@ -867,6 +885,8 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           cursor: 'pointer', letterSpacing: 0.8
         }}
       >RESET ALL PROGRESS</button>
+
+      {confirmDialog}
     </div>
   );
 }

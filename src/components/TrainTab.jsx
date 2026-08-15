@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Bot, History, Dumbbell, Play, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, History, Dumbbell, Calendar, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import WorkoutTab from './WorkoutTab';
 import AICoachTab from './AICoachTab';
-import { getPhase } from '../utils/gameLogic';
 
 // Recent session history from log (last 5 sessions)
 function SessionHistory({ log }) {
@@ -156,7 +155,6 @@ export default function TrainTab({
   onSaveProgram, onQuestMessageSent, userId,
 }) {
   const [coachOpen, setCoachOpen] = useState(false);
-  const phase = getPhase(state.currentWeek);
 
   function openCoach() {
     setCoachOpen(true);
@@ -166,78 +164,50 @@ export default function TrainTab({
 
   return (
     <div className="tab-enter" style={{ padding: '0 var(--space-4)' }}>
-      {/* Phase banner */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-        padding: 'var(--space-3) var(--space-4)',
-        marginBottom: 'var(--space-4)',
-        background: 'rgba(179,136,255,0.08)',
-        borderLeft: '3px solid var(--color-accent-purple)',
-        borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
-      }}>
-        <span style={{ fontSize: 16 }}>{phase.icon}</span>
-        <div>
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 'var(--text-xs)', fontWeight: 700,
-            color: 'var(--color-accent-purple)', letterSpacing: '0.04em',
-          }}>
-            {isRestDay ? 'REST DAY' : phase.name}
-            {!isRestDay && currentDayName ? ` · ${currentDayName}` : ''}
-          </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-            {isRestDay ? 'Recovery — your next session is previewed below' : phase.desc}
-          </div>
-        </div>
-      </div>
-
-      {/* AI Coach access card */}
+      {/* Coach entry point. Kept to a single row: the old version was a 76px
+          card stacked under a 60px phase banner, which pushed the actual
+          session below the fold on a 667px-tall phone. */}
       <button
         onClick={openCoach}
         aria-label="Open AI Coach"
+        className="fq-press"
         style={{
-          width: '100%', marginBottom: 'var(--space-4)',
-          display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-          padding: 'var(--space-4)',
-          background: 'linear-gradient(135deg, rgba(179,136,255,0.12), rgba(0,229,255,0.08))',
-          border: '1px solid var(--color-border-medium)',
+          width: '100%', minHeight: 'var(--tap-target)',
+          marginBottom: 'var(--space-3)',
+          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+          padding: '10px var(--space-4)',
+          background: 'linear-gradient(135deg, rgba(179,136,255,0.12), rgba(0,229,255,0.07))',
+          border: '1px solid rgba(179,136,255,0.2)',
           borderRadius: 'var(--radius-lg)',
-          cursor: 'pointer', textAlign: 'left',
-          transition: 'transform var(--transition-fast), box-shadow var(--transition-normal)',
+          textAlign: 'left',
         }}
-        onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
-        onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-        onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
-        onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
       >
-        <div style={{
-          width: 44, height: 44, borderRadius: 'var(--radius-md)',
-          background: 'rgba(179,136,255,0.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, position: 'relative',
-        }}>
-          <Bot size={22} color="var(--color-accent-purple)" />
+        <span style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
+          <Bot size={19} color="var(--color-accent-purple)" />
           {unreadAgentCount > 0 && (
             <span style={{
-              position: 'absolute', top: -4, right: -4,
+              position: 'absolute', top: -5, right: -6,
               background: 'var(--color-destructive)', color: '#fff',
-              borderRadius: '50%', width: 14, height: 14,
-              fontSize: 8, fontWeight: 700,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 'var(--radius-full)', minWidth: 14, height: 14, padding: '0 3px',
+              fontSize: 8, fontWeight: 700, lineHeight: '14px', textAlign: 'center',
             }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
           )}
-        </div>
-        <div>
-          <div style={{
-            fontSize: 'var(--text-md)', fontWeight: 600,
-            color: 'var(--color-text-primary)',
-          }}>AI Coach</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-            Pre-workout pep, form tips, analysis
-          </div>
-        </div>
+        </span>
+        <span style={{
+          flex: 1, minWidth: 0,
+          fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)',
+        }}>
+          AI Coach
+          <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)' }}>
+            {' '}· {unreadAgentCount > 0 ? 'new message' : 'form tips & overload plan'}
+          </span>
+        </span>
+        <ChevronRight size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
       </button>
 
-      {/* Workout content */}
+      {/* Workout content — the session hero inside WorkoutTab now carries the
+          phase, week and day, so the standalone phase banner that used to sit
+          here was saying the same thing twice before the fold. */}
       <WorkoutTab
         state={state}
         exercises={exercises}

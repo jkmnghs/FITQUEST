@@ -14,8 +14,6 @@ export default function RankTab({ state }) {
 
   return (
     <div>
-      <SectionTitle>Warrior Rank</SectionTitle>
-
       {/* Rank display */}
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
         {/* Hex badge */}

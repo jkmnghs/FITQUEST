@@ -137,27 +137,38 @@ export default function CheckinTab({ state, onSubmit }) {
         borderRadius: 14, padding: '4px 16px', backdropFilter: 'blur(20px)'
       }}>
         {CHECKLIST_ITEMS.map(item => (
-          <div key={item.id} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.04)'
-          }}>
-            <button
-              onClick={() => toggleCheck(item.id)}
+          // The whole row is the target, not just the 22px box — a checklist
+          // item you have to hit dead-centre with a thumb is a checklist item
+          // that gets skipped.
+          <button
+            key={item.id}
+            role="checkbox"
+            aria-checked={!!checked[item.id]}
+            onClick={() => toggleCheck(item.id)}
+            style={{
+              width: '100%', minHeight: 'var(--tap-target)',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '11px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+              border: 'none', borderRadius: 0, background: 'transparent',
+              textAlign: 'left',
+            }}
+          >
+            <span
+              aria-hidden="true"
               style={{
-                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                width: 24, height: 24, borderRadius: 'var(--radius-sm)', flexShrink: 0,
                 border: `2px solid ${checked[item.id] ? 'var(--green)' : 'rgba(255,255,255,0.15)'}`,
                 background: checked[item.id] ? 'var(--green)' : 'transparent',
                 color: checked[item.id] ? 'var(--bg)' : 'transparent',
-                fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 0.2s', cursor: 'pointer'
+                fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s',
               }}
-            >✓</button>
-            <div style={{
-              fontSize: 13,
-              color: checked[item.id] ? 'var(--text)' : 'var(--text2)',
-              textDecoration: checked[item.id] ? 'none' : 'none'
-            }}>{item.text}</div>
-          </div>
+            >✓</span>
+            <span style={{
+              fontSize: 'var(--text-sm)',
+              color: checked[item.id] ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+            }}>{item.text}</span>
+          </button>
         ))}
         {/* Score */}
         <div style={{

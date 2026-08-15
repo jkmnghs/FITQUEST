@@ -15,6 +15,7 @@ import { useAgentMessages } from './hooks/useAgentMessages';
 import { registerSW, requestNotificationPermission } from './utils/notifications';
 import { generateProgramFromAssessment } from './utils/programGenerator';
 import { resolveSession } from './utils/session';
+import { haptic } from './utils/haptics';
 import AIBuilderScreen from './components/AIBuilderScreen';
 import SyncIndicator from './components/SyncIndicator';
 
@@ -24,11 +25,34 @@ const ProgressTab = lazy(() => import('./components/ProgressTab'));
 const ProfileTab  = lazy(() => import('./components/ProfileTab'));
 
 const NAV_TABS = [
-  { id: 'train',    Icon: Dumbbell,   label: 'Train'    },
-  { id: 'fuel',     Icon: Utensils,   label: 'Fuel'     },
-  { id: 'progress', Icon: TrendingUp, label: 'Progress' },
-  { id: 'profile',  Icon: User,       label: 'Profile'  },
+  { id: 'train',    Icon: Dumbbell,   label: 'Train',    hint: "Today's session" },
+  { id: 'fuel',     Icon: Utensils,   label: 'Fuel',     hint: 'Meals & macros'  },
+  { id: 'progress', Icon: TrendingUp, label: 'Progress', hint: 'Stats & check-in'},
+  { id: 'profile',  Icon: User,       label: 'Profile',  hint: 'Rank & settings' },
 ];
+
+/** Deep-link target from the PWA manifest shortcuts (/?tab=fuel). */
+function initialTabFromUrl() {
+  if (typeof window === 'undefined') return 'train';
+  const requested = new URLSearchParams(window.location.search).get('tab');
+  return NAV_TABS.some(t => t.id === requested) ? requested : 'train';
+}
+
+/** Small red count bubble shared by the tab bar and the desktop rail. */
+function UnreadBadge({ count, offset = -4 }) {
+  if (!count) return null;
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: 'absolute', top: offset, right: offset,
+        background: 'var(--color-destructive)', color: '#fff',
+        borderRadius: 'var(--radius-full)', minWidth: 15, height: 15, padding: '0 3px',
+        fontSize: 9, fontWeight: 700, lineHeight: '15px', textAlign: 'center',
+      }}
+    >{count > 9 ? '9+' : count}</span>
+  );
+}
 
 function LazyTab({ children, fallback }) {
   return (
@@ -131,7 +155,7 @@ function SetPasswordScreen({ authError, onUpdate, onCancel }) {
 
 export default function App() {
   const { user, loading: authLoading, authError, signIn, signUp, signOut, resetPassword, updatePassword, changePassword, resendConfirmation, clearAuthError, passwordRecovery } = useAuth();
-  const [activeTab, setActiveTab] = useState('train');
+  const [activeTab, setActiveTab] = useState(initialTabFromUrl);
   const [modalOpen, setModalOpen] = useState(false);
   const [showCycleComplete, setShowCycleComplete] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -240,6 +264,7 @@ export default function App() {
   }
 
   function handleTabSelect(id) {
+    if (id !== activeTab) haptic('tap');
     setActiveTab(id);
     setScrollY(0);
     if (contentRef.current) contentRef.current.scrollTop = 0;
@@ -337,37 +362,69 @@ export default function App() {
         </div>
       )}
 
-      {/* Desktop wrapper + phone frame */}
-      <div className="desktop-wrapper">
-        {/* Branding panel — visible on desktop only via CSS */}
-        <div className="desktop-branding">
-          <h1 className="desktop-logo">FITQUEST</h1>
-          <p className="desktop-tagline">Your AI-Powered Training Companion</p>
-          <p className="desktop-hint">Best experienced on mobile</p>
+      {/* Adaptive shell: rail on desktop, bottom tab bar on phones/tablets */}
+      <div className="fq-shell">
+        {/* Desktop navigation rail — CSS decides whether this is visible, so
+            there is no breakpoint state in JS to get out of sync on resize. */}
+        <div className="fq-rail">
+          <div style={{ padding: '0 var(--space-3) var(--space-5)' }}>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 900,
+              color: 'var(--color-action)', letterSpacing: '0.08em',
+            }}>FITQUEST</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+              Week {state.currentWeek} · Lvl {state.level}
+            </div>
+          </div>
+
+          <nav aria-label="Primary" role="tablist" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {NAV_TABS.map(({ id, Icon, label, hint }) => {
+              const isActive = activeTab === id;
+              const showBadge = id === 'train' && unreadAgentCount > 0;
+              return (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={isActive}
+                  className="fq-rail__btn"
+                  onClick={() => handleTabSelect(id)}
+                >
+                  <span style={{ position: 'relative', display: 'flex' }}>
+                    <Icon size={19} strokeWidth={isActive ? 2.4 : 1.7} />
+                    <UnreadBadge count={showBadge ? unreadAgentCount : 0} offset={-6} />
+                  </span>
+                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span>{label}</span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 400, color: 'var(--color-text-tertiary)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div style={{
+            marginTop: 'auto', padding: 'var(--space-4) var(--space-3) 0',
+            fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5,
+            borderTop: '1px solid var(--color-border-subtle)',
+          }}>
+            Signed in as<br />
+            <span style={{ color: 'var(--color-text-secondary)', wordBreak: 'break-all' }}>{user?.email}</span>
+          </div>
         </div>
 
-        {/* Phone frame */}
-        <div className="phone-frame" style={{ position: 'relative', background: 'var(--color-bg-primary)' }}>
-          <div style={{
-            position: 'relative', zIndex: 1,
-            width: '100%', height: '100%',
-            display: 'flex', flexDirection: 'column',
-            paddingTop: 'var(--safe-area-top)',
-          }}>
-            {/* Header — hidden when workout modal is open */}
-            {!modalOpen && (
-              <Header state={state} scrollY={scrollY} />
-            )}
+        {/* App column */}
+        <div className="fq-app">
+          {/* Header — hidden when workout modal is open */}
+          {!modalOpen && (
+            <Header state={state} scrollY={scrollY} />
+          )}
 
-            {/* Content area */}
-            <div
-              ref={contentRef}
-              style={{
-                flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-                paddingBottom: 'calc(var(--nav-height) + var(--safe-area-bottom) + 16px)',
-              }}
-            >
-              <div style={{ padding: '8px 0' }}>
+          {/* Content area */}
+          <div ref={contentRef} className="fq-content">
+            <div className="fq-column" style={{ padding: '8px 0 24px' }}>
                 {activeTab === 'train' && (
                   <LazyTab fallback={<TrainTabSkeleton />}>
                     <TrainTab {...sharedTrainProps} />
@@ -411,109 +468,82 @@ export default function App() {
                     />
                   </LazyTab>
                 )}
-              </div>
             </div>
-
-            {/* Cycle complete modal — triggered from Settings when user is at week 12 of a cycle */}
-            {showCycleComplete && createPortal(
-              <ProgramCompleteModal
-                state={state}
-                onClose={() => setShowCycleComplete(false)}
-                onContinue={() => {
-                  updateSetting('currentWeek', state.currentWeek + 1);
-                  setShowCycleComplete(false);
-                }}
-                onChangeProgram={(id) => {
-                  changeProgram(id);
-                  updateSetting('currentWeek', state.currentWeek + 1);
-                  setShowCycleComplete(false);
-                }}
-              />,
-              document.body
-            )}
-
-            {/* Bottom tab bar — hidden when workout modal is open */}
-            {!modalOpen && (
-              <nav
-                role="tablist"
-                style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0,
-                  height: 'calc(var(--nav-height) + var(--safe-area-bottom))',
-                  zIndex: 100,
-                  background: 'var(--color-surface-2)',
-                  borderTop: '1px solid var(--color-border-subtle)',
-                  display: 'flex', alignItems: 'stretch',
-                  paddingBottom: 'var(--safe-area-bottom)',
-                  boxShadow: '0 -4px 24px rgba(0,0,0,0.3)',
-                }}
-              >
-                {NAV_TABS.map(({ id, Icon, label }) => {
-                  const isActive = activeTab === id;
-                  const showBadge = id === 'train' && unreadAgentCount > 0;
-                  return (
-                    <button
-                      key={id}
-                      role="tab"
-                      aria-label={label}
-                      aria-selected={isActive}
-                      onClick={() => handleTabSelect(id)}
-                      style={{
-                        flex: 1, display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center',
-                        gap: 3, padding: '8px 4px',
-                        border: 'none', background: 'transparent',
-                        cursor: 'pointer', position: 'relative',
-                        WebkitTapHighlightColor: 'transparent',
-                        minHeight: 44,
-                      }}
-                    >
-                      {/* Top indicator bar */}
-                      {isActive && (
-                        <span style={{
-                          position: 'absolute', top: 0, left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: 24, height: 3, borderRadius: 2,
-                          background: 'var(--color-action)',
-                        }} />
-                      )}
-                      {/* Icon with optional unread badge */}
-                      <span style={{ position: 'relative' }}>
-                        <Icon
-                          size={24}
-                          strokeWidth={isActive ? 2.5 : 1.5}
-                          color={isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)'}
-                          style={{
-                            transition: 'color var(--transition-normal)',
-                            transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                            display: 'block',
-                          }}
-                        />
-                        {showBadge && (
-                          <span style={{
-                            position: 'absolute', top: -4, right: -6,
-                            background: 'var(--color-destructive)', color: '#fff',
-                            borderRadius: '50%', width: 14, height: 14,
-                            fontSize: 8, fontWeight: 700,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {unreadAgentCount > 9 ? '9+' : unreadAgentCount}
-                          </span>
-                        )}
-                      </span>
-                      {/* Label */}
-                      <span style={{
-                        fontFamily: 'var(--font-primary)',
-                        fontSize: 11, fontWeight: isActive ? 600 : 400,
-                        color: isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)',
-                        letterSpacing: '0.02em',
-                        transition: 'color var(--transition-normal)',
-                      }}>{label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            )}
           </div>
+
+          {/* Cycle complete modal — triggered from Settings when user is at week 12 of a cycle */}
+          {showCycleComplete && createPortal(
+            <ProgramCompleteModal
+              state={state}
+              onClose={() => setShowCycleComplete(false)}
+              onContinue={() => {
+                updateSetting('currentWeek', state.currentWeek + 1);
+                setShowCycleComplete(false);
+              }}
+              onChangeProgram={(id) => {
+                changeProgram(id);
+                updateSetting('currentWeek', state.currentWeek + 1);
+                setShowCycleComplete(false);
+              }}
+            />,
+            document.body
+          )}
+
+          {/* Bottom tab bar — hidden when workout modal is open.
+              This is a flex sibling of the scroll area rather than an absolutely
+              positioned child: with `position: absolute; bottom: 0` inside a
+              100vh box, iOS Safari parked the bar underneath its own address
+              bar and the fourth tab was unreachable. */}
+          {!modalOpen && (
+            <nav role="tablist" aria-label="Primary" className="fq-tabbar">
+              {NAV_TABS.map(({ id, Icon, label }) => {
+                const isActive = activeTab === id;
+                const showBadge = id === 'train' && unreadAgentCount > 0;
+                return (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-label={label}
+                    aria-selected={isActive}
+                    onClick={() => handleTabSelect(id)}
+                    className="fq-tabbar__btn"
+                  >
+                    {/* Top indicator bar */}
+                    {isActive && (
+                      <span style={{
+                        position: 'absolute', top: 0, left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 24, height: 3, borderRadius: 2,
+                        background: 'var(--color-action)',
+                      }} />
+                    )}
+                    {/* Icon with optional unread badge */}
+                    <span style={{ position: 'relative', display: 'flex' }}>
+                      <Icon
+                        size={23}
+                        strokeWidth={isActive ? 2.5 : 1.5}
+                        color={isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)'}
+                        style={{
+                          transition: 'color var(--transition-normal)',
+                          transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                          display: 'block',
+                        }}
+                      />
+                      <UnreadBadge count={showBadge ? unreadAgentCount : 0} offset={-6} />
+                    </span>
+                    {/* Label */}
+                    <span style={{
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: 11, fontWeight: isActive ? 600 : 400,
+                      color: isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)',
+                      letterSpacing: '0.02em',
+                      transition: 'color var(--transition-normal)',
+                    }}>{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
         </div>
       </div>
     </ErrorBoundary>

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Lightbulb, Check } from 'lucide-react';
+import { X, Lightbulb, Check, History, Trophy, Calculator, TrendingUp } from 'lucide-react';
 import { FORM_TIPS } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay, isDeloadWeek, DEFAULT_SETS } from '../utils/gameLogic';
+import { getLastPerformance, best1RM, platesPerSide } from '../utils/exerciseHistory';
+import { EX_CATALOG_MAP } from '../data/exerciseCatalog';
+import { haptic } from '../utils/haptics';
 import RestTimer from './RestTimer';
 
 function makeDefaultSets(ex, count, weightKg) {
@@ -14,7 +17,165 @@ function makeDefaultSets(ex, count, weightKg) {
   }));
 }
 
-export default function ExerciseModal({ exId, exercises, week, unit, liftWeights, todayExDone, todayExDetails, savedSets, onSetsChange, onClose, onComplete }) {
+/**
+ * "What did I do last time, and what's my best?" — the two numbers a lifter
+ * checks before loading the bar. Both were already in state; neither was shown.
+ */
+function ReferenceStrip({ last, pr, unit, sessionBest1RM }) {
+  const items = [];
+
+  if (last?.repsPerSet?.length) {
+    items.push({
+      key: 'last',
+      Icon: History,
+      color: 'var(--color-text-secondary)',
+      label: 'Last time',
+      value: `${last.maxWeight > 0 ? `${convertWeight(last.maxWeight, unit)}${unit} × ` : ''}${last.repsPerSet.join(', ')}`,
+      sub: last.dateStr ? String(last.dateStr).split(',')[0] : null,
+    });
+  }
+  if (pr?.weight > 0) {
+    items.push({
+      key: 'pr',
+      Icon: Trophy,
+      color: 'var(--color-premium)',
+      label: 'Personal best',
+      value: `${convertWeight(pr.weight, unit)} ${unit}`,
+      sub: pr.week ? `Week ${pr.week}` : null,
+    });
+  }
+  if (sessionBest1RM) {
+    items.push({
+      key: 'e1rm',
+      Icon: TrendingUp,
+      color: 'var(--color-action)',
+      label: 'Est. 1RM today',
+      value: `${convertWeight(sessionBest1RM, unit)} ${unit}`,
+      sub: 'Epley estimate',
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(${Math.min(items.length, 3)}, minmax(0, 1fr))`,
+      gap: 'var(--space-2)',
+      marginBottom: 'var(--space-3)',
+    }}>
+      {items.map(({ key, Icon, color, label, value, sub }) => (
+        <div key={key} style={{
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid var(--color-border-subtle)',
+          borderRadius: 'var(--radius-md)',
+          padding: '9px 10px', minWidth: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+            <Icon size={11} color={color} />
+            <span style={{
+              fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)',
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{label}</span>
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700, color,
+            lineHeight: 1.3, wordBreak: 'break-word',
+          }}>{value}</div>
+          {sub && (
+            <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{sub}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Plate breakdown for one side of the bar.
+ *
+ * Only shown for barbell lifts — for dumbbells and machines the number on the
+ * card is already the number you set, so a plate list would be noise.
+ */
+function PlateCalculator({ targetKg, unit }) {
+  const [barKg, setBarKg] = useState(20);
+  const result = platesPerSide(targetKg, barKg);
+
+  const barOptions = [
+    { kg: 20, label: unit === 'lbs' ? '45 lb' : '20 kg' },
+    { kg: 15, label: unit === 'lbs' ? '35 lb' : '15 kg' },
+    { kg: 10, label: unit === 'lbs' ? '22 lb' : '10 kg' },
+  ];
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid var(--color-border-subtle)',
+      borderRadius: 'var(--radius-md)',
+      padding: 'var(--space-3)',
+      marginBottom: 'var(--space-3)',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+        marginBottom: 'var(--space-3)', flexWrap: 'wrap',
+      }}>
+        <span style={{
+          flex: 1, fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)',
+          textTransform: 'uppercase', letterSpacing: '0.05em',
+        }}>Per side · {convertWeight(targetKg, unit)} {unit} total</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {barOptions.map(({ kg, label }) => (
+            <button
+              key={kg}
+              onClick={() => setBarKg(kg)}
+              style={{
+                padding: '4px 9px', borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${barKg === kg ? 'rgba(0,229,255,0.35)' : 'var(--color-border-medium)'}`,
+                background: barKg === kg ? 'var(--color-action-muted)' : 'transparent',
+                color: barKg === kg ? 'var(--color-action)' : 'var(--color-text-tertiary)',
+                fontSize: 10, fontWeight: 700,
+              }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {!result ? (
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+          Target is lighter than the bar — use the bar alone or pick a lighter one.
+        </div>
+      ) : result.plates.length === 0 ? (
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+          Empty bar.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {result.plates.map(({ kg, count }) => (
+              <span key={kg} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '5px 10px', borderRadius: 'var(--radius-sm)',
+                background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.18)',
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+                color: 'var(--color-action)',
+              }}>
+                {count}× <span style={{ color: 'var(--color-text-primary)' }}>{kg}kg</span>
+              </span>
+            ))}
+          </div>
+          {result.remainderKg > 0 && (
+            <div style={{ fontSize: 10, color: 'var(--color-warning)', marginTop: 8 }}>
+              {result.remainderKg} kg per side can't be made with standard plates — round to the nearest achievable load.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function ExerciseModal({ state, exId, exercises, week, unit, liftWeights, todayExDone, todayExDetails, savedSets, onSetsChange, onClose, onComplete }) {
   const ex = (exercises || []).find(e => e.id === exId);
   const baseSets = getSetsForWeek(ex, week);
   const baseWeightKg = getWeightForExercise(ex, week, liftWeights);
@@ -32,6 +193,21 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
   const [timer, setTimer] = useState(null);
   const [tipIdx, setTipIdx] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showPlates, setShowPlates] = useState(false);
+
+  const last = getLastPerformance(state, exId);
+  const pr = state?.personalRecords?.[exId];
+  // Sets carry display-unit weights while the modal is open, so convert back to
+  // kg before estimating — otherwise an lbs user gets a 1RM 2.2× too high.
+  const sessionBest1RM = best1RM(
+    sets.map(s => ({
+      done: s.done,
+      weightKg: unit === 'lbs' ? kgFromDisplay(parseFloat(s.weightKg) || 0, unit) : (parseFloat(s.weightKg) || 0),
+      reps: parseFloat(s.reps) || 0,
+    }))
+  );
+  const isBarbell = !ex?.isBodyweight && !ex?.isPlank && baseWeightKg > 0
+    && (EX_CATALOG_MAP[exId]?.equipment === 'barbell');
 
   // The exercise can disappear while the modal is open (cloud poll, midnight
   // rollover). Closing from an effect keeps every hook above unconditional —
@@ -39,6 +215,14 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
   useEffect(() => {
     if (!ex) onClose?.();
   }, [ex, onClose]);
+
+  // Escape closes the sheet. Without it a desktop or keyboard user had no way
+  // out except hitting the small × in the corner.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   // Report every change back to WorkoutTab so sets survive modal close
   useEffect(() => {
@@ -60,6 +244,7 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
 
   function toggleSetDone(i) {
     setSets(prev => {
+      haptic(prev[i].done ? 'light' : 'tap');
       const next = prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
       // Start rest timer if we just checked a set (not the last)
       if (!prev[i].done && i < prev.length - 1) {
@@ -76,6 +261,7 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
   }
 
   function handleComplete() {
+    haptic('success');
     // Convert display weights to kg
     const processedSets = sets.map(s => ({
       ...s,
@@ -97,25 +283,33 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
 
   return createPortal(
     <>
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 9990,
-        background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-      }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-        <div style={{
-          width: '100%', maxWidth: 430, maxHeight: '92vh',
-          background: 'rgba(15,21,40,0.92)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderRadius: '22px 22px 0 0',
-          border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
-          overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          animation: 'slideUp 0.35s cubic-bezier(0.16,1,0.3,1)',
-          paddingBottom: 'calc(16px + var(--safe-bottom))',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
-        }}>
+      <div
+        className="fq-sheet-backdrop"
+        role="presentation"
+        style={{
+          zIndex: 9990,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+        }}
+        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div
+          className="fq-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={ex.name}
+          style={{
+            background: 'rgba(15,21,40,0.94)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.45)',
+          }}
+        >
           {/* Handle */}
-          <div style={{ width: 34, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 4, margin: '10px auto 0' }} />
+          <div className="fq-sheet__handle" style={{ width: 34, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 4, margin: '10px auto 0' }} />
 
           {/* Header */}
           <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -169,6 +363,36 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
               </div>
             ) : (
               <>
+                {/* Reference numbers — last session, personal best, live 1RM */}
+                <ReferenceStrip last={last} pr={pr} unit={unit} sessionBest1RM={sessionBest1RM} />
+
+                {/* Plate calculator — barbell lifts only */}
+                {isBarbell && (
+                  <>
+                    <button
+                      onClick={() => setShowPlates(o => !o)}
+                      aria-expanded={showPlates}
+                      style={{
+                        width: '100%', minHeight: 40, marginBottom: 'var(--space-3)',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '9px var(--space-3)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--color-border-medium)',
+                        background: showPlates ? 'var(--color-action-muted)' : 'rgba(255,255,255,0.03)',
+                        color: showPlates ? 'var(--color-action)' : 'var(--color-text-secondary)',
+                        fontSize: 'var(--text-sm)', fontWeight: 600, textAlign: 'left',
+                      }}
+                    >
+                      <Calculator size={15} />
+                      <span style={{ flex: 1 }}>Plate calculator</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                        {showPlates ? 'Hide' : 'Show'}
+                      </span>
+                    </button>
+                    {showPlates && <PlateCalculator targetKg={baseWeightKg} unit={unit} />}
+                  </>
+                )}
+
                 {/* Sets */}
                 <div style={{ background: 'var(--card)', borderRadius: 12, padding: 12, marginBottom: 12, border: '1px solid var(--card-border)' }}>
                   {ex.isPlank ? (
@@ -185,22 +409,38 @@ export default function ExerciseModal({ exId, exercises, week, unit, liftWeights
                   }}>+ Add Extra Set</button>
                 </div>
 
-                {/* Progress indicator */}
-                <div style={{ textAlign: 'center', marginBottom: 12, fontSize: 12, color: 'var(--text2)' }}>
-                  {doneCount}/{sets.length} sets checked
-                </div>
-
-                {/* Complete button */}
-                <button onClick={() => setShowConfirm(true)} style={{
-                  width: '100%', padding: 14, border: 'none', borderRadius: 'var(--radius-lg)',
-                  background: 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))',
-                  fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
-                  color: 'var(--color-bg-primary)', letterSpacing: 0.8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: '0 4px 18px rgba(0,229,255,0.12)'
+                {/* Sticky action footer — with six sets and the plate panel
+                    open, the complete button used to scroll out of reach, so
+                    finishing an exercise meant scrolling back down first. */}
+                <div style={{
+                  position: 'sticky', bottom: 0, zIndex: 2,
+                  margin: '0 -18px', padding: '12px 18px calc(4px + var(--safe-area-bottom))',
+                  background: 'linear-gradient(180deg, rgba(15,21,40,0), rgba(15,21,40,0.95) 28%)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
                 }}>
-                  <Check size={16} /> COMPLETE EXERCISE
-                </button>
+                  <div style={{
+                    textAlign: 'center', marginBottom: 10,
+                    fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)',
+                  }}>
+                    {doneCount}/{sets.length} sets checked
+                  </div>
+                  <button onClick={() => setShowConfirm(true)} style={{
+                    width: '100%', minHeight: 50, padding: 14, border: 'none',
+                    borderRadius: 'var(--radius-lg)',
+                    background: doneCount > 0
+                      ? 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))'
+                      : 'rgba(255,255,255,0.06)',
+                    fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
+                    color: doneCount > 0 ? 'var(--color-bg-primary)' : 'var(--color-text-tertiary)',
+                    letterSpacing: 0.8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: doneCount > 0 ? '0 4px 18px rgba(0,229,255,0.16)' : 'none',
+                    transition: 'background var(--transition-normal), color var(--transition-normal)',
+                  }}>
+                    <Check size={16} /> COMPLETE EXERCISE
+                  </button>
+                </div>
               </>
             )}
           </div>

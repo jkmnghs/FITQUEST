@@ -1,13 +1,356 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  ChevronLeft, ChevronRight, Play, Flag, MoreHorizontal, Repeat, Trash2,
+  Bot, Moon, Check, Timer, CalendarDays, Trophy,
+} from 'lucide-react';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 import ProgramCompleteModal from './ProgramCompleteModal';
 import { getProgramExercisesForDay } from './OtherTabs';
 import { getPickerCategories } from '../data/exerciseCatalog';
+import { useConfirm } from './ui/ConfirmDialog';
+import { haptic } from '../utils/haptics';
+import { getLastPerformance } from '../utils/exerciseHistory';
 
 // Ceiling from calculateAdherenceXP: 10 (training day) + 8 (RPE) + 20 (overload).
 const MAX_EXERCISE_XP = 38;
+
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const DAY_SHORT = { mon: 'M', tue: 'Tu', wed: 'W', thu: 'Th', fri: 'F', sat: 'Sa', sun: 'Su' };
+
+/**
+ * Resolves each training day in the viewed week to done / skipped / current.
+ *
+ * Skipped is calendar-aware: a day only counts as missed once its actual date
+ * has passed, anchored to `state.currentWeekStartDate` rather than re-inferred
+ * from session data (inferring it pushed earlier skipped days into next week
+ * whenever the first training day of a week was missed).
+ */
+function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
+  const wp = state.weekProgress?.[viewingWeek] || { count: 0, sessions: [] };
+  const isCurrentWeek = viewingWeek === state.currentWeek;
+
+  const daysFromSessions = (wp.sessions || [])
+    .map(s => s.dayKey || (s.date ? DAY_KEYS[new Date(s.date).getDay()] : null))
+    .filter(Boolean);
+  const resolvedDays = daysFromSessions.length > 0
+    ? [...new Set([...(wp.completedDays || []), ...daysFromSessions])]
+    : wp.completedDays || null;
+
+  const todayOrd = new Date().getDay();
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const weekStartDate = new Date();
+  weekStartDate.setHours(0, 0, 0, 0);
+  if (state.currentWeekStartDate) {
+    const parsed = new Date(state.currentWeekStartDate);
+    if (!isNaN(parsed)) {
+      weekStartDate.setTime(parsed.getTime());
+      weekStartDate.setHours(0, 0, 0, 0);
+    }
+  }
+  const weekStartOrd = weekStartDate.getDay();
+
+  // Cursor = first undone training day at or after today, so skipped past days
+  // don't hold it hostage.
+  const currentDayId = (isCurrentWeek && !wp.completed)
+    ? sortedTrainingDays.find(d => {
+        const done = resolvedDays ? resolvedDays.includes(d) : false;
+        return DAY_KEYS.indexOf(d) >= todayOrd && !done;
+      }) ?? null
+    : null;
+
+  return sortedTrainingDays.map((dayKey, i) => {
+    const done = resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count;
+    const daysFromStart = (DAY_KEYS.indexOf(dayKey) - weekStartOrd + 7) % 7;
+    const trainingDayDate = new Date(weekStartDate);
+    trainingDayDate.setDate(weekStartDate.getDate() + daysFromStart);
+    return {
+      dayKey,
+      label: DAY_SHORT[dayKey] || dayKey,
+      done,
+      skipped: isCurrentWeek && !done && trainingDayDate < todayMidnight,
+      current: dayKey === currentDayId,
+    };
+  });
+}
+
+/** Donut showing how much of today's session is logged. */
+function ProgressRing({ done, total, size = 62, restDay = false }) {
+  const r = (size - 7) / 2;
+  const circumference = 2 * Math.PI * r;
+  const pct = total > 0 ? Math.min(1, done / total) : 0;
+  const complete = total > 0 && done >= total;
+  const color = restDay ? 'var(--color-accent-purple)'
+    : complete ? 'var(--color-success)'
+    : 'var(--color-action)';
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - pct)}
+          style={{ transition: 'stroke-dashoffset 0.5s var(--transition-slow), stroke 0.3s' }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+      }}>
+        {restDay ? (
+          <Moon size={20} color="var(--color-accent-purple)" />
+        ) : (
+          <>
+            <span style={{
+              fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 900, color,
+            }}>{done}</span>
+            <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+              of {total}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Live elapsed-time readout for an in-progress session. */
+function useElapsed(startTime) {
+  const [elapsed, setElapsed] = useState(() =>
+    startTime ? Math.floor((Date.now() - startTime) / 1000) : 0);
+  useEffect(() => {
+    if (!startTime) return;
+    const tick = () => setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [startTime]);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+const FULL_DAY = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+
+/**
+ * One card answering "what am I doing right now, and what do I press?".
+ *
+ * This replaces five separately stacked blocks — week stepper, session-dot
+ * tracker, phase label, session timer and start button — that between them
+ * showed the phase twice and pushed the first exercise most of a screen down.
+ */
+function SessionHero({
+  state, viewingWeek, isCurrentWeek, sessionTitle, isRestDay, nextTrainingDayKey,
+  weekDays, doneCount, totalExercises, sessionFinished,
+  onPrevWeek, onNextWeek, onJumpToCurrent, onStartSession, onFinish,
+  onMakeUpDay, onOpenCoach, onTrainAnyway,
+}) {
+  const phase = getPhase(viewingWeek);
+  const elapsed = useElapsed(state.sessionStartTime);
+  const sessionRunning = !!state.sessionStartTime && !sessionFinished;
+  const wp = state.weekProgress?.[viewingWeek] || { count: 0 };
+  const sessionsThisWeek = wp.count || 0;
+
+  // Exactly one primary action, chosen by where the user actually is.
+  let cta = null;
+  if (!isCurrentWeek) {
+    cta = { label: `BACK TO WEEK ${state.currentWeek}`, onClick: onJumpToCurrent, tone: 'ghost', Icon: CalendarDays };
+  } else if (isRestDay) {
+    cta = { label: 'ASK YOUR COACH', onClick: onOpenCoach, tone: 'purple', Icon: Bot };
+  } else if (sessionFinished) {
+    cta = { label: 'SESSION COMPLETE', onClick: null, tone: 'done', Icon: Check };
+  } else if (doneCount > 0) {
+    cta = { label: `FINISH SESSION · ${doneCount}/${totalExercises}`, onClick: onFinish, tone: 'fire', Icon: Flag };
+  } else if (!state.sessionStartTime) {
+    cta = { label: 'START SESSION', onClick: onStartSession, tone: 'action', Icon: Play };
+  } else {
+    cta = { label: 'TAP AN EXERCISE TO LOG', onClick: null, tone: 'ghost', Icon: Timer };
+  }
+
+  const toneStyles = {
+    action: { background: 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))', color: 'var(--color-bg-primary)', border: 'none', boxShadow: '0 4px 18px rgba(0,229,255,0.22)' },
+    fire:   { background: 'linear-gradient(135deg, var(--color-fire), var(--color-warning))', color: 'var(--color-bg-primary)', border: 'none', boxShadow: '0 4px 18px rgba(255,109,0,0.22)' },
+    purple: { background: 'linear-gradient(135deg, rgba(179,136,255,0.22), rgba(0,229,255,0.16))', color: 'var(--color-accent-purple)', border: '1px solid rgba(179,136,255,0.3)', boxShadow: 'none' },
+    done:   { background: 'rgba(0,230,118,0.1)', color: 'var(--color-success)', border: '1px solid rgba(0,230,118,0.3)', boxShadow: 'none' },
+    ghost:  { background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-medium)', boxShadow: 'none' },
+  }[cta.tone];
+
+  return (
+    <section
+      aria-label="Today's session"
+      style={{
+        background: 'linear-gradient(160deg, var(--color-surface-1), rgba(15,21,40,0.75))',
+        border: '1px solid var(--color-border-medium)',
+        borderRadius: 'var(--radius-xl)',
+        padding: 'var(--space-4)',
+        marginBottom: 'var(--space-4)',
+      }}
+    >
+      {/* Week stepper */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 'var(--space-3)',
+      }}>
+        <button
+          onClick={onPrevWeek}
+          disabled={viewingWeek <= 1}
+          aria-label="Previous week"
+          style={{
+            width: 34, height: 34, borderRadius: 'var(--radius-md)', flexShrink: 0,
+            border: '1px solid var(--color-border-medium)', background: 'rgba(255,255,255,0.04)',
+            color: 'var(--color-text-secondary)', opacity: viewingWeek <= 1 ? 0.3 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        ><ChevronLeft size={17} /></button>
+
+        <div style={{ textAlign: 'center', minWidth: 0, padding: '0 var(--space-2)' }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 700,
+            color: isCurrentWeek ? 'var(--color-action)' : 'var(--color-accent-purple)',
+            letterSpacing: '0.06em',
+          }}>
+            WEEK {viewingWeek}{!isCurrentWeek ? ' · VIEWING' : ''}
+          </div>
+          <div style={{
+            fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {phase.icon} {phase.name}
+          </div>
+        </div>
+
+        <button
+          onClick={onNextWeek}
+          disabled={viewingWeek >= state.currentWeek}
+          aria-label="Next week"
+          style={{
+            width: 34, height: 34, borderRadius: 'var(--radius-md)', flexShrink: 0,
+            border: '1px solid var(--color-border-medium)', background: 'rgba(255,255,255,0.04)',
+            color: 'var(--color-text-secondary)',
+            opacity: viewingWeek >= state.currentWeek ? 0.3 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        ><ChevronRight size={17} /></button>
+      </div>
+
+      {/* Session identity + completion ring */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+        <ProgressRing done={doneCount} total={totalExercises} restDay={isRestDay} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{
+            fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700,
+            color: 'var(--color-text-primary)', lineHeight: 1.25, letterSpacing: '0.02em',
+          }}>
+            {isRestDay ? 'REST DAY' : (sessionTitle || "TODAY'S SESSION")}
+          </h2>
+          <div style={{
+            fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
+            marginTop: 3, lineHeight: 1.4,
+          }}>
+            {isRestDay
+              ? <>Recovery — next up {FULL_DAY[nextTrainingDayKey] || 'soon'}</>
+              : <>{totalExercises} exercise{totalExercises === 1 ? '' : 's'} · session {Math.min(sessionsThisWeek + (sessionFinished ? 0 : 1), state.sessionsPerWeek || weekDays.length)} of {state.sessionsPerWeek || weekDays.length}</>}
+          </div>
+          {sessionRunning && !isRestDay && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6,
+              padding: '3px 9px', borderRadius: 'var(--radius-sm)',
+              background: 'rgba(255,109,0,0.1)', border: '1px solid rgba(255,109,0,0.22)',
+            }}>
+              <Timer size={12} color="var(--color-warning)" />
+              <span style={{
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+                color: 'var(--color-warning)',
+              }}>{elapsed}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Week's training days — tap a missed one to make it up */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+        marginBottom: 'var(--space-4)', flexWrap: 'wrap',
+      }}>
+        {weekDays.map(({ dayKey, label, done, skipped, current }) => {
+          const interactive = skipped && !!onMakeUpDay;
+          let borderColor = 'var(--color-border-medium)';
+          let bg = 'transparent';
+          let fg = 'var(--color-text-tertiary)';
+          if (done)            { borderColor = 'var(--color-success)'; bg = 'var(--color-success)'; fg = 'var(--color-bg-primary)'; }
+          else if (skipped)    { borderColor = 'rgba(255,23,68,0.6)';  bg = 'rgba(255,23,68,0.1)'; fg = 'var(--color-destructive)'; }
+          else if (current)    { borderColor = 'var(--color-action)';  fg = 'var(--color-action)'; }
+
+          return (
+            <button
+              key={dayKey}
+              onClick={interactive ? () => onMakeUpDay(dayKey) : undefined}
+              disabled={!interactive}
+              aria-label={
+                done ? `${FULL_DAY[dayKey]} complete`
+                : skipped ? `Make up ${FULL_DAY[dayKey]}`
+                : `${FULL_DAY[dayKey]} upcoming`
+              }
+              title={skipped ? `Make up ${FULL_DAY[dayKey]}` : FULL_DAY[dayKey]}
+              style={{
+                width: 38, height: 38, borderRadius: 'var(--radius-full)',
+                border: `2px solid ${borderColor}`, background: bg, color: fg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
+                cursor: interactive ? 'pointer' : 'default',
+                animation: current ? 'rankPulse 2s infinite' : 'none',
+              }}
+            >{done ? '✓' : skipped ? '✗' : label}</button>
+          );
+        })}
+        <span style={{
+          fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 'auto',
+          fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: '0.04em',
+        }}>
+          {wp.completed ? 'WEEK DONE' : `${sessionsThisWeek}/${weekDays.length}`}
+        </span>
+      </div>
+
+      {/* Single primary action */}
+      <button
+        onClick={cta.onClick || undefined}
+        disabled={!cta.onClick}
+        style={{
+          width: '100%', minHeight: 50, padding: '14px 16px',
+          borderRadius: 'var(--radius-lg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+          fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 700,
+          letterSpacing: '0.05em', cursor: cta.onClick ? 'pointer' : 'default',
+          ...toneStyles,
+        }}
+      >
+        <cta.Icon size={17} />
+        {cta.label}
+      </button>
+
+      {/* Rest-day escape hatch — deliberately quieter than the coach button */}
+      {isRestDay && isCurrentWeek && (
+        <button
+          onClick={onTrainAnyway}
+          style={{
+            width: '100%', marginTop: 'var(--space-2)', padding: '10px',
+            minHeight: 'var(--tap-target)', border: 'none', background: 'transparent',
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.05em',
+          }}
+        >TRAIN ANYWAY →</button>
+      )}
+    </section>
+  );
+}
 
 export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
@@ -21,6 +364,13 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
   const [overrideRestDay, setOverrideRestDay] = useState(false);
   // Swipe state: tracks which card is swiped open
   const [swipedId, setSwipedId] = useState(null);
+  // Which card's overflow (⋯) menu is open — the keyboard/mouse-reachable
+  // equivalent of swiping, since swipe alone hid swap and delete from anyone
+  // not on a touchscreen.
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  // 12-week cycle map is collapsed until asked for
+  const [showWeekMap, setShowWeekMap] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   // Swap picker: which exercise is being swapped
   const [swapTargetId, setSwapTargetId] = useState(null);
@@ -56,12 +406,12 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 
   const wp = weekProgress?.[w] || { count: 0, dates: [], completed: false, sessions: [] };
 
-  const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const DAY_LABELS = { mon: 'M', tue: 'Tu', wed: 'W', thu: 'Th', fri: 'F', sat: 'Sa', sun: 'Su' };
+  const DAY_LABELS = DAY_SHORT;
   const sortedTrainingDays = state.trainingDays?.length
-    ? [...state.trainingDays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+    ? [...state.trainingDays].sort((a, b) => DAY_KEYS.indexOf(a) - DAY_KEYS.indexOf(b))
     : ['mon', 'wed', 'fri'];
   const totalSessions = sortedTrainingDays.length;
+  const weekDays = resolveWeekDays(state, w, sortedTrainingDays);
 
   function jumpToWeek(n) { setViewingWeek(n); }
 
@@ -71,259 +421,130 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 
   return (
     <div>
-      {/* Week selector */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 10 }}>
-        <NavBtn onClick={() => viewingWeek > 1 && setViewingWeek(v => v - 1)}>‹</NavBtn>
-        <span style={{
-          fontFamily: 'Orbitron', fontSize: 13, fontWeight: 700,
-          color: isCurrentWeek ? 'var(--cyan)' : 'var(--purple)', minWidth: 130, textAlign: 'center'
+      {confirmDialog}
+
+      <SessionHero
+        state={state}
+        viewingWeek={w}
+        isCurrentWeek={isCurrentWeek}
+        sessionTitle={currentDayName}
+        isRestDay={activeRestDay}
+        nextTrainingDayKey={nextTrainingDayKey}
+        weekDays={weekDays}
+        doneCount={todayDone.length}
+        totalExercises={exercises.length}
+        sessionFinished={!!todaySessionFinished}
+        onPrevWeek={() => setViewingWeek(v => Math.max(1, v - 1))}
+        onNextWeek={() => setViewingWeek(v => Math.min(state.currentWeek, v + 1))}
+        onJumpToCurrent={() => jumpToWeek(state.currentWeek)}
+        onStartSession={() => { haptic('tap'); onStartSession?.(); }}
+        onFinish={() => setShowFinishConfirm(true)}
+        onMakeUpDay={onBackfillWeek ? (dayKey) => setMakeUpDay(dayKey) : null}
+        onOpenCoach={onOpenCoach}
+        onTrainAnyway={() => setShowRestWarning(true)}
+      />
+
+      {/* Overtraining warning — only surfaced once the user reaches for
+          "train anyway", so a normal rest day stays calm. */}
+      {activeRestDay && showRestWarning && (
+        <div style={{
+          background: 'rgba(255,214,0,0.06)',
+          border: '1px solid rgba(255,214,0,0.25)',
+          borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+          marginBottom: 'var(--space-4)',
         }}>
-          WEEK {w}{!isCurrentWeek ? ' (VIEW)' : ''}
-        </span>
-        <NavBtn onClick={() => viewingWeek < state.currentWeek && setViewingWeek(v => v + 1)}>›</NavBtn>
-      </div>
-
-      {/* Session tracker dots */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-        marginBottom: 12, padding: '10px 14px',
-        background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12
-      }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(() => {
-            // Build the most accurate set of completed days possible
-            const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-            const daysFromSessions = (wp.sessions || []).map(s =>
-              s.dayKey || (s.date ? DAY_KEYS[new Date(s.date).getDay()] : null)
-            ).filter(Boolean);
-            const resolvedDays = daysFromSessions.length > 0
-              ? [...new Set([...(wp.completedDays || []), ...daysFromSessions])]
-              : wp.completedDays || null;
-
-            // Today's day-of-week ordinal (0 = Sun … 6 = Sat)
-            const todayOrd = new Date().getDay();
-
-            // When this program week started — persisted once when the week began
-            // (state.currentWeekStartDate) rather than re-inferred from session data.
-            // Inferring it from sessions broke as soon as the first training day of
-            // a week was skipped: with no session yet recorded, the app assumed the
-            // week "started today", pushing earlier skipped days into next week.
-            const weekStartDate = new Date();
-            weekStartDate.setHours(0, 0, 0, 0);
-            if (state.currentWeekStartDate) {
-              const parsed = new Date(state.currentWeekStartDate);
-              if (!isNaN(parsed)) {
-                weekStartDate.setTime(parsed.getTime());
-                weekStartDate.setHours(0, 0, 0, 0);
-              }
-            }
-            const weekStartOrd = weekStartDate.getDay();
-            const todayMidnight = new Date();
-            todayMidnight.setHours(0, 0, 0, 0);
-
-            // Current indicator = first undone training day at or after today.
-            // Calendar-aware: skipped past days don't block the cursor.
-            const currentDayId = (isCurrentWeek && !wp.completed)
-              ? sortedTrainingDays.find(d => {
-                  const ord = DAY_KEYS.indexOf(d);
-                  const done = resolvedDays ? resolvedDays.includes(d) : false;
-                  return ord >= todayOrd && !done;
-                }) ?? null
-              : null;
-
-            return sortedTrainingDays.map((dayId, i) => {
-              const done = resolvedDays ? resolvedDays.includes(dayId) : i < wp.count;
-              const dayOrd = DAY_KEYS.indexOf(dayId);
-              // Compute this training day's actual calendar date anchored to the week start.
-              // A day is "skipped" only if its actual date has already passed.
-              const daysFromStart = (dayOrd - weekStartOrd + 7) % 7;
-              const trainingDayDate = new Date(weekStartDate);
-              trainingDayDate.setDate(weekStartDate.getDate() + daysFromStart);
-              const isSkipped = isCurrentWeek && !done && trainingDayDate < todayMidnight;
-              const isCur = dayId === currentDayId;
-
-              let borderColor = 'rgba(255,255,255,0.1)';
-              let bgColor = 'transparent';
-              let textColor = 'var(--text3)';
-              if (done)       { borderColor = 'var(--green)'; bgColor = 'var(--green)'; textColor = 'var(--bg)'; }
-              else if (isSkipped) { borderColor = 'rgba(255,23,68,0.7)'; bgColor = 'var(--red-glow)'; textColor = 'var(--red)'; }
-              else if (isCur) { borderColor = 'var(--cyan)'; textColor = 'var(--cyan)'; }
-
-              return (
-                <div
-                  key={dayId}
-                  onClick={() => { if (isSkipped && onBackfillWeek) setMakeUpDay(dayId); }}
-                  title={isSkipped ? `Make up ${DAY_LABELS[dayId]}` : undefined}
-                  style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    border: `2px solid ${borderColor}`,
-                    background: bgColor,
-                    color: textColor,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-                    animation: isCur ? 'rankPulse 2s infinite' : 'none',
-                    cursor: isSkipped && onBackfillWeek ? 'pointer' : 'default'
-                  }}>{done ? '✓' : isSkipped ? '✗' : DAY_LABELS[dayId]}</div>
-              );
-            });
-          })()}
-        </div>
-        <div>
-          <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>Week {w} Sessions</div>
-          <div style={{
-            fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-            color: wp.completed ? 'var(--green)' : 'var(--cyan)'
-          }}>
-            {wp.completed ? '✓ COMPLETE' : `${wp.count}/${totalSessions} DONE`}
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-3)' }}>
+            ⚠️ <strong style={{ color: 'var(--color-premium)' }}>Rest days are when muscle is built.</strong>{' '}
+            Training through one usually costs more than it earns, and raises injury risk.
+            Your coach can tell you whether today is an exception.
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button
+              onClick={() => { setShowRestWarning(false); onOpenCoach?.(); }}
+              style={{
+                flex: 2, minHeight: 'var(--tap-target)', padding: '11px 8px',
+                borderRadius: 'var(--radius-md)', border: '1px solid rgba(179,136,255,0.3)',
+                background: 'rgba(179,136,255,0.14)', color: 'var(--color-accent-purple)',
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+              }}
+            >ASK COACH FIRST</button>
+            <button
+              onClick={() => { setOverrideRestDay(true); setShowRestWarning(false); }}
+              style={{
+                flex: 1, minHeight: 'var(--tap-target)', padding: '11px 8px',
+                borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-medium)',
+                background: 'transparent', color: 'var(--color-text-tertiary)',
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+              }}
+            >TRAIN</button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Week map — 12 pips for the current cycle */}
+      {/* 12-week cycle map — collapsed by default. It is a navigation aid, not
+          something you need on screen while logging sets. */}
       {(() => {
         const cycleStart = Math.floor((state.currentWeek - 1) / 12) * 12 + 1;
+        const cycleWeek = state.currentWeek - cycleStart + 1;
         return (
-          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap', padding: '0 10px' }}>
-            {Array.from({ length: 12 }, (_, i) => {
-              const wn = cycleStart + i;
-              const wkp = weekProgress?.[wn];
-              let bg = 'rgba(255,255,255,0.02)', border = 'rgba(255,255,255,0.06)', color = 'var(--text3)';
-              if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--green)'; }
-              if (wkp?.count > 0 && !wkp?.completed) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--gold)'; }
-              if (wn === state.currentWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.3)'; color = 'var(--cyan)'; }
-              const isViewing = wn === viewingWeek && wn !== state.currentWeek;
-              return (
-                <div key={wn} onClick={() => jumpToWeek(wn)} style={{
-                  width: 22, height: 22, borderRadius: 6, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700,
-                  background: bg, border: `1px solid ${border}`, color,
-                  boxShadow: isViewing ? '0 0 0 2px var(--purple)' : 'none',
-                  transition: 'all 0.2s'
-                }}>{i + 1}</div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
-      {/* Rest day banner */}
-      {activeRestDay && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(179,136,255,0.07), rgba(0,229,255,0.04))',
-          border: '1px solid rgba(179,136,255,0.18)',
-          borderRadius: 12, marginBottom: 14, overflow: 'hidden',
-        }}>
-          {/* Main row */}
-          <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 22, flexShrink: 0 }}>🌙</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--purple)', marginBottom: 3, letterSpacing: 0.8 }}>
-                REST DAY — RECOVERY
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
-                Next session:{' '}
-                <strong style={{ color: 'var(--cyan)' }}>
-                  {{ sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' }[nextTrainingDayKey] || 'upcoming'}
-                </strong>
-                . Preview below.
-              </div>
-            </div>
+          <div style={{ marginBottom: 'var(--space-4)' }}>
             <button
-              onClick={() => setShowRestWarning(w => !w)}
+              onClick={() => setShowWeekMap(o => !o)}
+              aria-expanded={showWeekMap}
               style={{
-                padding: '7px 12px', borderRadius: 8, border: 'none', flexShrink: 0,
-                background: 'rgba(179,136,255,0.15)', color: 'var(--purple)',
-                fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
-                cursor: 'pointer',
+                width: '100%', minHeight: 42,
+                display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                padding: '10px var(--space-4)',
+                background: 'var(--color-surface-1)',
+                border: '1px solid var(--color-border-subtle)',
+                borderRadius: showWeekMap ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)',
+                textAlign: 'left',
               }}
             >
-              TRAIN TODAY {showRestWarning ? '▲' : '▼'}
-            </button>
-          </div>
-
-          {/* Expandable warning + action panel */}
-          {showRestWarning && (
-            <div style={{
-              borderTop: '1px solid rgba(179,136,255,0.15)',
-              padding: '14px 16px',
-              background: 'rgba(0,0,0,0.2)',
-            }}>
-              <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 12 }}>
-                ⚠️ <strong style={{ color: 'var(--gold)' }}>Overtraining risk.</strong> Rest days are when muscles actually grow.
-                Training today may reduce XP and increase injury risk. It is strongly recommended to{' '}
-                <strong style={{ color: 'var(--cyan)' }}>consult your AI Coach first.</strong>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => { if (onOpenCoach) onOpenCoach(); }}
-                  style={{
-                    flex: 2, padding: '10px 0', borderRadius: 9, border: 'none',
-                    background: 'linear-gradient(135deg, rgba(0,229,255,0.18), rgba(179,136,255,0.18))',
-                    color: 'var(--cyan)', fontFamily: 'Orbitron', fontSize: 10, fontWeight: 700,
-                    cursor: 'pointer', letterSpacing: 0.8,
-                  }}
-                >
-                  🤖 ASK AI COACH
-                </button>
-                <button
-                  onClick={() => { setOverrideRestDay(true); setShowRestWarning(false); }}
-                  style={{
-                    flex: 1, padding: '10px 0', borderRadius: 9,
-                    border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-                    color: 'var(--text3)', fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700,
-                    cursor: 'pointer', letterSpacing: 0.5,
-                  }}
-                >
-                  SKIP & TRAIN
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Session timer */}
-      {!activeRestDay && state.sessionStartTime && !state.todaySessionFinished && isCurrentWeek && (
-        <SessionTimerBar startTime={state.sessionStartTime} />
-      )}
-
-      {/* Manual start session button */}
-      {!activeRestDay && isCurrentWeek && !state.sessionStartTime && !state.todaySessionFinished && (
-        <button onClick={onStartSession} style={{
-          width: '100%', padding: '11px 0', marginBottom: 14,
-          borderRadius: 12, cursor: 'pointer',
-          background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(179,136,255,0.12))',
-          border: '1px solid rgba(0,229,255,0.2)',
-          fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700,
-          color: 'var(--cyan)', letterSpacing: 0.8
-        }}>
-          ▶ START SESSION TIMER
-        </button>
-      )}
-
-      {/* Phase + session label */}
-      {(() => {
-        const phase = getPhase(w);
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{
-              fontFamily: 'Orbitron', fontSize: 11, fontWeight: 600,
-              color: activeRestDay ? 'var(--purple)' : 'var(--text2)',
-              letterSpacing: 1.5, textTransform: 'uppercase'
-            }}>
-              {currentDayName || (activeRestDay ? 'UPCOMING SESSION' : "TODAY'S SESSION")}
-            </div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: 'rgba(179,136,255,0.08)', border: '1px solid rgba(179,136,255,0.15)',
-              borderRadius: 8, padding: '3px 9px'
-            }}>
-              <span style={{ fontSize: 12 }}>{phase.icon}</span>
-              <span style={{ fontFamily: 'Orbitron', fontSize: 9, fontWeight: 700, color: 'var(--purple)', letterSpacing: 0.8 }}>
-                {phase.name}
+              <CalendarDays size={15} color="var(--color-text-tertiary)" />
+              <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                Week {cycleWeek} of 12
               </span>
-            </div>
+              {showWeekMap
+                ? <ChevronRight size={15} color="var(--color-text-tertiary)" style={{ transform: 'rotate(90deg)' }} />
+                : <ChevronRight size={15} color="var(--color-text-tertiary)" />}
+            </button>
+
+            {showWeekMap && (
+              <div style={{
+                display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
+                padding: 'var(--space-3)',
+                background: 'var(--color-surface-1)',
+                border: '1px solid var(--color-border-subtle)', borderTop: 'none',
+                borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+              }}>
+                {Array.from({ length: 12 }, (_, i) => {
+                  const wn = cycleStart + i;
+                  const wkp = weekProgress?.[wn];
+                  let bg = 'rgba(255,255,255,0.02)', border = 'var(--color-border-medium)', color = 'var(--color-text-tertiary)';
+                  if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--color-success)'; }
+                  else if (wkp?.count > 0) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--color-premium)'; }
+                  if (wn === state.currentWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.35)'; color = 'var(--color-action)'; }
+                  const isViewing = wn === viewingWeek && wn !== state.currentWeek;
+                  return (
+                    <button
+                      key={wn}
+                      onClick={() => jumpToWeek(wn)}
+                      aria-label={`Week ${wn}`}
+                      aria-current={wn === viewingWeek ? 'true' : undefined}
+                      style={{
+                        width: 38, height: 38, borderRadius: 'var(--radius-md)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+                        background: bg, border: `1px solid ${border}`, color,
+                        boxShadow: isViewing ? '0 0 0 2px var(--color-accent-purple)' : 'none',
+                        transition: 'all var(--transition-normal)',
+                      }}
+                    >{i + 1}</button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -352,130 +573,245 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         const convWt = convertWeight(wt, unit);
         const setsCount = getSetsForWeek(ex, w);
         const isSwiped = swipedId === ex.id;
+        const menuOpen = menuOpenId === ex.id;
+        const canEdit = !isDone && isCurrentWeek && !todaySessionFinished;
+        const tappable = isCurrentWeek && !todaySessionFinished;
+        const last = getLastPerformance(state, ex.id);
+        const pr = state.personalRecords?.[ex.id];
+
+        function openSwap(e) {
+          e?.stopPropagation();
+          setSwipedId(null);
+          setMenuOpenId(null);
+          setSwapTargetId(ex.id);
+        }
+
+        async function requestDelete(e) {
+          e?.stopPropagation();
+          setMenuOpenId(null);
+          const ok = await confirm({
+            title: `Remove ${ex.name}?`,
+            message: 'It comes off this training day. You can add it back any time from + ADD EXERCISE.',
+            confirmLabel: 'REMOVE',
+            destructive: true,
+          });
+          if (ok) {
+            onDeleteExercise?.(ex.id, sessionDayKey);
+            setSwipedId(null);
+          }
+        }
 
         return (
           <div key={ex.id} style={{ position: 'relative', marginBottom: 10 }}>
-            {/* Action buttons — revealed when card slides left (swipe or mouse-drag) */}
-            {!isDone && (
-            <div style={{
-              position: 'absolute', top: 0, right: 0, bottom: 0,
-              display: 'flex', alignItems: 'stretch', zIndex: 2, borderRadius: 16,
-            }}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setSwipedId(null); setSwapTargetId(ex.id); }}
-                style={{
-                  width: 72, border: 'none', background: 'rgba(0,229,255,0.18)',
-                  color: 'var(--cyan)', cursor: 'pointer', borderRadius: '16px 0 0 16px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700, letterSpacing: 0.5,
-                }}
-              ><span style={{ fontSize: 18 }}>🔄</span>SWAP</button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm(`Remove ${ex.name} from your program?`)) {
-                    onDeleteExercise?.(ex.id, sessionDayKey);
-                    setSwipedId(null);
-                  }
-                }}
-                style={{
-                  width: 72, border: 'none', background: 'rgba(255,23,68,0.2)',
-                  color: 'var(--red)', cursor: 'pointer', borderRadius: '0 16px 16px 0',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-                  fontFamily: 'Orbitron', fontSize: 8, fontWeight: 700, letterSpacing: 0.5,
-                }}
-              ><span style={{ fontSize: 18 }}>🗑️</span>DELETE</button>
-            </div>
+            {/* Swipe-revealed actions (touch) */}
+            {canEdit && (
+              <div style={{
+                position: 'absolute', top: 0, right: 0, bottom: 0,
+                display: 'flex', alignItems: 'stretch', zIndex: 2,
+                borderRadius: 'var(--radius-lg)',
+              }} aria-hidden={!isSwiped}>
+                <button
+                  onClick={openSwap}
+                  tabIndex={isSwiped ? 0 : -1}
+                  style={{
+                    width: 72, border: 'none', background: 'rgba(0,229,255,0.18)',
+                    color: 'var(--color-action)', borderRadius: 'var(--radius-lg) 0 0 var(--radius-lg)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700, letterSpacing: '0.05em',
+                  }}
+                ><Repeat size={17} />SWAP</button>
+                <button
+                  onClick={requestDelete}
+                  tabIndex={isSwiped ? 0 : -1}
+                  style={{
+                    width: 72, border: 'none', background: 'rgba(255,23,68,0.2)',
+                    color: 'var(--color-destructive)', borderRadius: '0 var(--radius-lg) var(--radius-lg) 0',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700, letterSpacing: '0.05em',
+                  }}
+                ><Trash2 size={17} />DELETE</button>
+              </div>
             )}
 
-            {/* Swipeable card — zIndex above buttons so it slides away to reveal them */}
+            {/* Card — zIndex above the actions so it slides away to reveal them */}
             <div
+              role={tappable ? 'button' : undefined}
+              tabIndex={tappable ? 0 : undefined}
+              aria-label={tappable ? `Log sets for ${ex.name}` : undefined}
               onTouchStart={e => {
-                if (isDone) return;
+                if (!canEdit) return;
                 touchStartX.current = e.touches[0].clientX;
                 touchStartY.current = e.touches[0].clientY;
               }}
               onTouchEnd={e => {
-                if (isDone) return;
+                if (!canEdit) return;
                 const dx = e.changedTouches[0].clientX - touchStartX.current;
                 const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
                 if (dy > 30) return;
-                if (dx < -40) setSwipedId(ex.id);
+                if (dx < -40) { setSwipedId(ex.id); haptic('light'); }
                 else if (dx > 20) setSwipedId(null);
               }}
               onMouseDown={e => {
-                if (isDone || e.button !== 0) return;
+                if (!canEdit || e.button !== 0) return;
                 mouseStartX.current = e.clientX;
               }}
               onMouseUp={e => {
-                if (isDone || mouseStartX.current === null) return;
+                if (!canEdit || mouseStartX.current === null) return;
                 const dx = e.clientX - mouseStartX.current;
                 mouseStartX.current = null;
                 if (dx < -40) setSwipedId(ex.id);
                 else if (dx > 20) setSwipedId(null);
               }}
               onMouseLeave={() => { mouseStartX.current = null; }}
+              onKeyDown={e => {
+                if (!tappable) return;
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveExId(ex.id); }
+              }}
               onClick={() => {
                 if (isSwiped) { setSwipedId(null); return; }
-                if (!isCurrentWeek || todaySessionFinished) return;
+                if (!tappable) return;
                 setActiveExId(ex.id);
               }}
               style={{
-                background: isDone ? 'rgba(0,230,118,0.04)' : 'var(--card)',
-                border: `1px solid ${isDone ? 'rgba(0,230,118,0.15)' : isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--card-border)'}`,
-                borderRadius: 16, padding: '14px 16px',
-                cursor: isCurrentWeek && !todaySessionFinished ? 'pointer' : 'default',
-                filter: isDone ? 'brightness(0.7)' : 'none',
-                position: 'relative', overflow: 'hidden',
-                backdropFilter: 'blur(20px)', zIndex: 3,
+                background: isDone ? 'rgba(0,230,118,0.05)' : 'var(--color-surface-1)',
+                border: `1px solid ${isDone ? 'rgba(0,230,118,0.18)' : isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--color-border-subtle)'}`,
+                borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+                cursor: tappable ? 'pointer' : 'default',
+                opacity: isDone ? 0.75 : 1,
+                position: 'relative', zIndex: 3,
                 transform: isSwiped ? 'translateX(-144px)' : 'translateX(0)',
-                transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), filter 0.3s, border-color 0.2s',
+                transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.3s, border-color 0.2s',
               }}
             >
-            {/* Top line on hover */}
-            <div style={{
-              position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-              background: 'linear-gradient(90deg,transparent,var(--cyan),transparent)',
-              opacity: isDone ? 1 : 0
-            }} />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: 'Exo 2, sans-serif', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {isDone ? '✅ ' : ''}{ex.name}
-                  {!isDone && sug === 'increase' && <Badge color="var(--green)" bg="rgba(0,230,118,0.12)" border="rgba(0,230,118,0.2)">↑ +2.5</Badge>}
-                  {!isDone && sug === 'repeat' && <Badge color="var(--gold)" bg="rgba(255,214,0,0.1)" border="rgba(255,214,0,0.2)">= SAME</Badge>}
-                  {!isDone && sug === 'deload' && <Badge color="var(--red)" bg="rgba(255,23,68,0.1)" border="rgba(255,23,68,0.2)">↓ DELOAD</Badge>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)', marginBottom: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 600,
+                    color: 'var(--color-text-primary)',
+                    display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+                  }}>
+                    {isDone && <Check size={15} color="var(--color-success)" strokeWidth={3} />}
+                    <span>{ex.name}</span>
+                    {!isDone && sug === 'increase' && <Badge color="var(--green)" bg="rgba(0,230,118,0.12)" border="rgba(0,230,118,0.2)">↑ +2.5</Badge>}
+                    {!isDone && sug === 'repeat' && <Badge color="var(--gold)" bg="rgba(255,214,0,0.1)" border="rgba(255,214,0,0.2)">= SAME</Badge>}
+                    {!isDone && sug === 'deload' && <Badge color="var(--red)" bg="rgba(255,23,68,0.1)" border="rgba(255,23,68,0.2)">↓ DELOAD</Badge>}
+                  </div>
+                  {ex.note && (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 3 }}>{ex.note}</div>
+                  )}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{ex.note}</div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {isDone ? (
+                    <span style={{
+                      fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
+                      color: 'var(--color-success)', background: 'var(--green-glow)',
+                      padding: '4px 9px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
+                      border: '1px solid rgba(0,230,118,0.25)',
+                    }}>DONE</span>
+                  ) : (
+                    <span style={{
+                      fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
+                      color: 'var(--color-warning)', background: 'var(--fire-glow)',
+                      padding: '4px 9px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
+                    }}>+{isDeload ? 10 : MAX_EXERCISE_XP} XP</span>
+                  )}
+
+                  {/* Overflow menu — the non-swipe route to swap/delete, so the
+                      actions are reachable with a mouse, a keyboard, or a
+                      screen reader rather than by discovering a hidden gesture. */}
+                  {canEdit && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpen ? null : ex.id); }}
+                      aria-label={`Actions for ${ex.name}`}
+                      aria-expanded={menuOpen}
+                      aria-haspopup="menu"
+                      style={{
+                        width: 32, height: 32, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                        border: '1px solid var(--color-border-medium)',
+                        background: menuOpen ? 'var(--color-action-muted)' : 'rgba(255,255,255,0.04)',
+                        color: menuOpen ? 'var(--color-action)' : 'var(--color-text-tertiary)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    ><MoreHorizontal size={16} /></button>
+                  )}
+                </div>
               </div>
-              {isDone ? (
-                <div style={{
-                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--green)',
-                  background: 'var(--green-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8,
-                  border: '1px solid rgba(0,230,118,0.25)'
-                }}>
-                  ✓ DONE
-                </div>
-              ) : (
-                <div style={{
-                  fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--fire2)',
-                  background: 'var(--fire-glow)', padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap', marginLeft: 8
-                }}>
-                  +{isDeload ? 10 : MAX_EXERCISE_XP} XP max
-                </div>
-              )}
-            </div>
 
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {ex.isPlank ? (
-                <Tag type="sets">{setsCount} × 45-60s</Tag>
-              ) : (
-                <Tag type="sets">{setsCount} × {ex.reps} @ {convWt} {unit}</Tag>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {ex.isPlank ? (
+                  <Tag type="sets">{setsCount} × 45-60s</Tag>
+                ) : (
+                  <Tag type="sets">{setsCount} × {ex.reps} @ {convWt} {unit}</Tag>
+                )}
+                {!ex.isPlank && <Tag type="rpe">RPE {isDeload ? '5-6' : ex.rpe}</Tag>}
+                <Tag type="rest">{ex.rest}</Tag>
+              </div>
+
+              {/* What you did last time, and your best ever — the two numbers
+                  you actually want before picking today's weight. */}
+              {!isDone && (last?.repsPerSet.length > 0 || pr?.weight > 0) && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap',
+                  marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)',
+                  borderTop: '1px solid var(--color-border-subtle)',
+                  fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
+                }}>
+                  {last?.repsPerSet.length > 0 && (
+                    <span>
+                      Last:{' '}
+                      <span style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                        {last.maxWeight > 0 ? `${convertWeight(last.maxWeight, unit)}${unit} × ` : ''}
+                        {last.repsPerSet.join(', ')}
+                      </span>
+                    </span>
+                  )}
+                  {pr?.weight > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Trophy size={11} color="var(--color-premium)" />
+                      <span style={{ color: 'var(--color-premium)', fontWeight: 600 }}>
+                        PR {convertWeight(pr.weight, unit)}{unit}
+                      </span>
+                    </span>
+                  )}
+                </div>
               )}
-              {!ex.isPlank && <Tag type="rpe">RPE {isDeload ? '5-6' : ex.rpe}</Tag>}
-              <Tag type="rest">{ex.rest}</Tag>
-            </div>
+
+              {/* Inline action menu */}
+              {menuOpen && (
+                <div
+                  role="menu"
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    display: 'flex', gap: 'var(--space-2)',
+                    marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)',
+                    borderTop: '1px solid var(--color-border-subtle)',
+                  }}
+                >
+                  <button
+                    role="menuitem"
+                    onClick={openSwap}
+                    style={{
+                      flex: 1, minHeight: 40, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', gap: 7,
+                      borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,229,255,0.2)',
+                      background: 'rgba(0,229,255,0.08)', color: 'var(--color-action)',
+                      fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+                    }}
+                  ><Repeat size={14} /> SWAP</button>
+                  <button
+                    role="menuitem"
+                    onClick={requestDelete}
+                    style={{
+                      flex: 1, minHeight: 40, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', gap: 7,
+                      borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,23,68,0.22)',
+                      background: 'rgba(255,23,68,0.08)', color: 'var(--color-destructive)',
+                      fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+                    }}
+                  ><Trash2 size={14} /> REMOVE</button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -534,6 +870,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       {/* Exercise modal */}
       {activeExId && (
         <ExerciseModal
+          state={state}
           exId={activeExId}
           exercises={exercises}
           week={state.currentWeek}
@@ -623,18 +960,29 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           return true;
         });
         return (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'flex-end',
-          }} onClick={() => setSwapTargetId(null)}>
-            <div onClick={e => e.stopPropagation()} style={{
-              width: '100%', background: 'var(--bg)',
-              border: '1px solid rgba(0,229,255,0.15)', borderRadius: '20px 20px 0 0',
-              padding: '20px 16px 0',
-              animation: 'slideUp 0.25s cubic-bezier(0.4,0,0.2,1)',
-              maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-            }}>
+          <div
+            className="fq-sheet-backdrop"
+            style={{
+              zIndex: 100,
+              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+            }}
+            onClick={() => setSwapTargetId(null)}
+          >
+            <div
+              className="fq-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label={isAdd ? 'Add exercise' : 'Swap exercise'}
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: 'var(--color-bg-primary)',
+                border: '1px solid rgba(0,229,255,0.15)',
+                padding: '20px 16px 0',
+                display: 'flex', flexDirection: 'column',
+                overscrollBehavior: 'contain',
+              }}
+            >
               {/* Header */}
               <div style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 4 }}>
                 {isAdd ? 'ADD EXERCISE' : `SWAP — ${exercises.find(e => e.id === swapTargetId)?.name}`}
@@ -683,7 +1031,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                     background: 'rgba(255,255,255,0.03)', color: 'var(--text)',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
                   }}>
-                    <span style={{ fontFamily: 'Exo 2, sans-serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{sub.name}</span>
+                    <span style={{ fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 600, flex: 1 }}>{sub.name}</span>
                     {(sub.isBodyweight || sub.isPlank) && (
                       <span style={{ fontSize: 10, color: 'var(--text3)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>BW</span>
                     )}
@@ -704,18 +1052,6 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 }
 
 // Sub-components
-
-function NavBtn({ onClick, children }) {
-  return (
-    <button onClick={onClick} style={{
-      width: 32, height: 32, borderRadius: 8,
-      border: '1px solid rgba(255,255,255,0.1)',
-      background: 'rgba(255,255,255,0.04)',
-      color: 'var(--text2)', fontSize: 18,
-      display: 'flex', alignItems: 'center', justifyContent: 'center'
-    }}>{children}</button>
-  );
-}
 
 function Tag({ type, children }) {
   const styles = {
@@ -739,28 +1075,6 @@ function Badge({ color, bg, border, children }) {
       padding: '2px 6px', borderRadius: 4, letterSpacing: 0.3,
       color, background: bg, border: `1px solid ${border}`
     }}>{children}</span>
-  );
-}
-
-function SessionTimerBar({ startTime }) {
-  const [elapsed, setElapsed] = React.useState(0);
-  React.useEffect(() => {
-    const tick = () => setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    tick();
-    const iv = setInterval(tick, 1000);
-    return () => clearInterval(iv);
-  }, [startTime]);
-  const m = Math.floor(elapsed / 60);
-  const s = elapsed % 60;
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-      marginBottom: 10, padding: '8px 14px',
-      background: 'rgba(255,109,0,0.08)', border: '1px solid rgba(255,109,0,0.2)',
-      borderRadius: 10, fontFamily: 'Orbitron', fontSize: 12, fontWeight: 700, color: 'var(--fire2)'
-    }}>
-      ⏱ {`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`}
-    </div>
   );
 }
 
