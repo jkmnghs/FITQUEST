@@ -1157,6 +1157,52 @@ export function useGameState(user) {
 
   // Backfill ONE specific training-day session for a given week.
   // Call once per day you want to log — each call is independently guarded.
+  /**
+   * Record a training day as deliberately missed.
+   *
+   * Until now the only way to resolve a missed day was backfillWeek, which
+   * logs it as *done* — crediting a session, XP and volume the user never
+   * did. With no honest alternative, a week that lost a day could never reach
+   * `completed`, so currentWeek never advanced and the user was pinned to it.
+   *
+   * A skipped day closes the slot without crediting anything: no session, no
+   * XP, no streak, no volume. It only lets the week finish.
+   */
+  const markDaySkipped = useCallback((week, dayKey, skipped = true) => {
+    setState(prev => {
+      const wp = prev.weekProgress?.[week]
+        || { count: 0, dates: [], completed: false, sessions: [], completedDays: [] };
+
+      // A day that was actually trained is not a candidate — clear the session
+      // first if the intent is to undo it.
+      if (skipped && (wp.completedDays || []).includes(dayKey)) return prev;
+
+      const skippedDays = skipped
+        ? [...new Set([...(wp.skippedDays || []), dayKey])]
+        : (wp.skippedDays || []).filter(d => d !== dayKey);
+
+      const sessionsNeeded = prev.sessionsPerWeek || 3;
+      const completed = (wp.count || 0) + skippedDays.length >= sessionsNeeded;
+      const weekProgress = { ...prev.weekProgress, [week]: { ...wp, skippedDays, completed } };
+
+      // Mirror finishSession: completing the current week moves it on. Without
+      // this the user would have to wait for the next day-reset to be released.
+      let currentWeek = prev.currentWeek;
+      let currentWeekStartDate = prev.currentWeekStartDate;
+      if (completed && week === prev.currentWeek) {
+        currentWeek = prev.currentWeek + 1;
+        currentWeekStartDate = today();
+      } else if (!completed && week < prev.currentWeek && !skipped) {
+        // Un-skipping a day that was holding a past week complete reopens it,
+        // but we deliberately do not drag currentWeek backwards — later weeks
+        // may already hold real sessions.
+      }
+
+      return { ...prev, weekProgress, currentWeek, currentWeekStartDate };
+    });
+    showToast(skipped ? 'Day marked as skipped' : 'Skip removed');
+  }, [setState, showToast]);
+
   const backfillWeek = useCallback((week, dayKey, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
     const guardKey = `${week}_${dayKey}`;
     if (_backfillGuard.has(guardKey)) {
@@ -1372,7 +1418,7 @@ export function useGameState(user) {
     toast, showToast,
     addXP,
     resetAll, resetToday,
-    startSession, backfillWeek,
+    startSession, backfillWeek, markDaySkipped,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
     addAIHistory, addAIEpisodic,

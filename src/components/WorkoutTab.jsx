@@ -62,6 +62,9 @@ function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
       }) ?? null
     : null;
 
+  const explicitlySkipped = new Set(wp.skippedDays || []);
+  const weekIsPast = viewingWeek < state.currentWeek;
+
   return sortedTrainingDays.map((dayKey, i) => {
     const done = resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count;
     const daysFromStart = (DAY_KEYS.indexOf(dayKey) - weekStartOrd + 7) % 7;
@@ -71,7 +74,17 @@ function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
       dayKey,
       label: DAY_SHORT[dayKey] || dayKey,
       done,
-      skipped: isCurrentWeek && !done && trainingDayDate < todayMidnight,
+      // A training day counts as missed when the user said so, or when the
+      // week it belongs to is behind us. The old rule was gated on
+      // isCurrentWeek alone, so last week's missed Wednesday rendered as a
+      // plain grey pill — indistinguishable from a day still to come, and
+      // with nothing to tap.
+      skipped: !done && (
+        explicitlySkipped.has(dayKey)
+        || weekIsPast
+        || (isCurrentWeek && trainingDayDate < todayMidnight)
+      ),
+      markedSkipped: explicitlySkipped.has(dayKey),
       current: dayKey === currentDayId,
     };
   });
@@ -279,26 +292,30 @@ function SessionHero({
         display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
         marginBottom: 'var(--space-4)', flexWrap: 'wrap',
       }}>
-        {weekDays.map(({ dayKey, label, done, skipped, current }) => {
+        {weekDays.map(({ dayKey, label, done, skipped, markedSkipped, current }) => {
           const interactive = skipped && !!onMakeUpDay;
           let borderColor = 'var(--color-border-medium)';
           let bg = 'transparent';
           let fg = 'var(--color-text-tertiary)';
           if (done)            { borderColor = 'var(--color-success)'; bg = 'var(--color-success)'; fg = 'var(--color-bg-primary)'; }
+          // A miss the user has consciously written off reads as settled, not
+          // as an outstanding problem — only unresolved misses stay red.
+          else if (markedSkipped) { borderColor = 'var(--color-border-medium)'; bg = 'rgba(255,255,255,0.04)'; fg = 'var(--color-text-tertiary)'; }
           else if (skipped)    { borderColor = 'rgba(255,23,68,0.6)';  bg = 'rgba(255,23,68,0.1)'; fg = 'var(--color-destructive)'; }
           else if (current)    { borderColor = 'var(--color-action)';  fg = 'var(--color-action)'; }
+
+          const label_ = done ? `${FULL_DAY[dayKey]} complete`
+            : markedSkipped ? `${FULL_DAY[dayKey]} marked as skipped`
+            : skipped ? `${FULL_DAY[dayKey]} missed — resolve it`
+            : `${FULL_DAY[dayKey]} upcoming`;
 
           return (
             <button
               key={dayKey}
               onClick={interactive ? () => onMakeUpDay(dayKey) : undefined}
               disabled={!interactive}
-              aria-label={
-                done ? `${FULL_DAY[dayKey]} complete`
-                : skipped ? `Make up ${FULL_DAY[dayKey]}`
-                : `${FULL_DAY[dayKey]} upcoming`
-              }
-              title={skipped ? `Make up ${FULL_DAY[dayKey]}` : FULL_DAY[dayKey]}
+              aria-label={label_}
+              title={label_}
               style={{
                 width: 38, height: 38, borderRadius: 'var(--radius-full)',
                 border: `2px solid ${borderColor}`, background: bg, color: fg,
@@ -352,7 +369,7 @@ function SessionHero({
   );
 }
 
-export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek }) {
+export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -406,7 +423,6 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 
   const wp = weekProgress?.[w] || { count: 0, dates: [], completed: false, sessions: [] };
 
-  const DAY_LABELS = DAY_SHORT;
   const sortedTrainingDays = state.trainingDays?.length
     ? [...state.trainingDays].sort((a, b) => DAY_KEYS.indexOf(a) - DAY_KEYS.indexOf(b))
     : ['mon', 'wed', 'fri'];
@@ -439,7 +455,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         onJumpToCurrent={() => jumpToWeek(state.currentWeek)}
         onStartSession={() => { haptic('tap'); onStartSession?.(); }}
         onFinish={() => setShowFinishConfirm(true)}
-        onMakeUpDay={onBackfillWeek ? (dayKey) => setMakeUpDay(dayKey) : null}
+        onMakeUpDay={(onBackfillWeek || onMarkDaySkipped) ? (dayKey) => setMakeUpDay(dayKey) : null}
         onOpenCoach={onOpenCoach}
         onTrainAnyway={() => setShowRestWarning(true)}
       />
@@ -910,14 +926,18 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         document.body
       )}
 
-      {/* Make up a skipped day */}
+      {/* Resolve a training day that wasn't trained */}
       {makeUpDay && createPortal(
-        <MakeUpDayModal
-          state={state}
+        <MissedDayModal
+          // The viewed week, not state.currentWeek. Tapping a missed day while
+          // looking at week 2 used to record the make-up against whatever week
+          // was current, silently crediting the wrong one.
+          week={w}
           dayId={makeUpDay}
-          dayLabel={DAY_LABELS[makeUpDay]}
+          isCurrentWeek={isCurrentWeek}
+          isMarkedSkipped={weekDays.find(d => d.dayKey === makeUpDay)?.markedSkipped ?? false}
           onCancel={() => setMakeUpDay(null)}
-          onConfirm={() => {
+          onMakeUp={() => {
             const dayExercises = getProgramExercisesForDay(state, makeUpDay);
             const customSets = {};
             const customWeights = {};
@@ -925,9 +945,11 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               customSets[ex.id] = ex.isPlank ? 2 : 3;
               customWeights[ex.id] = state.liftWeights?.[ex.id] ?? 0;
             });
-            onBackfillWeek(state.currentWeek, makeUpDay, 100, customWeights, customSets, 50);
+            onBackfillWeek(w, makeUpDay, 100, customWeights, customSets, 50);
             setMakeUpDay(null);
           }}
+          onSkip={() => { onMarkDaySkipped?.(w, makeUpDay, true); setMakeUpDay(null); }}
+          onUnskip={() => { onMarkDaySkipped?.(w, makeUpDay, false); setMakeUpDay(null); }}
         />,
         document.body
       )}
@@ -1150,34 +1172,86 @@ function FinishArea({ state, exercises, onFinish }) {
 
 const FULL_DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
-function MakeUpDayModal({ state, dayId, onCancel, onConfirm }) {
+/**
+ * What to do about a training day that was not trained.
+ *
+ * Previously the only offer was "make up", which logs the day as *done* —
+ * fine if you actually did the session late, but the only available answer
+ * even when you simply missed it. Marking it skipped closes the slot honestly:
+ * the week can complete, and no session, XP or volume is invented.
+ */
+function MissedDayModal({ week, dayId, isMarkedSkipped, isCurrentWeek, onCancel, onMakeUp, onSkip, onUnskip }) {
   const dayName = FULL_DAY_NAMES[dayId] || dayId;
+  const btn = (extra) => ({
+    width: '100%', minHeight: 'var(--tap-target)', padding: '12px 14px',
+    borderRadius: 'var(--radius-lg)', border: 'none',
+    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+    letterSpacing: '0.04em', textAlign: 'center', ...extra,
+  });
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9998,
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center'
-    }}>
-      <div style={{
-        background: 'var(--bg2)', border: '1px solid var(--card-border)',
-        borderRadius: 18, padding: '24px 20px',
-        width: 'calc(100% - 40px)', maxWidth: 340, textAlign: 'center'
-      }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Make Up {dayName}?</h3>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.6 }}>
-          You skipped {dayName} this week. Log it as done today (Week {state.currentWeek}) using your current working weights.
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: 12, borderRadius: 12, border: 'none',
-            background: 'rgba(255,255,255,0.06)', color: 'var(--text2)',
-            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
-          }}>CANCEL</button>
-          <button onClick={onConfirm} style={{
-            flex: 1, padding: 12, borderRadius: 12, border: 'none',
-            background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-            color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
-          }}>MAKE UP ✓</button>
+    <div
+      role="presentation"
+      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9998,
+        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'calc(var(--safe-area-top) + 20px) 20px calc(var(--safe-area-bottom) + 20px)',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${dayName}, week ${week}`}
+        style={{
+          background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-medium)',
+          borderRadius: 'var(--radius-xl)', padding: 'var(--space-6) var(--space-5)',
+          width: '100%', maxWidth: 340, textAlign: 'center',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
+          animation: 'popIn 0.18s cubic-bezier(0.2,0.9,0.3,1) both',
+        }}
+      >
+        <h3 style={{
+          fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 700,
+          color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)',
+        }}>{dayName} · Week {week}</h3>
+
+        <p style={{
+          fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
+          lineHeight: 1.6, marginBottom: 'var(--space-5)',
+        }}>
+          {isMarkedSkipped
+            ? 'This day is marked as skipped. It counts toward closing the week but earns nothing.'
+            : `You didn't train ${dayName}. Log it now, or mark it skipped so the week can close without crediting a session.`}
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {isMarkedSkipped ? (
+            <button onClick={onUnskip} style={btn({
+              background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border-medium)',
+            })}>UNDO SKIP</button>
+          ) : (
+            <>
+              <button onClick={onMakeUp} style={btn({
+                background: 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))',
+                color: 'var(--color-bg-primary)',
+                boxShadow: '0 4px 18px rgba(0,229,255,0.2)',
+              })}>
+                {isCurrentWeek ? 'I DID IT — LOG IT' : 'LOG IT FOR THAT WEEK'}
+              </button>
+              <button onClick={onSkip} style={btn({
+                background: 'rgba(255,23,68,0.1)', color: 'var(--color-destructive)',
+                border: '1px solid rgba(255,23,68,0.25)',
+              })}>MARK AS SKIPPED</button>
+            </>
+          )}
+          <button onClick={onCancel} style={btn({
+            background: 'transparent', color: 'var(--color-text-tertiary)',
+            minHeight: 40,
+          })}>CANCEL</button>
         </div>
       </div>
     </div>

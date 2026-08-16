@@ -150,7 +150,7 @@ function NextWorkoutCard({ state }) {
 export default function TrainTab({
   state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey,
   onCompleteExercise, onFinishSession, onStartSession,
-  onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onBackfillWeek,
+  onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onBackfillWeek, onMarkDaySkipped,
   unreadAgentCount, onMarkAgentRead, onOpenInbox, agentMessages, onSaveHistory,
   onSaveProgram, onQuestMessageSent, userId,
 }) {
@@ -223,6 +223,7 @@ export default function TrainTab({
         onSwapExercise={onSwapExercise}
         onDeleteExercise={onDeleteExercise}
         onBackfillWeek={onBackfillWeek}
+        onMarkDaySkipped={onMarkDaySkipped}
         onOpenCoach={openCoach}
       />
 
