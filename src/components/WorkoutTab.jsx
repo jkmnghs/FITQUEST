@@ -293,7 +293,7 @@ function SessionHero({
         marginBottom: 'var(--space-4)', flexWrap: 'wrap',
       }}>
         {weekDays.map(({ dayKey, label, done, skipped, markedSkipped, current }) => {
-          const interactive = skipped && !!onMakeUpDay;
+          const interactive = (skipped || done) && !!onMakeUpDay;
           let borderColor = 'var(--color-border-medium)';
           let bg = 'transparent';
           let fg = 'var(--color-text-tertiary)';
@@ -304,7 +304,7 @@ function SessionHero({
           else if (skipped)    { borderColor = 'rgba(255,23,68,0.6)';  bg = 'rgba(255,23,68,0.1)'; fg = 'var(--color-destructive)'; }
           else if (current)    { borderColor = 'var(--color-action)';  fg = 'var(--color-action)'; }
 
-          const label_ = done ? `${FULL_DAY[dayKey]} complete`
+          const label_ = done ? `${FULL_DAY[dayKey]} complete — tap to clear`
             : markedSkipped ? `${FULL_DAY[dayKey]} marked as skipped`
             : skipped ? `${FULL_DAY[dayKey]} missed — resolve it`
             : `${FULL_DAY[dayKey]} upcoming`;
@@ -369,7 +369,7 @@ function SessionHero({
   );
 }
 
-export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped }) {
+export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped, onClearDayProgress }) {
   const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -935,6 +935,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           week={w}
           dayId={makeUpDay}
           isCurrentWeek={isCurrentWeek}
+          isDone={weekDays.find(d => d.dayKey === makeUpDay)?.done ?? false}
           isMarkedSkipped={weekDays.find(d => d.dayKey === makeUpDay)?.markedSkipped ?? false}
           onCancel={() => setMakeUpDay(null)}
           onMakeUp={() => {
@@ -950,6 +951,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           }}
           onSkip={() => { onMarkDaySkipped?.(w, makeUpDay, true); setMakeUpDay(null); }}
           onUnskip={() => { onMarkDaySkipped?.(w, makeUpDay, false); setMakeUpDay(null); }}
+          onClear={() => { onClearDayProgress?.(w, makeUpDay); setMakeUpDay(null); }}
         />,
         document.body
       )}
@@ -1180,7 +1182,7 @@ const FULL_DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: '
  * even when you simply missed it. Marking it skipped closes the slot honestly:
  * the week can complete, and no session, XP or volume is invented.
  */
-function MissedDayModal({ week, dayId, isMarkedSkipped, isCurrentWeek, onCancel, onMakeUp, onSkip, onUnskip }) {
+function MissedDayModal({ week, dayId, isDone, isMarkedSkipped, isCurrentWeek, onCancel, onMakeUp, onSkip, onUnskip, onClear }) {
   const dayName = FULL_DAY_NAMES[dayId] || dayId;
   const btn = (extra) => ({
     width: '100%', minHeight: 'var(--tap-target)', padding: '12px 14px',
@@ -1222,13 +1224,20 @@ function MissedDayModal({ week, dayId, isMarkedSkipped, isCurrentWeek, onCancel,
           fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
           lineHeight: 1.6, marginBottom: 'var(--space-5)',
         }}>
-          {isMarkedSkipped
+          {isDone
+            ? 'This day is recorded as trained. Clearing it removes the session from the week and returns the day to missed. XP already banked is kept.'
+            : isMarkedSkipped
             ? 'This day is marked as skipped. It counts toward closing the week but earns nothing.'
             : `You didn't train ${dayName}. Log it now, or mark it skipped so the week can close without crediting a session.`}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {isMarkedSkipped ? (
+          {isDone ? (
+            <button onClick={onClear} style={btn({
+              background: 'rgba(255,23,68,0.1)', color: 'var(--color-destructive)',
+              border: '1px solid rgba(255,23,68,0.25)',
+            })}>CLEAR THIS DAY</button>
+          ) : isMarkedSkipped ? (
             <button onClick={onUnskip} style={btn({
               background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)',
               border: '1px solid var(--color-border-medium)',

@@ -1203,6 +1203,74 @@ export function useGameState(user) {
     showToast(skipped ? 'Day marked as skipped' : 'Skip removed');
   }, [setState, showToast]);
 
+  /**
+   * Remove a day that is recorded as trained from a week.
+   *
+   * Nothing could do this. backfillWeek only adds, markDaySkipped refuses a
+   * completed day, and resetToday reaches only today — so a day recorded by
+   * mistake (a mis-aimed backfill, or the double-count the reset bug used to
+   * produce) was permanent. Clearing it returns the day to "missed", from
+   * where it can be made up or marked skipped.
+   *
+   * Lifetime XP and level are deliberately left alone. weekProgress.sessions
+   * carries no per-session XP, and the log's figure is the pre-cap bonus
+   * rather than what was actually granted, so any subtraction here would be a
+   * guess — and guessing low on someone's rank is worse than leaving a banked
+   * total intact. The confirm copy says so explicitly.
+   */
+  const clearDayProgress = useCallback((week, dayKey) => {
+    setState(prev => {
+      const wp = prev.weekProgress?.[week];
+      if (!wp) return prev;
+
+      const sessions = wp.sessions || [];
+      const idx = sessions.findIndex(s => (s.dayKey || null) === dayKey);
+      const hadDay = (wp.completedDays || []).includes(dayKey) || idx !== -1;
+      if (!hadDay) return prev;
+
+      const completedDays = (wp.completedDays || []).filter(d => d !== dayKey);
+
+      // Drop the matching session and its date entry, keeping the two arrays
+      // aligned. Only one occurrence: a week can hold the same weekday twice
+      // if it was double-counted, and clearing should undo one at a time.
+      let dates = [...(wp.dates || [])];
+      let nextSessions = sessions;
+      if (idx !== -1) {
+        const removed = sessions[idx];
+        nextSessions = sessions.filter((_, i) => i !== idx);
+        const dateIdx = removed?.date ? dates.lastIndexOf(removed.date) : -1;
+        if (dateIdx !== -1) dates.splice(dateIdx, 1);
+      } else if (dates.length) {
+        dates = dates.slice(0, -1);
+      }
+
+      const count = Math.max(0, (wp.count || 0) - 1);
+      const sessionsNeeded = prev.sessionsPerWeek || 3;
+      const skippedDays = (wp.skippedDays || []).filter(d => d !== dayKey);
+      const completed = count + skippedDays.length >= sessionsNeeded;
+
+      // Release both halves of the backfill guard so the day can be recorded
+      // again — otherwise backfill would refuse a day this just freed.
+      _backfillGuard.delete(`${week}_${dayKey}`);
+      const locked = prev.backfillLock?.[week];
+      const backfillLock = Array.isArray(locked) && locked.includes(dayKey)
+        ? { ...prev.backfillLock, [week]: locked.filter(d => d !== dayKey) }
+        : prev.backfillLock;
+
+      return {
+        ...prev,
+        weekProgress: {
+          ...prev.weekProgress,
+          [week]: { ...wp, completedDays, dates, sessions: nextSessions, skippedDays, count, completed },
+        },
+        backfillLock,
+        totalSessions: Math.max(0, (prev.totalSessions || 0) - 1),
+        perfectWeeks: Math.max(0, (prev.perfectWeeks || 0) - (wp.completed && !completed ? 1 : 0)),
+      };
+    });
+    showToast('Day cleared');
+  }, [setState, showToast]);
+
   const backfillWeek = useCallback((week, dayKey, completionPct = 100, customWeights = {}, customSets = {}, durationMins = 50) => {
     const guardKey = `${week}_${dayKey}`;
     if (_backfillGuard.has(guardKey)) {
@@ -1418,7 +1486,7 @@ export function useGameState(user) {
     toast, showToast,
     addXP,
     resetAll, resetToday,
-    startSession, backfillWeek, markDaySkipped,
+    startSession, backfillWeek, markDaySkipped, clearDayProgress,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
     addAIHistory, addAIEpisodic,

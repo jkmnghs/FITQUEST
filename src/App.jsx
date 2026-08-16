@@ -174,7 +174,7 @@ export default function App() {
     completeExercise, finishSession,
     submitCheckin, updateSetting, setState,
     resetAll, resetToday, startSession, backfillWeek,
-    addAIHistory, logMeal, deleteMeal, importData, markDaySkipped,
+    addAIHistory, logMeal, deleteMeal, importData, markDaySkipped, clearDayProgress,
     completeAssessment, changeProgram, swapExercise, deleteExercise,
     syncFromCloud, lastSyncedAt, syncing, incrementQuestMessages,
   } = useGameState(user);
@@ -292,6 +292,7 @@ export default function App() {
     onDeleteExercise: deleteExercise,
     onBackfillWeek: backfillWeek,
     onMarkDaySkipped: markDaySkipped,
+    onClearDayProgress: clearDayProgress,
     unreadAgentCount,
     onMarkAgentRead: markAgentRead,
     onOpenInbox: pollAgentMessages,
