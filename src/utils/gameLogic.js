@@ -4,6 +4,29 @@ export function today() {
   return new Date().toDateString();
 }
 
+/**
+ * The day after today, in the same format as today().
+ *
+ * A program week that ends because its last session was just logged must begin
+ * the *following* day. Anchoring the new week to the same day stamped a
+ * training day as the week's start, so from the next day onward that weekday
+ * sat in the past with nothing recorded against it and the week strip showed
+ * it as missed — for a session the user had actually completed.
+ */
+export function tomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toDateString();
+}
+
+/** Midnight timestamp for a date in any of the formats the log has used. */
+export function midnightOf(value) {
+  const d = new Date(value);
+  if (isNaN(d)) return NaN;
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export function getPhase(week) {
   const w = ((week - 1) % 12) + 1; // map any week into the 1-12 cycle
   if (w <= 3) return PHASES[0];

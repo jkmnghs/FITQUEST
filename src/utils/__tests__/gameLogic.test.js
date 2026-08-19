@@ -3,6 +3,9 @@ import {
   xpForLevel,
   xpToLevel,
   removeXP,
+  today,
+  tomorrow,
+  midnightOf,
   getRank,
   getPhase,
   applyXP,
@@ -711,5 +714,42 @@ describe('removeXP', () => {
     expect(removeXP(state, undefined)).toEqual(state);
     expect(removeXP(state, NaN)).toEqual(state);
     expect(removeXP(state, -50)).toEqual(state);
+  });
+});
+
+
+describe('tomorrow / midnightOf', () => {
+  it('tomorrow is exactly one day after today, same format', () => {
+    const t = new Date(today());
+    const n = new Date(tomorrow());
+    expect(Math.round((n - t) / 864e5)).toBe(1);
+    expect(tomorrow()).toBe(new Date(Date.now() + 864e5).toDateString());
+  });
+
+  it('midnightOf normalises the two date formats the log has used', () => {
+    // finishSession writes toDateString(); backfillWeek writes ISO.
+    expect(midnightOf('Wed Aug 19 2026')).toBe(midnightOf('2026-08-19T13:45:00'));
+    expect(midnightOf('Wed Aug 19 2026')).not.toBe(midnightOf('Thu Aug 20 2026'));
+  });
+
+  it('midnightOf rejects junk instead of returning a bogus time', () => {
+    expect(Number.isNaN(midnightOf('not a date'))).toBe(true);
+    expect(Number.isNaN(midnightOf(undefined))).toBe(true);
+  });
+
+  it('a week anchored to tomorrow leaves no training day already in the past', () => {
+    // The rollover bug: anchoring the new week to the day its last session was
+    // logged put that weekday at daysFromStart 0, i.e. on the start date, so
+    // by the next day it read as missed.
+    const DAY = ['sun','mon','tue','wed','thu','fri','sat'];
+    const start = new Date(tomorrow());
+    const startOrd = start.getDay();
+    for (const dayKey of DAY) {
+      const daysFromStart = (DAY.indexOf(dayKey) - startOrd + 7) % 7;
+      const dayDate = new Date(start);
+      dayDate.setDate(start.getDate() + daysFromStart);
+      const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+      expect(dayDate.getTime()).toBeGreaterThan(todayMidnight.getTime());
+    }
   });
 });
