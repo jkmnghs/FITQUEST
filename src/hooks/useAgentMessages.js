@@ -9,36 +9,41 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { authPostJSON } from '../lib/authFetch';
+import {
+  improvedLifts, triggerKey, loadFiredKeys, saveFiredKey, forgetFiredKey,
+} from '../utils/agentTriggers';
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 // Client triggers go through the JWT-authenticated route. /api/agent itself is
 // gated on AGENT_SECRET for the cron, and that secret must never reach a browser.
 const AGENT_TRIGGER_URL = '/api/agent-trigger';
 
-export function useAgentMessages(userId, state, onProgramSwitch) {
+export function useAgentMessages(userId, state, onProgramSwitch, cloudLoading = false) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [messages, setMessages] = useState([]);
   const lastSessionCountRef = useRef(state?.totalSessions || 0);
+  const sessionBaselineSyncedRef = useRef(false);
   const lastPRsRef = useRef(null);
   const lastProgramSwitchedAtRef = useRef(state?.programSwitchedAt || null);
-  const firedTriggersRef = useRef(new Set());
   const pollTimerRef = useRef(null);
   const isInitializedRef = useRef(false);
   const pollMessagesRef = useRef(null);
 
   // ── Fire a trigger to the agent endpoint ──────────────────────────────────
-  const fireTrigger = useCallback(async (trigger) => {
+  const fireTrigger = useCallback(async (trigger, dedupDetail = '') => {
     if (!userId) {
       console.warn('[Quest Agent] fireTrigger skipped — no userId yet', trigger);
       return;
     }
-    const dedupKey = `${trigger}_${new Date().toDateString()}`;
-    if (firedTriggersRef.current.has(dedupKey)) {
-      console.log('[Quest Agent] trigger already fired today, skipping:', trigger);
+    const dedupKey = triggerKey(trigger, dedupDetail);
+    // Content-addressed and persisted, so closing the app doesn't make a
+    // month-old PR look new again on next launch.
+    if (loadFiredKeys(userId).has(dedupKey)) {
+      console.log('[Quest Agent] already fired for this event, skipping:', dedupKey);
       return;
     }
-    firedTriggersRef.current.add(dedupKey);
-    console.log('[Quest Agent] firing trigger:', trigger, 'for userId:', userId);
+    saveFiredKey(userId, dedupKey);
+    console.log('[Quest Agent] firing trigger:', dedupKey, 'for userId:', userId);
 
     try {
       // userId is derived server-side from the access token — sending it here
@@ -51,34 +56,62 @@ export function useAgentMessages(userId, state, onProgramSwitch) {
       setTimeout(() => pollMessagesRef.current?.(), 5000);
     } catch (e) {
       console.warn('[useAgentMessages] trigger failed:', e);
-      firedTriggersRef.current.delete(dedupKey);
+      forgetFiredKey(userId, dedupKey);
     }
   }, [userId]);
 
   // ── Detect post-workout trigger ────────────────────────────────────────────
   useEffect(() => {
+    if (cloudLoading) return; // same baseline race as the PR effect below
+    // Re-baseline once against the merged cloud state: the ref was seeded from
+    // localStorage at mount, which can be behind and would read as a new session.
+    if (!sessionBaselineSyncedRef.current) {
+      sessionBaselineSyncedRef.current = true;
+      lastSessionCountRef.current = state?.totalSessions || 0;
+      return;
+    }
     const prev = lastSessionCountRef.current;
     const current = state?.totalSessions || 0;
     if (current > prev && state?.todaySessionFinished) {
       lastSessionCountRef.current = current;
-      fireTrigger('post_workout');
+      // Keyed to the session number, so relaunching the app after a workout
+      // cannot re-congratulate the same session.
+      fireTrigger('post_workout', String(current));
     }
-  }, [state?.totalSessions, state?.todaySessionFinished, fireTrigger]);
+  }, [state?.totalSessions, state?.todaySessionFinished, fireTrigger, cloudLoading]);
 
   // ── Detect PR trigger ──────────────────────────────────────────────────────
   useEffect(() => {
-    const currentPRs = JSON.stringify(state?.personalRecords || {});
+    // Wait for the cloud merge before taking a baseline. This hook is called
+    // from the App body, so its effects run on the very first render — while
+    // `state` is still the localStorage copy and `cloudLoading` is true. The
+    // old code took its baseline there, then saw the merged cloud records
+    // arrive and read the difference as a brand-new PR. That is why a message
+    // appeared on essentially every app open.
+    if (cloudLoading) return;
+
+    const currentPRs = state?.personalRecords || {};
     if (!isInitializedRef.current) {
-      // First run after cloud load — record baseline, never fire spuriously
       lastPRsRef.current = currentPRs;
       isInitializedRef.current = true;
       return;
     }
-    if (currentPRs !== lastPRsRef.current) {
-      lastPRsRef.current = currentPRs;
-      fireTrigger('pr_milestone');
+
+    // Compare the lifts themselves rather than a JSON string: stringify is
+    // key-order dependent, so a re-serialized identical map looked changed.
+    // Only a heavier or brand-new lift counts — a record that was corrected
+    // downward or removed is not something to celebrate.
+    const improved = improvedLifts(lastPRsRef.current, currentPRs);
+    lastPRsRef.current = currentPRs;
+    if (improved.length > 0) {
+      // Keyed by which lifts improved and to what, so the same PR can never
+      // fire twice while a genuinely new one still gets through.
+      const detail = improved
+        .map(id => `${id}@${currentPRs[id]?.weight ?? currentPRs[id]}`)
+        .join(',');
+      fireTrigger('pr_milestone', detail);
     }
-  }, [state?.personalRecords, fireTrigger]);
+  }, [state?.personalRecords, fireTrigger, cloudLoading]);
 
   // ── Fire onboarding trigger ────────────────────────────────────────────────
   // Called externally via the returned `fireOnboarding` function after assessment completes

@@ -185,7 +185,7 @@ export default function App() {
     fireOnboarding,
     pollMessages: pollAgentMessages,
     messages: agentMessages,
-  } = useAgentMessages(user?.id, state, setState);
+  } = useAgentMessages(user?.id, state, setState, cloudLoading);
 
   const [notifStatus, setNotifStatus] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'

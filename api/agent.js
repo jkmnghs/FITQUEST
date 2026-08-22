@@ -362,12 +362,16 @@ function buildTriggerContext(trigger, state, userId) {
     .map(([id, v]) => `${id}: ${v}`)
     .join(', ') || 'none';
 
-  const recentPRs = Object.entries(prs)
-    .filter(([, pr]) => {
-      const prDate = new Date(pr.date || 0);
-      return (Date.now() - prDate.getTime()) < 7 * 24 * 60 * 60 * 1000;
-    })
+  // Two windows, because the two triggers mean different things by "recent".
+  // post_workout wants the week's wins as colour; pr_milestone is reacting to
+  // something that just happened, and a week-wide list let it announce a
+  // six-day-old record as though it had only just been set.
+  const prsWithin = (ms) => Object.entries(prs)
+    .filter(([, pr]) => (Date.now() - new Date(pr.date || 0).getTime()) < ms)
     .map(([id, pr]) => `${id}: ${pr.weight}${unit} (${pr.date})`);
+
+  const recentPRs = prsWithin(7 * 24 * 60 * 60 * 1000);
+  const justSetPRs = prsWithin(24 * 60 * 60 * 1000);
 
   const weightTrend = checkins.slice(-4)
     .map(c => `Wk${c.week}: ${c.weight}${unit}`)
@@ -429,8 +433,8 @@ GOAL: Re-engage without guilt. Acknowledge the break, make returning feel easy a
     pr_milestone: `
 ${baseContext}
 TRIGGER: User just hit a new personal record.
-NEW PRs: ${recentPRs.join(', ') || 'unknown lift'}
-GOAL: Celebrate with specific context — mention the lift, put the number in context of their journey. 2-3 sentences max, high energy.`.trim(),
+NEW PRs: ${justSetPRs.join(', ') || recentPRs.join(', ') || 'unknown lift'}
+GOAL: Celebrate with specific context — mention the lift, put the number in context of their journey. 2-3 sentences max, high energy. Celebrate only what is listed above as new; do not describe an older record as if it had just been set.`.trim(),
 
     onboarding: `
 TRIGGER: User just completed onboarding assessment.
@@ -497,6 +501,50 @@ Always send a coach message explaining the switch. Never switch more than once p
 export const VALID_TRIGGERS = ['post_workout', 'reengagement', 'pr_milestone', 'onboarding', 'weekly_review'];
 
 /**
+ * Minimum gap between two agent messages for the same trigger, per user.
+ *
+ * The client decides when to wake the agent, and a client bug means duplicate
+ * wakes — which is exactly what happened: three near-identical "NEW PR"
+ * messages about one lift, because each app launch re-fired the trigger. The
+ * client side of that is fixed, but the agent should not be one bug away from
+ * spamming someone's inbox, so the rule is enforced here too where it cannot
+ * be bypassed by a stale or offline bundle.
+ *
+ * Chosen per trigger by how often the underlying event can genuinely recur.
+ * `onboarding` is absent deliberately: it happens once, and the client already
+ * guards it — a cooldown would only get in the way of a legitimate retry.
+ */
+const TRIGGER_COOLDOWN_MS = {
+  post_workout:  4 * 60 * 60 * 1000,  // nobody completes two sessions in 4h
+  pr_milestone:  6 * 60 * 60 * 1000,  // one celebration per training day
+  reengagement: 24 * 60 * 60 * 1000,  // never nag twice in a day
+  weekly_review: 3 * 24 * 60 * 60 * 1000,
+};
+
+/**
+ * How long ago this trigger last produced a message, or null if never.
+ * Reads the durable message log rather than process memory, so it survives the
+ * serverless instance being recycled.
+ */
+export function msSinceTrigger(agentMessages, trigger, now = Date.now()) {
+  let newest = null;
+  for (const msg of agentMessages || []) {
+    if (msg?.trigger !== trigger) continue;
+    const ts = Date.parse(msg.createdAt || '');
+    if (!Number.isNaN(ts) && (newest === null || ts > newest)) newest = ts;
+  }
+  return newest === null ? null : now - newest;
+}
+
+/** True when this trigger is still inside its cooldown for this user. */
+export function isTriggerOnCooldown(agentMessages, trigger, now = Date.now()) {
+  const cooldown = TRIGGER_COOLDOWN_MS[trigger];
+  if (!cooldown) return false;
+  const since = msSinceTrigger(agentMessages, trigger, now);
+  return since !== null && since < cooldown;
+}
+
+/**
  * Runs one agent turn for a user. Shared by the secret-gated cron handler below
  * and by api/agent-trigger.js, which authenticates the browser with its Supabase
  * access token instead — so AGENT_SECRET never has to reach the client.
@@ -533,6 +581,14 @@ export async function runAgent(trigger, userId) {
       .single();
 
     const userState = profileData?.state || {};
+
+    // Bail before spending an Anthropic call: if this trigger already spoke
+    // recently there is nothing new to say, and saying it again is the bug.
+    if (isTriggerOnCooldown(userState.agentMessages, trigger)) {
+      console.log(`[Quest Agent] ${trigger} on cooldown for ${userId} — skipping`);
+      return { status: 200, body: { ok: true, skipped: 'cooldown', trigger } };
+    }
+
     const context = buildTriggerContext(trigger, userState, userId);
 
     // --- Step 2: Agentic loop (max 5 tool calls) ---
