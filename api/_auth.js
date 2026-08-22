@@ -62,13 +62,23 @@ export async function requireUser(req, res) {
 // Every model the client is permitted to request. Keep this in sync with the
 // model strings actually used in src/ — an unlisted model is rejected outright
 // rather than silently downgraded, so a typo surfaces instead of hiding.
+// Aliases only: a dated snapshot ID pins us to one build of a model.
 export const ALLOWED_MODELS = new Set([
-  'claude-haiku-4-5-20251001',
-  'claude-sonnet-4-5',
-  'claude-sonnet-4-6',
+  'claude-haiku-4-5',
+  'claude-sonnet-5',
 ]);
 
-export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+// Model IDs that earlier bundles sent. An installed PWA can keep running a
+// cached bundle for days after a deploy, so a superseded ID is remapped to its
+// current equivalent rather than rejected — stale clients keep working, while
+// an actual typo still fails loudly.
+export const LEGACY_MODEL_ALIASES = {
+  'claude-haiku-4-5-20251001': 'claude-haiku-4-5',
+  'claude-sonnet-4-5': 'claude-sonnet-5',
+  'claude-sonnet-4-6': 'claude-sonnet-5',
+};
+
+export const DEFAULT_MODEL = 'claude-haiku-4-5';
 export const MAX_OUTPUT_TOKENS = 4096;
 
 /**
@@ -79,12 +89,13 @@ export function sanitizeAnthropicBody(body) {
   if (!body || typeof body !== 'object') return null;
   if (!Array.isArray(body.messages) || body.messages.length === 0) return null;
 
-  const model = ALLOWED_MODELS.has(body.model) ? body.model : null;
+  const requested = LEGACY_MODEL_ALIASES[body.model] ?? body.model;
+  const model = ALLOWED_MODELS.has(requested) ? requested : null;
   if (body.model && !model) return null; // explicit but disallowed model
 
-  const requested = Number(body.max_tokens);
-  const maxTokens = Number.isFinite(requested) && requested > 0
-    ? Math.min(Math.round(requested), MAX_OUTPUT_TOKENS)
+  const requestedTokens = Number(body.max_tokens);
+  const maxTokens = Number.isFinite(requestedTokens) && requestedTokens > 0
+    ? Math.min(Math.round(requestedTokens), MAX_OUTPUT_TOKENS)
     : 1024;
 
   const payload = {
@@ -96,6 +107,15 @@ export function sanitizeAnthropicBody(body) {
   if (Array.isArray(body.tools)) payload.tools = body.tools;
   if (body.tool_choice && typeof body.tool_choice === 'object') {
     payload.tool_choice = body.tool_choice;
+  }
+
+  // Sonnet 5 runs adaptive thinking whenever `thinking` is omitted, and
+  // thinking tokens are charged against max_tokens. Every call we make here is
+  // a short, strictly-shaped JSON or chat reply on a budget as small as 256
+  // tokens, so thinking would eat the answer and leave a truncated response.
+  // Ask for it off explicitly instead of relying on the old default.
+  if (payload.model === 'claude-sonnet-5') {
+    payload.thinking = { type: 'disabled' };
   }
   return payload;
 }

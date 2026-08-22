@@ -169,7 +169,7 @@ ${splitIsolationRule}`;
 
   try {
     const res = await authPostJSON('/api/coach', {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: 4096,
       system: 'You are a training program generator. Output only valid JSON.',
       messages: [{ role: 'user', content: prompt }],

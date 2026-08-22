@@ -536,7 +536,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
 
     try {
       const requestBody = {
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-4-5',
         max_tokens: isBuildMode ? 4000 : 500,
         system: systemPrompt,
         messages: modeHistory,

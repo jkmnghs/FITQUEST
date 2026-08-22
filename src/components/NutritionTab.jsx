@@ -129,7 +129,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     setFoods([]);
     try {
       const res = await authPostJSON(API_URL, {
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-5',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -168,7 +168,9 @@ Guidelines:
 
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
-      const text = data.content[0].text.trim();
+      // Pick the text block by type: a response can lead with a non-text block
+      // (a thinking block, say), and content[0] would then have no .text.
+      const text = (data.content?.find(b => b.type === 'text')?.text || '').trim();
 
       let parsed;
       try {
@@ -269,7 +271,7 @@ Guidelines:
     try {
       // Ask Claude for gram weight + full nutrition
       const claudeRes = await authPostJSON(API_URL, {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         max_tokens: 256,
         messages: [{
           role: 'user',
@@ -278,7 +280,7 @@ Guidelines:
       });
       if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
       const claudeData = await claudeRes.json();
-      const text = claudeData.content[0].text.trim();
+      const text = (claudeData.content?.find(b => b.type === 'text')?.text || '').trim();
       let c = {};
       try { c = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) c = JSON.parse(m[0]); }
 
