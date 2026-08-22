@@ -133,3 +133,54 @@ export async function callAnthropic(payload, apiKey) {
   const data = await response.json();
   return { status: response.status, data };
 }
+
+// ── Shared per-user rate limiting ───────────────────────────────────────────
+// In-memory, so it is per serverless instance and resets on a cold start. That
+// makes it a burst damper, not a hard ceiling — the durable per-user limits are
+// the Supabase-backed quotas in the routes themselves.
+const rateLimitBuckets = new Map();
+
+export function checkRateLimit(bucket, userId, { max, windowMs = 60_000 }) {
+  const key = `${bucket}:${userId}`;
+  const now = Date.now();
+  const entry = rateLimitBuckets.get(key);
+  if (!entry || now - entry.windowStart > windowMs) {
+    rateLimitBuckets.set(key, { windowStart: now, count: 1 });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= max;
+}
+
+/**
+ * Consume one unit of a per-day, per-user budget held in user_profiles.state.
+ *
+ * Rolls over by comparing a stored date stamp rather than trusting a client to
+ * reset the counter. Returns { ok } — and on refusal, the limit that was hit.
+ */
+export async function consumeDailyQuota(supabase, userId, { countField, dateField, limit }) {
+  const todayStamp = new Date().toISOString().slice(0, 10);
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('state')
+      .eq('id', userId)
+      .single();
+
+    const state = profile?.state || {};
+    const sameDay = state[dateField] === todayStamp;
+    const used = sameDay ? (state[countField] || 0) : 0;
+    if (used >= limit) return { ok: false, limit };
+
+    await supabase.rpc('admin_merge_user_state', {
+      p_user_id: userId,
+      p_patch: { [countField]: used + 1, [dateField]: todayStamp },
+    });
+    return { ok: true };
+  } catch (e) {
+    // Graceful degradation: a Supabase outage shouldn't take the feature down.
+    // The in-memory limiter still caps bursts.
+    console.error('[quota] daily quota check failed:', e.message);
+    return { ok: true };
+  }
+}

@@ -157,7 +157,7 @@ function checkQuestReset(state) {
   monday.setHours(0, 0, 0, 0);
   const weekStart = monday.toISOString().slice(0, 10);
   if (!state.questMessagesWeekStart || state.questMessagesWeekStart !== weekStart) {
-    return { ...state, questMessagesThisWeek: 0, questMessagesWeekStart: weekStart };
+    return { ...state, questMessagesThisWeek: 0, programGenerationsThisWeek: 0, questMessagesWeekStart: weekStart };
   }
   return state;
 }

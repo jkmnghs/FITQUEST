@@ -146,6 +146,7 @@ Return ONLY a valid JSON array — no markdown, no explanation, nothing else:
 [
   {
     "name": "Food Name",
+    "cookingMethod": "grilled",
     "grams": 150,
     "calories": 250,
     "protein": 30,
@@ -160,6 +161,7 @@ Guidelines:
 - Calories/macros must accurately match the gram amount (e.g. raw rolled oats: ~389 kcal/100g, ~13g protein, ~66g carbs, ~7g fat)
 - Look carefully at texture, color, and context to distinguish similar foods (e.g. oats vs flour vs rice)
 - Separate mixed dishes into visible components
+- cookingMethod: how it was prepared — grilled, fried, deep-fried, breaded, boiled, steamed, raw, roasted, stewed, braised, or the dish name if it is a named preparation (adobo, sinigang, teriyaki, carbonara). Use "unknown" only if it genuinely cannot be told. This decides whether reference nutrition values can be applied, so a fried or sauce-heavy item must say so.
 - Use "Unknown food" if unidentifiable`,
               },
             ],
@@ -188,6 +190,11 @@ Guidelines:
       // Sanitize parsed fields — guard against non-numeric values from Claude
       parsed = parsed.map(f => ({
         name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : 'Unknown food',
+        // Carried through to findFoodReference below: its complex-cooking guard
+        // is what stops a fried or sauce-heavy dish being overwritten with
+        // plain-ingredient reference values. Dropping this field here left that
+        // guard reading the food name alone.
+        cookingMethod: typeof f.cookingMethod === 'string' ? f.cookingMethod.trim() : '',
         grams:    Number(f.grams)    > 0  ? Number(f.grams)    : 100,
         calories: Number(f.calories) >= 0 ? Number(f.calories) : 0,
         protein:  Number(f.protein)  >= 0 ? Number(f.protein)  : 0,
@@ -247,6 +254,7 @@ Guidelines:
 
       setFoods(enriched.map(f => ({
         name:     f.name || 'Unknown',
+        cookingMethod: f.cookingMethod || '',
         grams:    Number(f.grams)    || 0,
         calories: Number(f.calories) || 0,
         protein:  Number(f.protein)  || 0,
@@ -275,7 +283,7 @@ Guidelines:
         max_tokens: 256,
         messages: [{
           role: 'user',
-          content: `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Realistic serving gram weight.`,
+          content: `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","cookingMethod":"grilled","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Realistic serving gram weight. cookingMethod is how it is prepared (grilled, fried, deep-fried, breaded, boiled, steamed, raw, stewed) or the named dish if it is one (adobo, sinigang, teriyaki) — "unknown" only if genuinely unclear.`,
         }],
       });
       if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
@@ -294,7 +302,11 @@ Guidelines:
       } : null;
 
       // Tier 1: Reference database
-      const ref = findFoodReference(name, '');
+      // The raw query is included as a cooking hint alongside the method: the
+      // user typing "chicken adobo" carries the signal even when the model
+      // normalizes the name down to "Chicken".
+      const cookingMethod = typeof c.cookingMethod === 'string' ? c.cookingMethod.trim() : '';
+      const ref = findFoodReference(name, `${cookingMethod} ${query}`.trim());
       if (ref) {
         const m = grams / 100;
         setFoods(prev => [...prev, {

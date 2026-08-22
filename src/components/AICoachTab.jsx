@@ -7,6 +7,7 @@ import { formatForCoach } from '../utils/coachExport';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
 import { authPostJSON } from '../lib/authFetch';
+import { getRecentPerformances, sessionEstimated1RM, getStrengthTrend } from '../utils/exerciseHistory';
 
 const DAY_FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
@@ -66,13 +67,44 @@ const COACH_MODES = [
 const ONE_SHOT_MODES = ['pep', 'analysis', 'overload', 'form'];
 
 // Mode-specific system prompts — only send data relevant to each mode
+// What the user actually signed up for. The base prompt used to assert a
+// "12-week body recomposition program" for everybody, so a user who picked
+// Strength got told they were doing recomp — and then, in physique mode, saw
+// `Stated goal: strength` a few lines later in the same prompt. The model was
+// being handed a contradiction and left to pick a side.
+const GOAL_DESC = {
+  recomp:   'body recomposition',
+  fat_loss: 'fat loss',
+  muscle:   'muscle building',
+  strength: 'strength',
+};
+
+/**
+ * Where the user is in the training cycle.
+ *
+ * The phase structure repeats every 12 weeks (getPhase maps any week into the
+ * 1-12 cycle), so a user in week 15 is in their second cycle — printing
+ * "Wk 15/12" told the model something impossible.
+ */
+function cyclePosition(week) {
+  const w = Number(week) || 1;
+  const inCycle = ((w - 1) % 12) + 1;
+  const cycle = Math.floor((w - 1) / 12) + 1;
+  return cycle > 1
+    ? `Wk ${w} (cycle ${cycle}, week ${inCycle}/12)`
+    : `Wk ${w}/12`;
+}
+
 function buildSystemPrompt(state, mode) {
   const phase = getPhase(state.currentWeek);
   const unit = state.unit;
   const name = state.name || 'Athlete';
   const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
+  const goal = state.assessment?.goal;
+  const goalDesc = GOAL_DESC[goal] || 'general fitness';
+  const weekLabel = cyclePosition(state.currentWeek);
 
-  const base = `You are Coach AI for FitQuest — a hyper-personalized fitness coach for ${name}'s 12-week body recomposition program.
+  const base = `You are Coach AI for FitQuest — a hyper-personalized fitness coach for ${name}, whose stated training goal is ${goalDesc}.
 COACHING STYLE: Direct, energetic, motivating. Use ${name}'s actual numbers — never be generic. Keep responses concise (150-200 words max). Use formatting sparingly.
 EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest the best available alternative based on their equipment. Common swaps: Bench Press → DB Bench Press or Push-ups; Barbell Squat → DB Goblet Squat or Bodyweight Squat; Lat Pulldown → DB Bent-Over Row or Inverted Row; Leg Curl → DB Romanian Deadlift or Nordic Curl. Always match the muscle group. If they have no replacement, give a bodyweight option.`;
 
@@ -94,7 +126,7 @@ You are ${name}'s personal program designer. You build and save evidence-based w
 TRAINING DAYS: ${trainingDays}
 EQUIPMENT: ${equipmentDesc}
 CURRENT PROGRAM: ${currentProgram}
-STATS: Lv ${state.level} | Wk ${state.currentWeek} | ${state.totalSessions} sessions | ${state.assessment?.level || 'intermediate'} | Goal: ${state.assessment?.goal || 'recomp'}
+STATS: Lv ${state.level} | ${weekLabel} | ${state.totalSessions} sessions | ${state.assessment?.level || 'intermediate'} | Goal: ${goal || 'not set'}
 
 EXERCISE CATALOG — ONLY exercises available for this user's equipment (use exact IDs): ${catalog}
 
@@ -133,7 +165,7 @@ BODY DATA:
 - BMI: ${bmi || 'n/a'}${bmi ? (bmi < 18.5 ? ' (underweight)' : bmi < 25 ? ' (normal)' : bmi < 30 ? ' (overweight)' : ' (obese)') : ''}
 - Waist: ${waist > 0 ? waist + 'cm' : 'not measured'}
 ${whr ? `- Waist-to-height ratio: ${whr} (healthy <0.50, elevated risk >0.55)` : ''}
-- Stated goal: ${state.assessment?.goal || 'not set'}
+- Stated goal: ${goal || 'not set'}
 - Training level: ${state.assessment?.level || 'intermediate'}
 
 WEIGHT TREND (last 8 check-ins): ${weightTrend}
@@ -153,7 +185,7 @@ Analyze the data honestly. If data is sparse, say so and ask for check-ins. Give
     // Form mode only needs exercise context, not full lift data
     return `${base}
 PROGRAM: ${exercises.map(e => e.name).join(', ')}
-PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
+PHASE: ${weekLabel} — ${phase.name}: ${phase.desc}`;
   }
 
   const sug = state.overloadSuggestions || {};
@@ -164,7 +196,43 @@ PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
     return `  ${ex.name}: ${wt}${unit}${s ? ` [${s === 'increase' ? '↑ ready' : s === 'repeat' ? '= repeat' : '↓ deload'}]` : ''}`;
   }).join('\n');
 
-  const statusLine = `${name} | Lv ${state.level} | Wk ${state.currentWeek}/12 | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
+  // Actual performance, not just the current working weight.
+  //
+  // This block used to be one line per lift — weight plus a one-word flag the
+  // app had already computed — so the model was asked for progressive-overload
+  // advice while being shown none of the inputs overload is derived from. It
+  // could only paraphrase the flag. Reps, RPE and set completion across the
+  // last few sessions are what distinguish "add weight" from "you missed reps
+  // twice running, hold".
+  const liftHistory = exercises.filter(e => !e.isPlank).map(ex => {
+    const perfs = getRecentPerformances(state, ex.id, 3);
+    if (perfs.length === 0) return `  ${ex.name}: no logged sessions yet`;
+
+    const lines = perfs.map(pf => {
+      const reps = pf.repsPerSet.length > 0 ? pf.repsPerSet.join('/') : '—';
+      const wt = convertWeight(pf.maxWeight, unit);
+      const missed = pf.setsPrescribed > 0 && pf.setsCompleted < pf.setsPrescribed
+        ? ` MISSED ${pf.setsPrescribed - pf.setsCompleted} set(s)`
+        : '';
+      return `Wk${pf.week ?? '?'}: ${wt}${unit} × ${reps} reps`
+        + `${pf.maxRPE > 0 ? ` @RPE${pf.maxRPE}` : ''}${missed}`;
+    });
+
+    const e1rm = sessionEstimated1RM(perfs[0]);
+    const trend = getStrengthTrend(perfs);
+    // Labelled for what it actually measures. An athlete grinding the same
+    // weight for fewer reps at a higher RPE can still show a "rising" Epley
+    // estimate, so calling this a bare "trend" would overstate it — the reps,
+    // RPE and missed-set data on the lines above are what qualify it.
+    const tail = [
+      e1rm != null ? `est1RM ~${convertWeight(e1rm, unit)}${unit}` : null,
+      trend ? `est1RM trend ${trend}` : null,
+    ].filter(Boolean).join(', ');
+
+    return `  ${ex.name} (newest first): ${lines.join(' | ')}${tail ? ` — ${tail}` : ''}`;
+  }).join('\n');
+
+  const statusLine = `${name} | Lv ${state.level} | ${weekLabel} | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
 
   if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
     const DAY_ORD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -179,7 +247,9 @@ PHASE: Week ${state.currentWeek}/12 — ${phase.name}: ${phase.desc}`;
       : 'No workout scheduled today (rest day or no program set).';
     return `${base}
 STATUS: ${statusLine}
-LIFTS:\n${liftSummary}
+CURRENT WORKING WEIGHTS:\n${liftSummary}
+RECENT PERFORMANCE (last 3 logged sessions per lift):\n${liftHistory}
+NOTE: est1RM is an Epley estimate from logged weight and reps, not a tested max — never prescribe directly from it. It can rise while the athlete is actually stalling, so weigh it against missed sets and rising RPE, which are the stronger signals.
 ${todayPlan}`;
   }
 
@@ -199,6 +269,7 @@ TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect 
 
 function buildUserPrompt(mode, state, userMessage) {
   const phase = getPhase(state.currentWeek);
+  const goalDesc = GOAL_DESC[state.assessment?.goal] || 'general fitness';
   const sug = state.overloadSuggestions || {};
   const unit = state.unit;
   const todayDone = state.todayExDone || [];
@@ -299,14 +370,14 @@ Cover: setup, key cues, most common mistakes, one immediate improvement.`;
     case 'checkin': {
       const checkins = state.weeklyCheckins || [];
       if (checkins.length === 0) {
-        return `No Sunday check-ins yet (Week ${state.currentWeek}). Explain check-in purpose and what metrics matter for recomp. Motivate first check-in.`;
+        return `No Sunday check-ins yet (Week ${state.currentWeek}). Explain check-in purpose and what metrics matter for ${goalDesc}. Motivate first check-in.`;
       }
       const trend = checkins.slice(-4).map(c => `  Wk ${c.week}: ${c.weight}${unit}${c.waist > 0 ? `, waist ${c.waist}cm` : ''}`).join('\n');
-      return `Analyze recomp progress:
+      return `Analyze progress toward ${goalDesc}:
 ${trend}
-Sessions: ${state.totalSessions} | Perfect weeks: ${state.perfectWeeks} | Week ${state.currentWeek}/12 | Streak: ${state.streak}d
+Sessions: ${state.totalSessions} | Perfect weeks: ${state.perfectWeeks} | ${cyclePosition(state.currentWeek)} | Streak: ${state.streak}d
 ${userMessage ? `Question: "${userMessage}"` : ''}
-Analyze weight trend for recomposition. Are trends appropriate? What to focus on?`;
+Analyze the weight trend against that goal. Are the trends appropriate? What should they focus on?`;
     }
 
     case 'build':
@@ -1147,7 +1218,7 @@ function getPlaceholder(modeId) {
     case 'analysis': return 'My squat felt heavy today...';
     case 'overload': return 'Should I add 2.5kg to everything?';
     case 'form':     return 'squat  (or bench, rdl, etc.)';
-    case 'checkin':  return 'Am I on track for recomp?';
+    case 'checkin':  return 'Am I on track for my goal?';
     case 'build':    return 'e.g. Build me a Monday push session';
     case 'physique': return 'Should I focus on fat loss or muscle?';
     default:         return 'Ask anything...';
@@ -1160,7 +1231,7 @@ function getQuickPrompts(modeId) {
     case 'analysis': return ['How\'d I do?', 'What to focus on next?'];
     case 'overload': return ['What increases next?', 'Explain the logic', 'Am I progressing well?'];
     case 'form':     return ['Squat', 'Bench', 'RDL', 'Lat Pulldown', 'OHP', 'Leg Curl'];
-    case 'checkin':  return ['Am I recomping?', 'Weight trend ok?', 'Halfway check'];
+    case 'checkin':  return ['Am I on track?', 'Weight trend ok?', 'Halfway check'];
     case 'build':    return ['Build my Monday push session', 'Set up Wednesday pull day', 'Add lateral raises to Friday', 'Design a full body day'];
     case 'physique': return ['Analyze my physique', 'Should I cut or bulk?', 'Am I recomping?', 'What does my BMI say?'];
     default:         return [];
@@ -1175,7 +1246,7 @@ function getModeDescription(modeId, state) {
     case 'analysis': return `Get an AI breakdown of today's session. Works best after completing some exercises. ${sessions === 0 ? 'Complete your first workout to unlock full analysis.' : `You've done ${sessions} sessions total.`}`;
     case 'overload': return 'Get your exact progressive overload plan for next session, based on your RPE data. Shows which lifts to increase, repeat, or back off.';
     case 'form':     return 'Ask for form tips on any exercise: Squat, Bench, RDL, Lat Pulldown, OHP, Leg Curl, or Plank. Type the exercise name or hit a quick button.';
-    case 'checkin':  return `Review your body recomposition progress across ${state.weeklyCheckins?.length || 0} check-ins. Get an honest assessment of your weight trend and what it means.`;
+    case 'checkin':  return `Review your progress across ${state.weeklyCheckins?.length || 0} check-ins. Get an honest assessment of your weight trend and what it means.`;
     case 'build':    return 'Tell the AI what kind of session you want and it will design a full exercise program for that day — sets, reps, rest, RPE — then show you a preview to confirm before saving.';
     case 'physique': return `Get an honest, data-driven assessment of your body composition. Based on your weight trend, BMI, and waist measurements, the AI will tell you whether you should focus on recomp, fat loss, muscle building, or strength — with specific reasoning. ${state.weeklyCheckins?.length ? `You have ${state.weeklyCheckins.length} check-in(s) to analyze.` : 'Log your first Sunday check-in to unlock full analysis.'}`;
     default:         return 'Ask your coach anything.';

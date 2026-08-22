@@ -20,6 +20,9 @@ const SERVER_OWNED_KEYS = [
   'agentDeloadSuggested',
   'pendingProgramSwitch',
   'questMessagesThisWeek',
+  'programGenerationsThisWeek',
+  'nutritionCallsToday',
+  'nutritionCallsDate',
   'questMessagesWeekStart',
 ];
 

@@ -49,14 +49,13 @@ function getSupabase() {
 }
 
 // ── Tool definitions — what Claude can call ──────────────────────────────────
-const AGENT_TOOLS = [
+export const AGENT_TOOLS = [
   {
     name: 'get_user_state',
-    description: 'Read the full current state for a user from Supabase.',
+    description: 'Read the full current state for the user this session is running for.',
     input_schema: {
       type: 'object',
-      properties: { userId: { type: 'string', description: 'Supabase user UUID' } },
-      required: ['userId'],
+      properties: {},
     },
   },
   {
@@ -65,11 +64,10 @@ const AGENT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
         note: { type: 'string', description: 'Concise coaching note (max 200 chars)' },
         category: { type: 'string', enum: ['plateau', 'progress', 'injury', 'motivation', 'nutrition', 'general'] },
       },
-      required: ['userId', 'note', 'category'],
+      required: ['note', 'category'],
     },
   },
   {
@@ -78,12 +76,11 @@ const AGENT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
         message: { type: 'string', description: 'The message to display to the user (markdown supported, max 400 chars)' },
         trigger: { type: 'string', description: 'The trigger type that caused this message' },
         emoji: { type: 'string', description: 'Single emoji for the message bubble (optional)' },
       },
-      required: ['userId', 'message', 'trigger'],
+      required: ['message', 'trigger'],
     },
   },
   {
@@ -92,14 +89,13 @@ const AGENT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
         calories: { type: 'number', description: 'New daily calorie target' },
         protein: { type: 'number', description: 'New daily protein target in grams' },
         carbs: { type: 'number', description: 'New daily carbs target in grams' },
         fat: { type: 'number', description: 'New daily fat target in grams' },
         reason: { type: 'string', description: 'Why the adjustment was made (shown to user)' },
       },
-      required: ['userId', 'calories', 'protein', 'reason'],
+      required: ['calories', 'protein', 'reason'],
     },
   },
   {
@@ -108,10 +104,9 @@ const AGENT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
         reason: { type: 'string', description: 'Clinical reasoning for the deload recommendation' },
       },
-      required: ['userId', 'reason'],
+      required: ['reason'],
     },
   },
   {
@@ -120,12 +115,11 @@ const AGENT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
         exerciseId: { type: 'string', description: 'The exercise id from the user\'s activeExercises (e.g. squat, db_bench, db_goblet — use exact id from get_user_state result)' },
         newWeightKg: { type: 'number', description: 'New working weight in kg' },
         reason: { type: 'string' },
       },
-      required: ['userId', 'exerciseId', 'newWeightKg', 'reason'],
+      required: ['exerciseId', 'newWeightKg', 'reason'],
     },
   },
   {
@@ -134,11 +128,10 @@ const AGENT_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
         newProgramId: { type: 'string', enum: ['fullbody_3x', 'fullbody_2x', 'fullbody_4x', 'dumbbell_only_3x', 'dumbbell_3x', 'dumbbell_4x', 'bodyweight_3x'] },
         reason: { type: 'string', description: 'Coaching reasoning shown to the user' },
       },
-      required: ['userId', 'newProgramId', 'reason'],
+      required: ['newProgramId', 'reason'],
     },
   },
 ];
@@ -158,7 +151,13 @@ async function mergeState(supabase, userId, patch) {
 }
 
 // ── Tool execution ───────────────────────────────────────────────────────────
-async function executeTool(toolName, input, supabase, agentLog) {
+// `userId` is the authenticated user from runAgent — it is NEVER taken from
+// `input`. The tools used to declare a userId parameter and trust whatever the
+// model passed back, which made every read and write addressable by the model
+// against a service-role client that bypasses RLS. The prompt asked the model
+// nicely to echo the right UUID; that is an instruction, not an access control.
+// Now the id is not something the model can express at all.
+async function executeTool(toolName, input, supabase, agentLog, userId) {
   agentLog.push({ tool: toolName, input, timestamp: new Date().toISOString() });
 
   switch (toolName) {
@@ -166,7 +165,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (error || !data) return { error: 'User not found' };
       return { state: data.state };
@@ -176,7 +175,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (!data) return { error: 'User not found' };
       const state = data.state || {};
@@ -188,7 +187,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString().slice(0, 10),
       };
       const aiEpisodic = [...(state.aiEpisodic || []), note];
-      await mergeState(supabase, input.userId, { aiEpisodic });
+      await mergeState(supabase, userId, { aiEpisodic });
       return { ok: true, noteId: note.id };
     }
 
@@ -196,7 +195,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (!data) return { error: 'User not found' };
       const state = data.state || {};
@@ -209,7 +208,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), msg]; // keep last 50
-      await mergeState(supabase, input.userId, { agentMessages });
+      await mergeState(supabase, userId, { agentMessages });
       return { ok: true, messageId: msg.id };
     }
 
@@ -217,7 +216,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (!data) return { error: 'User not found' };
       const state = data.state || {};
@@ -238,7 +237,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), nutritionMsg];
-      await mergeState(supabase, input.userId, { nutritionGoals, agentMessages });
+      await mergeState(supabase, userId, { nutritionGoals, agentMessages });
       return { ok: true, newGoals: nutritionGoals };
     }
 
@@ -246,7 +245,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (!data) return { error: 'User not found' };
       const state = data.state || {};
@@ -259,7 +258,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), deloadMsg];
-      await mergeState(supabase, input.userId, { agentMessages, agentDeloadSuggested: true });
+      await mergeState(supabase, userId, { agentMessages, agentDeloadSuggested: true });
       return { ok: true };
     }
 
@@ -267,7 +266,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (!data) return { error: 'User not found' };
       const state = data.state || {};
@@ -295,7 +294,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       };
       const aiEpisodic = [...(state.aiEpisodic || []), switchNote];
 
-      await mergeState(supabase, input.userId, {
+      await mergeState(supabase, userId, {
         agentMessages,
         aiEpisodic,
         pendingProgramSwitch: {
@@ -311,7 +310,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
       const { data } = await supabase
         .from('user_profiles')
         .select('state')
-        .eq('id', input.userId)
+        .eq('id', userId)
         .single();
       if (!data) return { error: 'User not found' };
       const state = data.state || {};
@@ -326,7 +325,7 @@ async function executeTool(toolName, input, supabase, agentLog) {
         createdAt: new Date().toISOString(),
       };
       const agentMessages = [...(state.agentMessages || []).slice(-49), weightMsg];
-      await mergeState(supabase, input.userId, { liftWeights, agentMessages });
+      await mergeState(supabase, userId, { liftWeights, agentMessages });
       return { ok: true, newWeight: input.newWeightKg };
     }
 
@@ -398,7 +397,6 @@ function buildTriggerContext(trigger, state, userId) {
     .join(', ') || 'none';
 
   const baseContext = `
-USER_ID: ${userId}
 USER: ${name} | Wk ${week}/12 | Lv ${state.level || 1} | Streak: ${streak}d | Total sessions: ${sessions}
 PROGRAM: ${state.programId || 'unknown'} | EXERCISE IDs (use these for update_lift_weight): ${exerciseIds}
 LIFTS: ${liftSummary}
@@ -436,7 +434,6 @@ GOAL: Celebrate with specific context — mention the lift, put the number in co
 
     onboarding: `
 TRIGGER: User just completed onboarding assessment.
-USER_ID: ${userId}
 NAME: ${name}
 GOAL: ${state.assessment?.goal || 'unknown'}
 LEVEL: ${state.assessment?.level || 'unknown'}
@@ -483,12 +480,6 @@ DECISION FRAMEWORK:
 5. Log an episodic note if you detected something worth remembering
 
 STYLE: Direct, specific, personal. Use their name. Reference actual numbers. Max 3 sentences per message. No generic motivational fluff.
-
-CRITICAL — userId RULES:
-- Every tool call requires a userId parameter
-- ALWAYS use the exact UUID from USER_ID in the context (e.g. "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-- NEVER use the user's name, username, or any other string as userId
-- The user's name is for the message text only
 
 CAUTION:
 - Never reduce weights without clear overtraining signals (RPE consistently ≥9 across 2+ sessions, or session dropoff)
@@ -589,7 +580,7 @@ export async function runAgent(trigger, userId) {
       // Execute all tool calls in parallel
       const toolResults = await Promise.all(
         toolUseBlocks.map(async (block) => {
-          const result = await executeTool(block.name, block.input, supabase, agentLog);
+          const result = await executeTool(block.name, block.input, supabase, agentLog, userId);
           return {
             type: 'tool_result',
             tool_use_id: block.id,
