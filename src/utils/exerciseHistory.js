@@ -177,3 +177,47 @@ export function getStrengthTrend(performances) {
   if (change < -0.025) return 'falling';
   return 'flat';
 }
+
+/**
+ * Sessions actually completed in the last `days` calendar days.
+ *
+ * Distinct from `weekProgress[currentWeek].count`, which counts sessions in
+ * the current *program* week. Those diverge the moment a program week closes:
+ * currentWeek advances, the new week's count starts at zero, and a user who
+ * trained yesterday is reported as having done nothing "this week". The coach
+ * then told them to fix their consistency. When a prompt says "this week" it
+ * means the calendar, so it needs this number.
+ */
+export function sessionsInLastDays(state, days = 7) {
+  const log = state?.log;
+  if (!Array.isArray(log)) return 0;
+
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  const cutoffMs = cutoff.getTime();
+
+  const seen = new Set();
+  for (const entry of log) {
+    if (entry?.type !== 'session') continue;
+    const d = new Date(entry.date);
+    if (isNaN(d)) continue;
+    d.setHours(0, 0, 0, 0);
+    if (d.getTime() < cutoffMs) continue;
+    // One session per day: a day logged twice is still one training day.
+    seen.add(d.getTime());
+  }
+  return seen.size;
+}
+
+/** Date of the most recent completed session, or null. */
+export function lastSessionDate(state) {
+  const log = state?.log;
+  if (!Array.isArray(log)) return null;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const entry = log[i];
+    if (entry?.type !== 'session') continue;
+    if (entry.date) return entry.date;
+  }
+  return null;
+}

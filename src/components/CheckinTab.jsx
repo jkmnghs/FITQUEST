@@ -35,8 +35,20 @@ export default function CheckinTab({ state, onSubmit }) {
       return false;
     }
     const ws = parseFloat(waist) || 0;
-    if (ws < 0 || ws > 300) {
-      setError('Enter a valid waist measurement (0–300 cm)');
+    // Onboarding already rejects an inches or pant-size figure; this screen
+    // accepted anything from 0–300 and labelled it "cm", so a 32 entered here
+    // flowed through to the coach as a 32cm waist and a nonsense
+    // waist-to-height ratio. Same physiological floor as onboarding: under 30%
+    // of height is not a measurement a person can have.
+    if (ws > 0) {
+      const heightCm = Number(state.assessment?.height) || 170;
+      const minWaist = Math.max(55, Math.round(heightCm * 0.30));
+      if (ws < minWaist || ws > 250) {
+        setError(`Enter ${minWaist}–250 cm, or leave blank. Measure in centimetres around your navel — not inches or pant size.`);
+        return false;
+      }
+    } else if (ws < 0) {
+      setError('Enter a valid waist measurement');
       return false;
     }
     if (sleep !== '') {
@@ -99,7 +111,7 @@ export default function CheckinTab({ state, onSubmit }) {
             <InputRow label="Weight" value={weight} onChange={v => { setWeight(v); setError(null); setShowOverwrite(false); }}
               placeholder="e.g. 70.0" unit={state.unit} inputMode="decimal" step="0.1" min="1" max="500" />
             <InputRow label="Waist" value={waist} onChange={v => { setWaist(v); setError(null); }}
-              placeholder="Optional" unit="cm" inputMode="decimal" step="0.1" min="0" max="300" />
+              placeholder="Optional — in cm" unit="cm" inputMode="decimal" step="0.1" min="0" max="250" />
             <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
               placeholder="Optional" unit="hrs/night" inputMode="decimal" step="0.5" min="0" max="24" />
             {error && (

@@ -7,7 +7,10 @@ import { formatForCoach } from '../utils/coachExport';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
 import { authPostJSON } from '../lib/authFetch';
-import { getRecentPerformances, sessionEstimated1RM, getStrengthTrend } from '../utils/exerciseHistory';
+import {
+  getRecentPerformances, sessionEstimated1RM, getStrengthTrend,
+  sessionsInLastDays, lastSessionDate,
+} from '../utils/exerciseHistory';
 
 const DAY_FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
@@ -147,15 +150,28 @@ CRITICAL RULES — FOLLOW EXACTLY:
     const lastCheckin = checkins[checkins.length - 1];
     const currentWeight = lastCheckin?.weight || 0;
     const height = state.assessment?.height || 0;
-    const waist = lastCheckin?.waist || 0;
+    const rawWaist = lastCheckin?.waist || 0;
+    // Check-ins recorded before the input was validated can hold an inches or
+    // pant-size figure stored as centimetres. Rather than deriving a ratio from
+    // it — and having the model quietly "assume this was 82cm", which is what
+    // it did — treat an impossible measurement as no measurement.
+    const waistPlausible = rawWaist >= Math.max(55, Math.round((height || 170) * 0.30)) && rawWaist <= 250;
+    const waist = waistPlausible ? rawWaist : 0;
     const bmi = (height > 0 && currentWeight > 0)
       ? (currentWeight / Math.pow(height / 100, 2)).toFixed(1)
       : null;
     const whr = (height > 0 && waist > 0) ? (waist / height).toFixed(2) : null;
     const weightTrend = checkins.slice(-8)
-      .map(c => `Wk${c.week}: ${c.weight}${unit}${c.waist > 0 ? ` w${c.waist}cm` : ''}`)
+      .map(c => {
+        const ok = c.waist >= Math.max(55, Math.round((height || 170) * 0.30)) && c.waist <= 250;
+        return `Wk${c.week}: ${c.weight}${unit}${ok ? ` w${c.waist}cm` : ''}`;
+      })
       .join(', ') || 'No check-ins yet';
     const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
+    // Program-week count and calendar-week count are different numbers, and
+    // only one of them answers "have they trained lately". See sessionsInLastDays.
+    const last7 = sessionsInLastDays(state, 7);
+    const lastSession = lastSessionDate(state);
     return `${base}
 You are ${name}'s physique analyst. Objectively assess body composition data and recommend the optimal training focus: recomp, fat loss, muscle building, or strength. Be direct and data-driven.
 
@@ -163,13 +179,17 @@ BODY DATA:
 - Current weight: ${currentWeight > 0 ? currentWeight + unit : 'not set'}
 - Height: ${height > 0 ? height + 'cm' : 'not set'}
 - BMI: ${bmi || 'n/a'}${bmi ? (bmi < 18.5 ? ' (underweight)' : bmi < 25 ? ' (normal)' : bmi < 30 ? ' (overweight)' : ' (obese)') : ''}
-- Waist: ${waist > 0 ? waist + 'cm' : 'not measured'}
+- Waist: ${waist > 0 ? waist + 'cm' : (rawWaist > 0
+    ? `recorded as ${rawWaist}, which is not a possible waist in cm — treat it as MISSING, ask them to re-measure in centimetres, and do not guess what they meant`
+    : 'not measured')}
 ${whr ? `- Waist-to-height ratio: ${whr} (healthy <0.50, elevated risk >0.55)` : ''}
 - Stated goal: ${goal || 'not set'}
 - Training level: ${state.assessment?.level || 'intermediate'}
 
 WEIGHT TREND (last 8 check-ins): ${weightTrend}
-TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect weeks | ${weekSessions}/${state.sessionsPerWeek || 3} this week | Streak: ${state.streak}d
+TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect weeks | Streak: ${state.streak}d
+SESSIONS IN THE LAST 7 DAYS: ${last7} (target ${state.sessionsPerWeek || 3}/week) | Last session: ${lastSession || 'never'}
+PROGRAM WEEK PROGRESS: ${weekSessions}/${state.sessionsPerWeek || 3} logged since the current program week began — this resets to 0 whenever a program week completes, so a low number here does NOT mean they have stopped training. Judge consistency on the last-7-days figure above.
 
 RECOMMENDATION FRAMEWORK:
 - Recomp: best for intermediates at moderate BF, eating at maintenance, training 3-4x/week consistently
@@ -232,7 +252,9 @@ PHASE: ${weekLabel} — ${phase.name}: ${phase.desc}`;
     return `  ${ex.name} (newest first): ${lines.join(' | ')}${tail ? ` — ${tail}` : ''}`;
   }).join('\n');
 
-  const statusLine = `${name} | Lv ${state.level} | ${weekLabel} | ${phase.name} | Streak: ${state.streak}d | Sessions this week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
+  const statusLine = `${name} | Lv ${state.level} | ${weekLabel} | ${phase.name} | Streak: ${state.streak}d`
+    + ` | Last 7 days: ${sessionsInLastDays(state, 7)} sessions (target ${state.sessionsPerWeek || 3}/wk)`
+    + ` | This program week: ${weekSessions}/${state.sessionsPerWeek || 3}`;
 
   if (mode === 'pep' || mode === 'analysis' || mode === 'overload') {
     const DAY_ORD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];

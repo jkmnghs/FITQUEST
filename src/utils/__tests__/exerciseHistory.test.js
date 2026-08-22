@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getLastPerformance, estimate1RM, best1RM, platesPerSide,
   getRecentPerformances, sessionEstimated1RM, getStrengthTrend,
+  sessionsInLastDays, lastSessionDate,
 } from '../exerciseHistory';
 
 function sessionEntry({ week, dateStr, details }) {
@@ -238,5 +239,60 @@ describe('getStrengthTrend', () => {
       { maxWeight: 40, repsPerSet: [20] },
       { maxWeight: 35, repsPerSet: [20] },
     ])).toBeNull();
+  });
+});
+
+describe('sessionsInLastDays', () => {
+  const dayAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toDateString(); };
+  const s = (n) => ({ type: 'session', date: dayAgo(n) });
+
+  it('counts a session logged yesterday', () => {
+    // The reported bug: the program week had just rolled over, so the
+    // program-week counter read 0/3 and the coach told a user who trained
+    // yesterday to fix their consistency.
+    expect(sessionsInLastDays({ log: [s(1)] }, 7)).toBe(1);
+  });
+
+  it('ignores sessions outside the window', () => {
+    expect(sessionsInLastDays({ log: [s(1), s(3), s(20)] }, 7)).toBe(2);
+  });
+
+  it('includes today', () => {
+    expect(sessionsInLastDays({ log: [s(0)] }, 7)).toBe(1);
+  });
+
+  it('counts a day trained twice as one training day', () => {
+    expect(sessionsInLastDays({ log: [s(2), s(2)] }, 7)).toBe(1);
+  });
+
+  it('ignores non-session log entries', () => {
+    const log = [s(1), { type: 'exercise', date: dayAgo(1) }, { type: 'meal', date: dayAgo(2) }];
+    expect(sessionsInLastDays({ log }, 7)).toBe(1);
+  });
+
+  it('returns 0 for an empty or absent log rather than throwing', () => {
+    expect(sessionsInLastDays({ log: [] }, 7)).toBe(0);
+    expect(sessionsInLastDays({}, 7)).toBe(0);
+    expect(sessionsInLastDays(null, 7)).toBe(0);
+  });
+
+  it('skips entries with an unparseable date', () => {
+    expect(sessionsInLastDays({ log: [{ type: 'session', date: 'whenever' }, s(1)] }, 7)).toBe(1);
+  });
+});
+
+describe('lastSessionDate', () => {
+  it('returns the most recent session date', () => {
+    const log = [
+      { type: 'session', date: 'Mon Aug 17 2026' },
+      { type: 'exercise', date: 'Tue Aug 18 2026' },
+      { type: 'session', date: 'Wed Aug 19 2026' },
+    ];
+    expect(lastSessionDate({ log })).toBe('Wed Aug 19 2026');
+  });
+
+  it('returns null when nothing has been logged', () => {
+    expect(lastSessionDate({ log: [] })).toBeNull();
+    expect(lastSessionDate(null)).toBeNull();
   });
 });
