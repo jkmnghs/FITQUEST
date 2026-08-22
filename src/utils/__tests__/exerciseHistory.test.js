@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getLastPerformance, estimate1RM, best1RM, platesPerSide,
+  getRecentPerformances, sessionEstimated1RM, getStrengthTrend,
 } from '../exerciseHistory';
 
 function sessionEntry({ week, dateStr, details }) {
@@ -144,5 +145,98 @@ describe('platesPerSide', () => {
       { kg: 25, count: 2 },
       { kg: 10, count: 1 },
     ]);
+  });
+});
+
+describe('getRecentPerformances', () => {
+  const state = {
+    log: [
+      sessionEntry({ week: 1, dateStr: 'a', details: { squat: { setsCompleted: 3, maxWeight: 60, repsPerSet: [8, 8, 8] } } }),
+      sessionEntry({ week: 2, dateStr: 'b', details: { squat: { setsCompleted: 3, maxWeight: 62.5, repsPerSet: [8, 8, 7] } } }),
+      sessionEntry({ week: 3, dateStr: 'c', details: { squat: { setsCompleted: 3, maxWeight: 65, repsPerSet: [8, 7, 6] } } }),
+      sessionEntry({ week: 4, dateStr: 'd', details: { squat: { setsCompleted: 3, maxWeight: 67.5, repsPerSet: [7, 6, 6] } } }),
+    ],
+  };
+
+  it('returns the most recent sessions first, capped at the limit', () => {
+    const perfs = getRecentPerformances(state, 'squat', 3);
+    expect(perfs.map(p => p.week)).toEqual([4, 3, 2]);
+  });
+
+  it('returns everything available when there is less history than the limit', () => {
+    expect(getRecentPerformances(state, 'squat', 10)).toHaveLength(4);
+  });
+
+  it('returns an empty array rather than null for an unlogged exercise', () => {
+    expect(getRecentPerformances(state, 'bench')).toEqual([]);
+    expect(getRecentPerformances(null, 'squat')).toEqual([]);
+  });
+
+  it('skips sessions where the exercise was prescribed but never logged', () => {
+    const withSkip = {
+      log: [
+        sessionEntry({ week: 1, dateStr: 'a', details: { squat: { setsCompleted: 3, maxWeight: 60, repsPerSet: [8] } } }),
+        sessionEntry({ week: 2, dateStr: 'b', details: { squat: { setsCompleted: 0, setsPrescribed: 3, maxWeight: 0, repsPerSet: [] } } }),
+      ],
+    };
+    const perfs = getRecentPerformances(withSkip, 'squat', 3);
+    expect(perfs).toHaveLength(1);
+    expect(perfs[0].week).toBe(1);
+  });
+});
+
+describe('sessionEstimated1RM', () => {
+  it('uses the best rep count at the session max weight', () => {
+    // Epley on 100kg x 5 = 100 * (1 + 5/30) = 116.7
+    expect(sessionEstimated1RM({ maxWeight: 100, repsPerSet: [5, 4, 3] })).toBeCloseTo(116.7, 1);
+  });
+
+  it('returns null when reps are outside the range Epley is trustworthy in', () => {
+    expect(sessionEstimated1RM({ maxWeight: 40, repsPerSet: [20, 18] })).toBeNull();
+  });
+
+  it('returns null for a session with no logged reps', () => {
+    expect(sessionEstimated1RM({ maxWeight: 100, repsPerSet: [] })).toBeNull();
+    expect(sessionEstimated1RM(null)).toBeNull();
+  });
+});
+
+describe('getStrengthTrend', () => {
+  // performances arrive newest-first, matching getRecentPerformances
+  it('reports rising when the newest session estimates higher than the oldest', () => {
+    expect(getStrengthTrend([
+      { maxWeight: 70, repsPerSet: [8] },
+      { maxWeight: 65, repsPerSet: [8] },
+      { maxWeight: 60, repsPerSet: [8] },
+    ])).toBe('rising');
+  });
+
+  it('reports falling when strength has gone backwards', () => {
+    expect(getStrengthTrend([
+      { maxWeight: 60, repsPerSet: [8] },
+      { maxWeight: 65, repsPerSet: [8] },
+      { maxWeight: 70, repsPerSet: [8] },
+    ])).toBe('falling');
+  });
+
+  it('treats small session-to-session noise as flat', () => {
+    // 61kg vs 60kg is under the 2.5% band
+    expect(getStrengthTrend([
+      { maxWeight: 61, repsPerSet: [8] },
+      { maxWeight: 60, repsPerSet: [8] },
+    ])).toBe('flat');
+  });
+
+  it('refuses to call a trend from a single session', () => {
+    expect(getStrengthTrend([{ maxWeight: 60, repsPerSet: [8] }])).toBeNull();
+    expect(getStrengthTrend([])).toBeNull();
+    expect(getStrengthTrend(null)).toBeNull();
+  });
+
+  it('refuses to call a trend when reps are unestimatable', () => {
+    expect(getStrengthTrend([
+      { maxWeight: 40, repsPerSet: [20] },
+      { maxWeight: 35, repsPerSet: [20] },
+    ])).toBeNull();
   });
 });

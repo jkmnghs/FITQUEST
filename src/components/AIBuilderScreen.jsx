@@ -441,7 +441,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
         {/* top label */}
         <div style={{ textAlign: 'center', marginBottom: 6 }}>
           <div style={{ fontFamily: ORBITRON, fontSize: 9.5, letterSpacing: 5, color: 'rgba(255,255,255,0.35)' }}>
-            FIT<span style={{ color: CYAN }}>·</span>QUEST AI
+            FITQUEST AI
           </div>
         </div>
 

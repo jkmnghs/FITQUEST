@@ -133,6 +133,9 @@ export const stateSchema = z.object({
   mealLogs: z.array(mealEntrySchema).max(500),
   nutritionGoals: nutritionGoalsSchema,
   questMessagesThisWeek: z.number().int().nonnegative(),
+  programGenerationsThisWeek: z.number().int().nonnegative(),
+  nutritionCallsToday: z.number().int().nonnegative(),
+  nutritionCallsDate: z.string(),
   questMessagesWeekStart: z.string().nullable(),
   assessment: assessmentSchema,
   // New v2 fields
@@ -216,6 +219,9 @@ export function repairState(state) {
 
   // Fix quota
   if (repaired.questMessagesThisWeek == null) repaired.questMessagesThisWeek = 0;
+  if (repaired.programGenerationsThisWeek == null) repaired.programGenerationsThisWeek = 0;
+  if (repaired.nutritionCallsToday == null) repaired.nutritionCallsToday = 0;
+  if (repaired.nutritionCallsDate == null) repaired.nutritionCallsDate = '';
 
   return repaired;
 }

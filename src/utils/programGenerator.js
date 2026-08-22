@@ -8,6 +8,10 @@ import { authPostJSON } from '../lib/authFetch';
 // filters.
 
 // Which groups are allowed for each split-day label
+// Fewer than this and the day isn't a usable session — see the split-filter
+// note in generateProgramFromAssessment.
+const MIN_EXERCISES_PER_DAY = 3;
+
 const SPLIT_ALLOWED = {
   ppl:         { push: ['push','core'], pull: ['pull','core'], legs: ['legs','core'] },
   upper_lower: { upper: ['push','pull','core'], lower: ['legs','core'] },
@@ -64,6 +68,57 @@ function filterToSplitDay(exercises, dayType, split) {
   return exercises.filter(ex => allowed.includes(getExerciseGroup(ex.id)));
 }
 
+/**
+ * Replace exercises the user cannot actually perform.
+ *
+ * The prompt says "use ONLY these exact IDs" and nothing checked that it was
+ * obeyed. On a split, `filterToSplitDay` dropped unknown ids by accident —
+ * `getExerciseGroup` returns null for them — but full-body runs no split
+ * filter at all, and full-body is exactly what bodyweight-only users are
+ * always given. So the one group that cannot improvise a substitute was the
+ * one receiving unvalidated equipment.
+ *
+ * A rejected exercise is swapped for the closest same-group exercise the user
+ * *can* do, rather than dropped, so the session keeps its shape.
+ */
+export function reconcileWithCatalog(exercises, allowedIds, catalogById) {
+  const used = new Set();
+  const out = [];
+
+  for (const ex of exercises) {
+    if (allowedIds.has(ex.id) && !used.has(ex.id)) {
+      used.add(ex.id);
+      out.push(ex);
+      continue;
+    }
+    if (used.has(ex.id)) continue; // model repeated an exercise within a day
+
+    // Prefer a replacement training the same thing. `group` is undefined for a
+    // hallucinated id, in which case any unused allowed exercise beats nothing.
+    const wantGroup = getExerciseGroup(ex.id);
+    const candidates = [...allowedIds].filter(id => !used.has(id));
+    const sameGroup = wantGroup
+      ? candidates.filter(id => getExerciseGroup(id) === wantGroup)
+      : [];
+    const pick = (sameGroup.length > 0 ? sameGroup : candidates)[0];
+    if (!pick) continue;
+
+    used.add(pick);
+    const entry = catalogById[pick];
+    out.push(normalizeGeneratedExercise({
+      id: pick,
+      name: entry?.name || pick,
+      sets: ex.sets,
+      reps: ex.reps,
+      restSec: ex.restSec,
+      rpe: ex.rpe,
+      isBodyweight: entry?.isBodyweight,
+      isPlank: entry?.isPlank,
+    }));
+  }
+  return out;
+}
+
 export const EQUIPMENT_DESC = {
   full_gym:       'Full gym: barbells, dumbbells, cables, all machines available',
   dumbbells:      'Dumbbells and resistance bands ONLY — no barbells, no cables, no machines',
@@ -100,7 +155,12 @@ export async function generateProgramFromAssessment(assessment) {
       ? (numDays <= 3 ? 'full_body' : numDays === 4 ? 'upper_lower' : 'ppl')
       : splitPref;
 
-  const catalog = filterCatalogForEquipment(equipment)
+  const availableCatalog = filterCatalogForEquipment(equipment);
+  // Same list the prompt advertises — kept so the response can be checked
+  // against it instead of trusted.
+  const allowedIds = new Set(availableCatalog.map(e => e.id));
+  const catalogById = Object.fromEntries(availableCatalog.map(e => [e.id, e]));
+  const catalog = availableCatalog
     .map(e => {
       const weight = e.isBodyweight ? 'BW,0kg' : `${e.startKg}kg`;
       return `${e.id}="${e.name}"[${weight}][${(e.group || 'core').toUpperCase()}]`;
@@ -169,7 +229,10 @@ ${splitIsolationRule}`;
 
   try {
     const res = await authPostJSON('/api/coach', {
-      model: 'claude-sonnet-4-6',
+      // Charged against the program-generation budget, not the user's five
+      // weekly coach messages — finishing onboarding shouldn't spend one.
+      purpose: 'program_generation',
+      model: 'claude-sonnet-5',
       max_tokens: 4096,
       system: 'You are a training program generator. Output only valid JSON.',
       messages: [{ role: 'user', content: prompt }],
@@ -187,8 +250,15 @@ ${splitIsolationRule}`;
     for (const [day, prog] of Object.entries(parsed)) {
       if (!trainingDays.includes(day) || !Array.isArray(prog.exercises) || prog.exercises.length === 0) continue;
 
+      // Equipment first: an id the user can't perform is replaced before any
+      // split reasoning, so the substitute is what gets split-filtered.
+      let exercises = reconcileWithCatalog(
+        prog.exercises.map(normalizeGeneratedExercise),
+        allowedIds,
+        catalogById,
+      );
+
       // Strip exercises that belong to the wrong muscle group for this split day
-      let exercises = prog.exercises.map(normalizeGeneratedExercise);
       if (effectiveSplit === 'ppl') {
         const dayType = pplDayTypes[trainingDays.indexOf(day) % 3];
         exercises = filterToSplitDay(exercises, dayType, 'ppl');
@@ -196,6 +266,13 @@ ${splitIsolationRule}`;
         const dayType = ulDayTypes[trainingDays.indexOf(day) % 2];
         exercises = filterToSplitDay(exercises, dayType, 'upper_lower');
       }
+
+      // Split filtering has no floor of its own: a day the model built for the
+      // wrong muscle group can come out the other side with one exercise left,
+      // which reads as a broken program rather than a short one. Below the
+      // floor, treat the day as failed so the caller falls back to a stock
+      // program instead of saving a stub.
+      if (exercises.length < MIN_EXERCISES_PER_DAY) continue;
 
       if (exercises.length > 0) {
         valid[day] = {

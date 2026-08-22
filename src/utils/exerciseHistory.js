@@ -105,3 +105,75 @@ export function platesPerSide(targetKg, barKg = 20, plates = PLATES_KG) {
   }
   return { plates: result, remainderKg };
 }
+
+/**
+ * The last `limit` completed performances of one exercise, most recent first.
+ *
+ * Same source and filtering as getLastPerformance — this just doesn't stop at
+ * the first hit, because a single data point can't distinguish "progressing"
+ * from "stalled for a month".
+ */
+export function getRecentPerformances(state, exId, limit = 3) {
+  if (!state || !exId) return [];
+  const log = state.log;
+  if (!Array.isArray(log)) return [];
+
+  const out = [];
+  for (let i = log.length - 1; i >= 0 && out.length < limit; i--) {
+    const entry = log[i];
+    if (!entry || entry.type !== 'session') continue;
+    const detail = entry.exerciseDetails?.[exId];
+    if (!detail) continue;
+    if (!(detail.setsCompleted > 0)) continue;
+
+    out.push({
+      maxWeight: detail.maxWeight || 0,
+      repsPerSet: Array.isArray(detail.repsPerSet) ? detail.repsPerSet.filter(r => r > 0) : [],
+      setsCompleted: detail.setsCompleted || 0,
+      setsPrescribed: detail.setsPrescribed || 0,
+      maxRPE: detail.maxRPE || 0,
+      dateStr: entry.dateStr || entry.date || '',
+      week: entry.week ?? null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Epley estimate for one logged session.
+ *
+ * The log stores `maxWeight` and a flat `repsPerSet`, without pairing a weight
+ * to each set — so this assumes the straight-set loading the app's programs
+ * actually prescribe (same weight every set). Under a pyramid that assumption
+ * would pair the top weight with a lighter set's reps and read high, which is
+ * why the result is only ever labelled an estimate.
+ */
+export function sessionEstimated1RM(perf) {
+  if (!perf) return null;
+  const reps = Array.isArray(perf.repsPerSet) ? perf.repsPerSet.filter(r => r > 0) : [];
+  if (reps.length === 0) return null;
+  return estimate1RM(perf.maxWeight, Math.max(...reps));
+}
+
+/**
+ * Direction of travel across recent sessions, oldest → newest.
+ *
+ * Returns null rather than guessing when there are fewer than two comparable
+ * sessions. The 2.5% band keeps normal session-to-session noise from being
+ * reported as a trend.
+ */
+export function getStrengthTrend(performances) {
+  if (!Array.isArray(performances) || performances.length < 2) return null;
+  const estimates = performances.map(sessionEstimated1RM).filter(e => e != null);
+  if (estimates.length < 2) return null;
+
+  // performances arrive newest-first
+  const newest = estimates[0];
+  const oldest = estimates[estimates.length - 1];
+  if (!(oldest > 0)) return null;
+
+  const change = (newest - oldest) / oldest;
+  if (change > 0.025) return 'rising';
+  if (change < -0.025) return 'falling';
+  return 'flat';
+}

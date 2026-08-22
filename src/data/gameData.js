@@ -138,6 +138,9 @@ export const DEFAULT_STATE = {
   nutritionGoals: { calories: 2000, protein: 155, carbs: 190, fat: 60 },
   // Quest AI message quota (free tier: 5/week)
   questMessagesThisWeek: 0,
+  programGenerationsThisWeek: 0,
+  nutritionCallsToday: 0,
+  nutritionCallsDate: '',
   questMessagesWeekStart: null, // ISO date string — resets every Monday
   // Body composition (populated from assessment)
   bmi: null,

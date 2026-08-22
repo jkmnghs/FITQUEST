@@ -4,8 +4,11 @@
  * Supabase free projects pause after 7 days of inactivity.
  * This minimal read keeps the project awake at zero cost.
  *
- * Schedule: vercel.json → "0 9 */3 * *" (9am every 3 days)
+ * Schedule: see the cron line below.
  */
+// vercel.json cron: "0 9 */3 * *" — 9am every 3 days. This has to live in a
+// line comment: the "*/" inside "*/3" terminates a block comment early, which
+// is what made this whole file unparseable and silently killed the keep-alive.
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
