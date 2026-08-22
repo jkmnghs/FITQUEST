@@ -11,6 +11,7 @@ import {
   getRecentPerformances, sessionEstimated1RM, getStrengthTrend,
   sessionsInLastDays, lastSessionDate,
 } from '../utils/exerciseHistory';
+import { getBodyMetrics, formatBodyData, formatCheckinTrend } from '../utils/bodyMetrics';
 
 const DAY_FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
@@ -146,27 +147,7 @@ CRITICAL RULES — FOLLOW EXACTLY:
   }
 
   if (mode === 'physique') {
-    const checkins = state.weeklyCheckins || [];
-    const lastCheckin = checkins[checkins.length - 1];
-    const currentWeight = lastCheckin?.weight || 0;
-    const height = state.assessment?.height || 0;
-    const rawWaist = lastCheckin?.waist || 0;
-    // Check-ins recorded before the input was validated can hold an inches or
-    // pant-size figure stored as centimetres. Rather than deriving a ratio from
-    // it — and having the model quietly "assume this was 82cm", which is what
-    // it did — treat an impossible measurement as no measurement.
-    const waistPlausible = rawWaist >= Math.max(55, Math.round((height || 170) * 0.30)) && rawWaist <= 250;
-    const waist = waistPlausible ? rawWaist : 0;
-    const bmi = (height > 0 && currentWeight > 0)
-      ? (currentWeight / Math.pow(height / 100, 2)).toFixed(1)
-      : null;
-    const whr = (height > 0 && waist > 0) ? (waist / height).toFixed(2) : null;
-    const weightTrend = checkins.slice(-8)
-      .map(c => {
-        const ok = c.waist >= Math.max(55, Math.round((height || 170) * 0.30)) && c.waist <= 250;
-        return `Wk${c.week}: ${c.weight}${unit}${ok ? ` w${c.waist}cm` : ''}`;
-      })
-      .join(', ') || 'No check-ins yet';
+    const weightTrend = formatCheckinTrend(state, unit, 8);
     const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
     // Program-week count and calendar-week count are different numbers, and
     // only one of them answers "have they trained lately". See sessionsInLastDays.
@@ -176,13 +157,7 @@ CRITICAL RULES — FOLLOW EXACTLY:
 You are ${name}'s physique analyst. Objectively assess body composition data and recommend the optimal training focus: recomp, fat loss, muscle building, or strength. Be direct and data-driven.
 
 BODY DATA:
-- Current weight: ${currentWeight > 0 ? currentWeight + unit : 'not set'}
-- Height: ${height > 0 ? height + 'cm' : 'not set'}
-- BMI: ${bmi || 'n/a'}${bmi ? (bmi < 18.5 ? ' (underweight)' : bmi < 25 ? ' (normal)' : bmi < 30 ? ' (overweight)' : ' (obese)') : ''}
-- Waist: ${waist > 0 ? waist + 'cm' : (rawWaist > 0
-    ? `recorded as ${rawWaist}, which is not a possible waist in cm — treat it as MISSING, ask them to re-measure in centimetres, and do not guess what they meant`
-    : 'not measured')}
-${whr ? `- Waist-to-height ratio: ${whr} (healthy <0.50, elevated risk >0.55)` : ''}
+${formatBodyData(state, unit)}
 - Stated goal: ${goal || 'not set'}
 - Training level: ${state.assessment?.level || 'intermediate'}
 
@@ -275,7 +250,10 @@ NOTE: est1RM is an Epley estimate from logged weight and reps, not a tested max 
 ${todayPlan}`;
   }
 
-  // checkin — needs weight trend + training stats
+  // checkin — weight trend, training stats, and the same body data physique
+  // gets. This branch used to send weight alone, so the model could not compute
+  // a BMI and asked the user to log a height they had entered at onboarding and
+  // which was sitting in state the whole time.
   const checkins = state.weeklyCheckins || [];
   const last = checkins[checkins.length - 1];
   const prev = checkins.length > 1 ? checkins[checkins.length - 2] : null;
@@ -285,8 +263,12 @@ ${todayPlan}`;
 
   return `${base}
 STATUS: ${statusLine}
+BODY DATA:
+${formatBodyData(state, unit)}
 BODY WEIGHT: ${weightTrend}
-TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect weeks`;
+CHECK-IN HISTORY: ${formatCheckinTrend(state, unit, 8)}
+TRAINING: ${state.totalSessions} sessions total | ${state.perfectWeeks} perfect weeks
+Do not ask for data that appears above — if a figure is present, use it.`;
 }
 
 function buildUserPrompt(mode, state, userMessage) {
