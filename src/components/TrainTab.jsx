@@ -189,7 +189,7 @@ export default function TrainTab({
               position: 'absolute', top: -5, right: -6,
               background: 'var(--color-destructive)', color: '#fff',
               borderRadius: 'var(--radius-full)', minWidth: 14, height: 14, padding: '0 3px',
-              fontSize: 8, fontWeight: 700, lineHeight: '14px', textAlign: 'center',
+              fontSize: 11, fontWeight: 700, lineHeight: '14px', textAlign: 'center',
             }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
           )}
         </span>

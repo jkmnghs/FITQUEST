@@ -35,7 +35,7 @@ export function AchievementsTab({ state }) {
                 {unlocked ? a.name : 'Unknown'}
               </div>
               {unlocked && (
-                <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 2 }}>{a.desc}</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{a.desc}</div>
               )}
             </div>
           );
@@ -233,6 +233,7 @@ export const getProgramExercisesForDay = exercisesForDay;
 export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError }) {
   const { confirm, confirmDialog } = useConfirm();
   const [backfillOpen, setBackfillOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(() => Math.max(1, (state.currentWeek || 1) - 1));
   const [backfillDay, setBackfillDay] = useState(null);
   const [backfillDuration, setBackfillDuration] = useState(50);
@@ -334,22 +335,41 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
     <div>
       {/* Title supplied by ProfileTab's SectionHeader — see RankTab. */}
 
+      {/* Cycle complete claim button — visible when user is on or just past the end of a 12-week cycle */}
+      {onShowCycleComplete && (((state.currentWeek - 1) % 12) + 1 === 12) && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
+          border: '1px solid rgba(0,229,255,0.2)',
+          borderRadius: 13, padding: 14, marginBottom: 8,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyan)', marginBottom: 4 }}>
+            🏆 Cycle End Reached!
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
+            Week {state.currentWeek} is the final week of your current cycle. Claim your reward and choose your next program.
+          </div>
+          <button
+            onClick={onShowCycleComplete}
+            style={{
+              width: '100%', padding: 10, border: 'none', borderRadius: 10,
+              background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+              color: 'var(--bg)', letterSpacing: 0.5, cursor: 'pointer',
+              boxShadow: '0 4px 18px var(--cyan-glow)',
+            }}
+          >CLAIM CYCLE REWARD 🏆</button>
+        </div>
+      )}
+
       {/* Account section */}
       {userEmail && (
-        <div style={{
-          background: 'var(--card)', border: '1px solid rgba(0,229,255,0.1)',
-          borderRadius: 13, padding: '14px 16px', marginBottom: 8,
-          backdropFilter: 'blur(20px)',
-        }}>
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
-            color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
-          }}>ACCOUNT</div>
+        <SettingsGroup title="Account">
+        <div style={{ padding: '12px var(--space-4)' }}>
           <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 12, wordBreak: 'break-all' }}>
             {userEmail}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={onSignOut} style={accountBtn('rgba(255,23,68,0.12)', 'var(--red)')}>SIGN OUT</button>
+            <button onClick={onSignOut} style={accountBtn('rgba(255,255,255,0.06)', 'var(--color-text-secondary)')}>SIGN OUT</button>
             {onChangePassword && (
               <button
                 onClick={() => { setPwOpen(o => !o); setPwNote(null); onClearAuthError?.(); }}
@@ -394,55 +414,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             </div>
           )}
 
-          {/* Delete account */}
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {!deleteOpen ? (
-              <button
-                onClick={() => { setDeleteOpen(true); setDeleteConfirm(''); setDeleteError(null); }}
-                style={{
-                  background: 'none', border: 'none', padding: 0,
-                  color: 'var(--text3)', fontFamily: 'var(--font-display)', fontSize: 9,
-                  fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer',
-                }}
-              >DELETE ACCOUNT</button>
-            ) : (
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--red)', lineHeight: 1.5, marginBottom: 8 }}>
-                  This permanently deletes your account and all training data. It cannot be undone.
-                  Type <strong>DELETE</strong> to confirm.
-                </div>
-                <input
-                  value={deleteConfirm}
-                  onChange={e => setDeleteConfirm(e.target.value)}
-                  placeholder="DELETE"
-                  style={{ ...inputStyle, width: '100%', textAlign: 'left', marginBottom: 8 }}
-                />
-                {deleteError && (
-                  <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}>{deleteError}</div>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={() => setDeleteOpen(false)}
-                    style={{ flex: 1, ...accountBtn('rgba(255,255,255,0.06)', 'var(--text2)') }}
-                  >CANCEL</button>
-                  <button
-                    onClick={submitAccountDelete}
-                    disabled={deleteConfirm !== 'DELETE' || deleteBusy}
-                    style={{
-                      flex: 1, padding: '9px 18px', borderRadius: 10, border: 'none',
-                      background: deleteConfirm === 'DELETE' && !deleteBusy ? 'var(--red)' : 'rgba(255,23,68,0.12)',
-                      color: deleteConfirm === 'DELETE' && !deleteBusy ? '#fff' : 'var(--text3)',
-                      fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-                      cursor: deleteConfirm === 'DELETE' && !deleteBusy ? 'pointer' : 'not-allowed',
-                    }}
-                  >{deleteBusy ? 'DELETING...' : 'DELETE FOREVER'}</button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
+        </SettingsGroup>
       )}
 
+      <SettingsGroup title="Preferences">
       {/* Name */}
       <SettingRow label="Name">
         <input
@@ -461,32 +437,6 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         </select>
       </SettingRow>
 
-      {/* Cycle complete claim button — visible when user is on or just past the end of a 12-week cycle */}
-      {onShowCycleComplete && (((state.currentWeek - 1) % 12) + 1 === 12) && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
-          border: '1px solid rgba(0,229,255,0.2)',
-          borderRadius: 13, padding: 14, marginBottom: 8,
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyan)', marginBottom: 4 }}>
-            🏆 Cycle End Reached!
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
-            Week {state.currentWeek} is the final week of your current cycle. Claim your reward and choose your next program.
-          </div>
-          <button
-            onClick={onShowCycleComplete}
-            style={{
-              width: '100%', padding: 10, border: 'none', borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-              color: 'var(--bg)', letterSpacing: 0.5, cursor: 'pointer',
-              boxShadow: '0 4px 18px var(--cyan-glow)',
-            }}
-          >CLAIM CYCLE REWARD 🏆</button>
-        </div>
-      )}
-
       {/* Unit */}
       <SettingRow label="Unit">
         <select value={state.unit} onChange={e => onUpdate('unit', e.target.value)} style={inputStyle}>
@@ -495,11 +445,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         </select>
       </SettingRow>
 
+      </SettingsGroup>
+
       {/* Notifications */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
-      }}>
+      <SettingsGroup title="Notifications">
+      <div style={{ padding: '10px var(--space-4)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <label style={{ fontSize: 14, fontWeight: 600 }}>Push Notifications</label>
           <div style={{
@@ -515,9 +465,9 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         {notifStatus !== 'granted' && notifStatus !== 'denied' && (
           <button onClick={onRequestNotif} style={{
             width: '100%', padding: 10, border: 'none', borderRadius: 10,
-            background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+            background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.28)', color: 'var(--color-action)',
             fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-            color: 'var(--bg)', cursor: 'pointer', letterSpacing: 0.5
+            cursor: 'pointer', letterSpacing: 0.5
           }}>ENABLE NOTIFICATIONS</button>
         )}
         {notifStatus === 'denied' && (
@@ -532,11 +482,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         )}
       </div>
 
+      </SettingsGroup>
+
+      <SettingsGroup title="Training data">
       {/* Backfill History */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid rgba(179,136,255,0.2)',
-        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
-      }}>
+      <div style={{ padding: '10px var(--space-4)' }}>
         <button
           onClick={() => setBackfillOpen(o => !o)}
           style={{
@@ -715,11 +665,23 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
       </div>
 
       {/* Nutrition Goals */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Nutrition Goals</div>
+      <button
+        onClick={() => setGoalsOpen(o => !o)}
+        className="fq-set-row"
+        aria-expanded={goalsOpen}
+      >
+        <span style={{ flex: 1 }}>Nutrition goals</span>
+        <span style={{ color: 'var(--color-text-tertiary)' }}>
+          {state.nutritionGoals?.calories ?? '—'} kcal
+        </span>
+        <span aria-hidden="true" style={{
+          color: 'var(--color-text-tertiary)',
+          transform: goalsOpen ? 'rotate(90deg)' : 'none',
+          transition: 'transform var(--transition-normal)', lineHeight: 1,
+        }}>&#8250;</span>
+      </button>
+      {goalsOpen && (
+      <div className="fq-set-panel" style={{ paddingTop: 'var(--space-3)' }}>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
           Auto-calculated from your profile (height, weight, goal, activity). Edit to override.
         </div>
@@ -743,14 +705,11 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           </SettingRow>
         ))}
       </div>
+      )}
 
       {/* Export / Import */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Backup & Restore</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ padding: '10px var(--space-4)', borderTop: '1px solid var(--color-border-medium)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 10, lineHeight: 1.5 }}>
           Export your progress as a JSON file, or restore from a previous backup.
         </div>
 
@@ -797,10 +756,10 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
               URL.revokeObjectURL(url);
             }}
             style={{
-              flex: 1, padding: 10, border: 'none', borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
+              flex: 1, padding: 10, borderRadius: 10,
+              background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.28)', color: 'var(--color-action)',
               fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-              color: 'var(--bg)', cursor: 'pointer', letterSpacing: 0.5
+              cursor: 'pointer', letterSpacing: 0.5
             }}
           >EXPORT</button>
           <label style={{
@@ -849,6 +808,9 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         </div>
       </div>
 
+      </SettingsGroup>
+
+      <SettingsGroup title="Danger zone" tone="danger">
       {/* Reset Today */}
       <button
         onClick={() => {
@@ -858,14 +820,8 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             confirmLabel: 'CLEAR',
           }).then(ok => { if (ok) onResetToday(); });
         }}
-        style={{
-          width: '100%', padding: 12, marginTop: 8,
-          border: '2px solid var(--gold)', borderRadius: 13,
-          background: 'rgba(255,214,0,0.06)', color: 'var(--gold)',
-          fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
-          cursor: 'pointer', letterSpacing: 0.8
-        }}
-      >RESET TODAY'S SESSION</button>
+        className="fq-set-row" style={{ color: '#ff8a9b', fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 500 }}
+      >Reset today&rsquo;s session</button>
 
       {/* Reset */}
       <button
@@ -877,30 +833,113 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
             destructive: true,
           }).then(ok => { if (ok) onReset(); });
         }}
-        style={{
-          width: '100%', padding: 12, marginTop: 8,
-          border: '2px solid var(--red)', borderRadius: 13,
-          background: 'rgba(255,23,68,0.06)', color: 'var(--red)',
-          fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
-          cursor: 'pointer', letterSpacing: 0.8
-        }}
-      >RESET ALL PROGRESS</button>
+        className="fq-set-row" style={{ color: '#ff8a9b', fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 500 }}
+      >Reset all progress</button>
+
+      {/* Delete account — collected here rather than sitting above the
+      preferences, where it shared a card with sign out. */}
+      <>
+        {!deleteOpen ? (
+          <button
+            onClick={() => { setDeleteOpen(true); setDeleteConfirm(''); setDeleteError(null); }}
+            className="fq-set-row"
+            style={{ color: '#ff8a9b', fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 500 }}
+          >Delete account</button>
+        ) : (
+          <div className="fq-set-panel" style={{ paddingTop: 'var(--space-4)' }}>
+            <div style={{ fontSize: 12, color: 'var(--red)', lineHeight: 1.5, marginBottom: 8 }}>
+              This permanently deletes your account and all training data. It cannot be undone.
+              Type <strong>DELETE</strong> to confirm.
+            </div>
+            <input
+              value={deleteConfirm}
+              onChange={e => setDeleteConfirm(e.target.value)}
+              placeholder="DELETE"
+              style={{ ...inputStyle, width: '100%', textAlign: 'left', marginBottom: 8 }}
+            />
+            {deleteError && (
+              <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}>{deleteError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setDeleteOpen(false)}
+                style={{ flex: 1, ...accountBtn('rgba(255,255,255,0.06)', 'var(--text2)') }}
+              >CANCEL</button>
+              <button
+                onClick={submitAccountDelete}
+                disabled={deleteConfirm !== 'DELETE' || deleteBusy}
+                style={{
+                  flex: 1, padding: '9px 18px', borderRadius: 10, border: 'none',
+                  background: deleteConfirm === 'DELETE' && !deleteBusy ? 'var(--red)' : 'rgba(255,23,68,0.12)',
+                  color: deleteConfirm === 'DELETE' && !deleteBusy ? '#fff' : 'var(--text3)',
+                  fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                  cursor: deleteConfirm === 'DELETE' && !deleteBusy ? 'pointer' : 'not-allowed',
+                }}
+              >{deleteBusy ? 'DELETING...' : 'DELETE FOREVER'}</button>
+            </div>
+          </div>
+        )}
+      </>
+      </SettingsGroup>
 
       {confirmDialog}
     </div>
   );
 }
 
-function SettingRow({ label, children }) {
+/**
+ * One row inside a settings group.
+ *
+ * Was a standalone card — border, radius, 8px margin — so a run of settings
+ * rendered as detached boxes rather than a list. It is now a flat row that
+ * takes its chrome from the group around it.
+ */
+function SettingRow({ label, sub, value, children, onClick, tone, chevron }) {
+  const Tag = onClick ? 'button' : 'div';
+  const labelColor = tone === 'danger' ? '#ff8a9b' : 'var(--color-text-primary)';
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      background: 'var(--card)', border: '1px solid var(--card-border)',
-      borderRadius: 13, padding: 14, marginBottom: 8, backdropFilter: 'blur(20px)'
-    }}>
-      <label style={{ fontSize: 14, fontWeight: 600 }}>{label}</label>
+    <Tag
+      className="fq-set-row"
+      {...(onClick ? { onClick, type: 'button' } : {})}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', color: labelColor, fontWeight: 500 }}>{label}</span>
+        {sub && (
+          <span style={{
+            display: 'block', marginTop: 2,
+            fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', lineHeight: 1.45,
+          }}>{sub}</span>
+        )}
+      </span>
+      {value != null && (
+        <span style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{value}</span>
+      )}
       {children}
-    </div>
+      {chevron && (
+        <span aria-hidden="true" style={{
+          color: 'var(--color-text-tertiary)', flexShrink: 0,
+          transition: 'transform var(--transition-normal)',
+          transform: chevron === 'open' ? 'rotate(90deg)' : 'none',
+          lineHeight: 1,
+        }}>&#8250;</span>
+      )}
+    </Tag>
+  );
+}
+
+/** A labelled run of settings rows. */
+function SettingsGroup({ title, tone, children }) {
+  return (
+    <section style={{ marginBottom: 'var(--space-5)' }}>
+      {title && (
+        <div className="fq-set-header" style={tone === 'danger' ? { color: '#ff8a9b' } : undefined}>
+          {title}
+        </div>
+      )}
+      <div className={`fq-set-group${tone === 'danger' ? ' fq-set-group--danger' : ''}`}>
+        {children}
+      </div>
+    </section>
   );
 }
 

@@ -388,11 +388,11 @@ function AgentInbox({ messages, onMarkAllRead }) {
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <div style={{
-                  fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                   color: msg.read ? 'var(--text3)' : 'var(--cyan)', letterSpacing: 1,
                   textTransform: 'uppercase',
                 }}>{msg.trigger?.replace(/_/g, ' ') || 'QUEST'}{!msg.read && <span style={{ marginLeft: 6, color: 'var(--cyan)' }}>● NEW</span>}</div>
-                <div style={{ fontSize: 9, color: 'var(--text3)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)' }}>
                   {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                 </div>
               </div>
@@ -664,7 +664,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             {unreadAgentCount > 0 && (
               <span style={{
                 background: 'var(--red)', color: '#fff', borderRadius: '50%',
-                width: 16, height: 16, fontSize: 9, fontWeight: 700,
+                width: 16, height: 16, fontSize: 11, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>{unreadAgentCount > 9 ? '9+' : unreadAgentCount}</span>
             )}
@@ -948,7 +948,7 @@ function ExerciseList({ exercises }) {
             width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
             background: 'rgba(255,255,255,0.05)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-display)', fontSize: 8, color: 'var(--text3)',
+            fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)',
           }}>{i + 1}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{ex.name}</div>
@@ -1005,7 +1005,7 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
                 ? `✓ SAVED — ${inputs.map(t => (DAY_FULL[t.day] || t.day || '').toUpperCase()).join(' · ')}`
                 : `${isMultiDay ? `${inputs.length}-DAY` : (DAY_FULL[inputs[0]?.day] || inputs[0]?.day || '?').toUpperCase()} PROGRAM PROPOSAL`}
             </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--text3)' }}>{totalExercises} exercises</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)' }}>{totalExercises} exercises</div>
           </div>
 
           {/* Day sections */}
@@ -1019,7 +1019,7 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
                     borderTop: di > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, color: '#b3ff5e', letterSpacing: 1 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: '#b3ff5e', letterSpacing: 1 }}>
                       {dayLabel.toUpperCase()}
                     </div>
                     {t.title && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t.title}</div>}

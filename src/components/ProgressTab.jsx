@@ -141,7 +141,7 @@ function BodyStatsCard({ state }) {
           ].map(({ label, pct }) => (
             <span key={label} style={{
               position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',
-              fontSize: 8, fontWeight: 700, color: 'var(--color-text-tertiary)',
+              fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)',
               whiteSpace: 'nowrap',
             }}>{label}</span>
           ))}
@@ -171,7 +171,7 @@ function BodyStatsCard({ state }) {
           ].map(({ val, pct }) => (
             <span key={val} style={{
               position: 'absolute', left: `${pct}%`, transform: 'translateX(-50%)',
-              fontSize: 9, color: 'var(--color-text-tertiary)',
+              fontSize: 11, color: 'var(--color-text-tertiary)',
             }}>{val}</span>
           ))}
         </div>

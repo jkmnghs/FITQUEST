@@ -124,7 +124,7 @@ function ProgressRing({ done, total, size = 62, restDay = false }) {
             <span style={{
               fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 900, color,
             }}>{done}</span>
-            <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
               of {total}
             </span>
           </>
@@ -633,7 +633,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                     width: 72, border: 'none', background: 'rgba(0,229,255,0.18)',
                     color: 'var(--color-action)', borderRadius: 'var(--radius-lg) 0 0 var(--radius-lg)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-                    fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700, letterSpacing: '0.05em',
+                    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
                   }}
                 ><Repeat size={17} />SWAP</button>
                 <button
@@ -643,7 +643,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                     width: 72, border: 'none', background: 'rgba(255,23,68,0.2)',
                     color: 'var(--color-destructive)', borderRadius: '0 var(--radius-lg) var(--radius-lg) 0',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-                    fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700, letterSpacing: '0.05em',
+                    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
                   }}
                 ><Trash2 size={17} />DELETE</button>
               </div>
@@ -1031,7 +1031,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 {['All', ...categories.map(c => c.category)].map(cat => (
                   <button key={cat} onClick={() => setPickerCategory(cat)} style={{
                     padding: '5px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                    whiteSpace: 'nowrap', fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                    whiteSpace: 'nowrap', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                     letterSpacing: 0.5, flexShrink: 0,
                     background: pickerCategory === cat ? 'rgba(0,229,255,0.18)' : 'rgba(255,255,255,0.05)',
                     color: pickerCategory === cat ? 'var(--cyan)' : 'var(--text3)',
@@ -1100,7 +1100,7 @@ function Tag({ type, children }) {
 function Badge({ color, bg, border, children }) {
   return (
     <span style={{
-      fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700,
+      fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
       padding: '2px 6px', borderRadius: 4, letterSpacing: 0.3,
       color, background: bg, border: `1px solid ${border}`
     }}>{children}</span>
@@ -1136,7 +1136,7 @@ function FinishArea({ state, exercises, onFinish }) {
               }} />
               <div style={{ flex: 1, color: done ? 'var(--text)' : 'var(--text2)' }}>{e.name}</div>
               <div style={{
-                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
                 color: done ? 'var(--green)' : 'var(--text3)'
               }}>
                 {done && det ? `${det.setsCompleted}/${det.setsPrescribed}` : '—'}

@@ -255,7 +255,7 @@ function StepRow({ step, status }) {
         </div>
         {(isActive || isDone) && (
           <div style={{
-            fontFamily: ORBITRON, fontSize: 9, letterSpacing: 1.4, marginTop: 2,
+            fontFamily: ORBITRON, fontSize: 11, letterSpacing: 1.4, marginTop: 2,
             color: isActive ? CYAN : 'rgba(255,255,255,0.28)',
             textShadow: isActive ? `0 0 6px ${CYAN}55` : 'none',
           }}>{step.sub}</div>

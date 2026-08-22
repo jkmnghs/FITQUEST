@@ -48,7 +48,7 @@ function UnreadBadge({ count, offset = -4 }) {
         position: 'absolute', top: offset, right: offset,
         background: 'var(--color-destructive)', color: '#fff',
         borderRadius: 'var(--radius-full)', minWidth: 15, height: 15, padding: '0 3px',
-        fontSize: 9, fontWeight: 700, lineHeight: '15px', textAlign: 'center',
+        fontSize: 11, fontWeight: 700, lineHeight: '15px', textAlign: 'center',
       }}
     >{count > 9 ? '9+' : count}</span>
   );
@@ -127,12 +127,12 @@ function SetPasswordScreen({ authError, onUpdate, onCancel }) {
       <div style={{ width: '100%', maxWidth: 360, background: 'var(--card)', border: '1px solid rgba(0,229,255,0.12)', borderRadius: 20, padding: '28px 24px', backdropFilter: 'blur(20px)', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
         <form onSubmit={handleSubmit}>
           <label style={{ display: 'block', marginBottom: 16 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6 }}>NEW PASSWORD</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6 }}>NEW PASSWORD</div>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimum 6 characters" autoComplete="new-password"
               style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)', outline: 'none', boxSizing: 'border-box' }} />
           </label>
           <label style={{ display: 'block', marginBottom: 20 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6 }}>CONFIRM PASSWORD</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6 }}>CONFIRM PASSWORD</div>
             <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat new password" autoComplete="new-password"
               style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)', outline: 'none', boxSizing: 'border-box' }} />
           </label>
@@ -145,7 +145,7 @@ function SetPasswordScreen({ authError, onUpdate, onCancel }) {
           {/* Escape hatch — a user who lands here from a recovery link and
               changes their mind was previously stuck on this screen. */}
           <button type="button" onClick={onCancel}
-            style={{ width: '100%', marginTop: 12, padding: '10px', border: 'none', background: 'transparent', color: 'var(--text3)', fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: 1, cursor: 'pointer' }}>
+            style={{ width: '100%', marginTop: 12, padding: '10px', border: 'none', background: 'transparent', color: 'var(--text3)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: 'pointer' }}>
             CANCEL — SIGN OUT
           </button>
         </form>

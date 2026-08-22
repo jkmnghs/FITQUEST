@@ -23,7 +23,7 @@ export default function DailySummaryBar({ dayTotals, goals, mealCount }) {
       {/* Calorie row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-2)' }}>
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 9,
+          fontFamily: 'var(--font-display)', fontSize: 11,
           color: 'var(--color-text-tertiary)', letterSpacing: '0.1em',
         }}>TODAY</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
@@ -83,7 +83,7 @@ export default function DailySummaryBar({ dayTotals, goals, mealCount }) {
                 alignItems: 'baseline', marginBottom: 5,
               }}>
                 <span style={{
-                  fontFamily: 'var(--font-display)', fontSize: 8,
+                  fontFamily: 'var(--font-display)', fontSize: 11,
                   color: 'var(--color-text-tertiary)', letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                 }}>{m.label}</span>
@@ -106,7 +106,7 @@ export default function DailySummaryBar({ dayTotals, goals, mealCount }) {
                 }} />
               </div>
               <div style={{
-                fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 4, textAlign: 'right',
+                fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, textAlign: 'right',
               }}>/ {goal}g</div>
             </div>
           );

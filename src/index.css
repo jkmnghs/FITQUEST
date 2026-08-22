@@ -50,7 +50,11 @@
   /* ── Colors: Text ── */
   --color-text-primary: #e8eaf6;
   --color-text-secondary: #9fa8da;
-  --color-text-tertiary: #5c6bc0;
+  /* Was #5c6bc0 — 3.96:1 on the page ground and 3.14:1 on a raised card,
+     below the 4.5:1 minimum, on the app's second-most-used text colour
+     (225 references: every "Last: 45kg x 10, 9, 8", meta line and hint).
+     Same hue, lifted until it clears with margin: 6.43:1 and 5.10:1. */
+  --color-text-tertiary: #8691d0;
 
   /* ── Colors: Borders ── */
   --color-border-subtle: rgba(255,255,255,0.04);
@@ -123,7 +127,7 @@
   --gold-glow: rgba(255, 214, 0, 0.1);
   --text: #e8eaf6;
   --text2: #9fa8da;
-  --text3: #5c6bc0;
+  --text3: var(--color-text-tertiary);
   --card: rgba(21, 29, 53, 0.92);
   --card-border: rgba(255,255,255,0.04);
   --safe-top: env(safe-area-inset-top, 20px);
@@ -479,6 +483,57 @@ select, textarea {
   }
   /* The drag handle means nothing once the sheet stops being draggable. */
   .fq-sheet__handle { display: none; }
+}
+
+/* ── Settings list ──
+   Grouped inset lists. Every settings row used to be its own floating card
+   with its own border and an 8px gap, so fourteen settings read as a pile of
+   detached boxes. Grouping them under labelled headers with hairline dividers
+   is the convention on both platforms, and it is what lets a reader scan for
+   the row they want instead of reading every one. */
+.fq-set-group {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.fq-set-group--danger { border-color: rgba(255,23,68,0.22); }
+
+.fq-set-header {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-text-tertiary);
+  padding: 0 var(--space-1) var(--space-2);
+  text-transform: uppercase;
+}
+
+.fq-set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 10px var(--space-4);
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--color-text-primary);
+  font-family: var(--font-primary);
+  font-size: var(--text-base);
+}
+.fq-set-row + .fq-set-row,
+.fq-set-panel + .fq-set-row { border-top: 1px solid var(--color-border-medium); }
+.fq-set-group--danger .fq-set-row + .fq-set-row { border-top-color: rgba(255,23,68,0.16); }
+.fq-set-row:disabled { opacity: 1; }
+
+/* Where a heavier control still has to live inline (backfill, macro goals),
+   it sits in a panel that reads as part of the row above it, not as a
+   separate card. */
+.fq-set-panel {
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--color-border-medium);
 }
 
 /* ── Shared surfaces ── */

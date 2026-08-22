@@ -58,7 +58,7 @@ export default function RankTab({ state }) {
                   animation: isCur ? 'rankPulse 2s infinite' : 'none'
                 }}>{r.l}</div>
                 <div style={{
-                  fontSize: 9, fontWeight: 600, letterSpacing: 0.3,
+                  fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
                   color: isLocked ? 'var(--text3)' : 'var(--text2)'
                 }}>{r.name}</div>
               </div>

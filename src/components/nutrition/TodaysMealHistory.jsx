@@ -27,7 +27,7 @@ export default function TodaysMealHistory({ todayMeals, onDeleteMeal }) {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--text1)' }}>
               {meal.totals.calories}
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text3)' }}>kcal</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>kcal</div>
           </div>
           {onDeleteMeal && meal.id && (
             <button

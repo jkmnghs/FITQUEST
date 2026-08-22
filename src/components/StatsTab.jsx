@@ -86,7 +86,7 @@ export default function StatsTab({ state }) {
                 <span style={{ fontWeight: 700 }}>{convWt > 0 ? `${convWt} ${unit}` : '—'}</span>
                 {gain > 0.1 && <span style={{ color: 'var(--green)' }}>+{gain.toFixed(1)}</span>}
                 {pr && <span style={{
-                  fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700, padding: '2px 5px',
+                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, padding: '2px 5px',
                   borderRadius: 4, background: 'rgba(255,214,0,0.12)', color: 'var(--gold)',
                   border: '1px solid rgba(255,214,0,0.25)'
                 }}>PR</span>}
@@ -399,7 +399,7 @@ function SleepChart({ checkins }) {
 function MiniTag({ color, bg, border, children }) {
   return (
     <span style={{
-      fontFamily: 'var(--font-display)', fontSize: 8, fontWeight: 700,
+      fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
       padding: '2px 5px', borderRadius: 4, letterSpacing: 0.3,
       color, background: bg, border: `1px solid ${border}`
     }}>{children}</span>

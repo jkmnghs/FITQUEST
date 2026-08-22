@@ -74,7 +74,7 @@ function ReferenceStrip({ last, pr, unit, sessionBest1RM }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
             <Icon size={11} color={color} />
             <span style={{
-              fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)',
+              fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)',
               textTransform: 'uppercase', letterSpacing: '0.05em',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{label}</span>
@@ -84,7 +84,7 @@ function ReferenceStrip({ last, pr, unit, sessionBest1RM }) {
             lineHeight: 1.3, wordBreak: 'break-word',
           }}>{value}</div>
           {sub && (
-            <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{sub}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{sub}</div>
           )}
         </div>
       ))}
@@ -121,7 +121,7 @@ function PlateCalculator({ targetKg, unit }) {
         marginBottom: 'var(--space-3)', flexWrap: 'wrap',
       }}>
         <span style={{
-          flex: 1, fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)',
+          flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)',
           textTransform: 'uppercase', letterSpacing: '0.05em',
         }}>Per side · {convertWeight(targetKg, unit)} {unit} total</span>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -482,7 +482,7 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
         {['#', unit.toUpperCase(), 'REPS', 'RPE', ''].map((h, i) => (
-          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600, letterSpacing: 0.5 }}>{h}</span>
+          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)', textAlign: 'center', fontWeight: 600, letterSpacing: 0.5 }}>{h}</span>
         ))}
       </div>
       {sets.map((s, i) => (
@@ -555,7 +555,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
         {['#', 'SECONDS', 'TIMER', ''].map((h, i) => (
-          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 8, color: 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>{h}</span>
+          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>{h}</span>
         ))}
       </div>
       {sets.map((s, i) => {

@@ -43,7 +43,7 @@ const inputSt = {
 const selectSt = { ...inputSt, cursor: 'pointer', appearance: 'none', paddingRight: 6 };
 
 function FieldLabel({ children }) {
-  return <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--font-display)', letterSpacing: 1, marginBottom: 4 }}>{children}</div>;
+  return <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-display)', letterSpacing: 1, marginBottom: 4 }}>{children}</div>;
 }
 
 function ExForm({ ex, onChange, onDone }) {
@@ -101,7 +101,7 @@ function ExForm({ ex, onChange, onDone }) {
         <button onClick={onDone} style={{
           marginTop: 10, padding: '7px 16px', borderRadius: 8, border: 'none',
           background: 'rgba(0,229,255,0.12)', color: 'var(--cyan)',
-          fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
         }}>DONE</button>
       )}
     </div>
@@ -319,7 +319,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
                 width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
                 background: 'rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, color: 'var(--text3)',
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--text3)',
               }}>{idx + 1}</div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -375,7 +375,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           border: '1px solid rgba(0,229,255,0.2)', borderRadius: 14,
           background: 'rgba(0,229,255,0.03)',
         }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 10 }}>
             SEARCH EXERCISE LIBRARY
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -391,7 +391,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
             <button onClick={useCustomName} style={{
               padding: '0 14px', borderRadius: 8, border: 'none',
               background: 'rgba(0,229,255,0.15)', color: 'var(--cyan)',
-              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
             }}>USE</button>
           </div>
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -410,7 +410,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           <button onClick={() => setAddForm(null)} style={{
             marginTop: 10, padding: '7px 14px', borderRadius: 8, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
-            fontFamily: 'var(--font-display)', fontSize: 9, cursor: 'pointer',
+            fontFamily: 'var(--font-display)', fontSize: 11, cursor: 'pointer',
           }}>CANCEL</button>
         </div>
       ) : (
@@ -442,7 +442,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
             <button onClick={() => setAddForm(null)} style={{
               padding: '11px 16px', borderRadius: 10, border: 'none',
               background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
-              fontFamily: 'var(--font-display)', fontSize: 9, cursor: 'pointer',
+              fontFamily: 'var(--font-display)', fontSize: 11, cursor: 'pointer',
             }}>CANCEL</button>
           </div>
         </div>
@@ -464,7 +464,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
             padding: '14px 18px', borderRadius: 12,
             border: '1px solid rgba(255,50,68,0.2)',
             background: 'rgba(255,50,68,0.07)', color: 'var(--red)',
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             cursor: 'pointer', letterSpacing: 1, flexShrink: 0,
           }}>CLEAR DAY</button>
         )}

@@ -111,11 +111,11 @@ function StepHeader({ step, total, title }) {
         marginBottom: 8,
       }}>
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
           color: 'var(--text3)', letterSpacing: 1.5,
         }}>STEP {step} OF {total}</div>
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--cyan)',
+          fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--cyan)',
         }}>{Math.round(pct)}%</div>
       </div>
       <div style={{
@@ -140,7 +140,7 @@ function NumInput({ label, value, onChange, placeholder, unit, isText, error }) 
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{
-        fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+        fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
         color: error ? 'var(--fire2)' : 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
       }}>{label}{unit && <span style={{ marginLeft: 4 }}>({unit})</span>}</div>
       <input
@@ -387,7 +387,7 @@ export default function OnboardingScreen({ onComplete }) {
                     color: data.parqAnswers[i] === val
                       ? (val ? 'var(--red)' : 'var(--cyan)')
                       : 'var(--text3)',
-                    fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                     cursor: 'pointer', minWidth: 40,
                   }}>{label}</button>
                 ))}
@@ -550,7 +550,7 @@ export default function OnboardingScreen({ onComplete }) {
           )}
           <div style={{ marginTop: 16 }}>
             <div style={{
-              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
               color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
             }}>ADDITIONAL NOTES (optional)</div>
             <textarea
@@ -587,7 +587,7 @@ export default function OnboardingScreen({ onComplete }) {
         <Card>
           <StepHeader step={7} total={TOTAL_STEPS} title="Your Training Schedule" />
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>DAYS PER WEEK</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
@@ -604,7 +604,7 @@ export default function OnboardingScreen({ onComplete }) {
             ))}
           </div>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>SESSION LENGTH</div>
           {lengthOpts.map(l => (
@@ -708,7 +708,7 @@ export default function OnboardingScreen({ onComplete }) {
 
           <div style={{ marginBottom: fe.sex ? 6 : 14 }}>
             <div style={{
-              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
               color: fe.sex ? 'var(--fire2)' : 'var(--text3)', letterSpacing: 1.5, marginBottom: 8,
             }}>BIOLOGICAL SEX</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -767,7 +767,7 @@ export default function OnboardingScreen({ onComplete }) {
         <Card>
           <StepHeader step={11} total={TOTAL_STEPS} title="Lifestyle & Recovery" />
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>DAILY ACTIVITY LEVEL</div>
           {activityOpts.map(a => (
@@ -779,7 +779,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>TYPICAL SLEEP</div>
           {sleepOpts.map(s => (
@@ -788,7 +788,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>STRESS LEVEL</div>
           {stressOpts.map(s => (
@@ -833,7 +833,7 @@ export default function OnboardingScreen({ onComplete }) {
         <Card>
           <StepHeader step={12} total={TOTAL_STEPS} title="Dietary Context" />
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>DIETARY RESTRICTIONS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 20 }}>
@@ -844,7 +844,7 @@ export default function OnboardingScreen({ onComplete }) {
             ))}
           </div>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>TRACKING EXPERIENCE</div>
           {trackOpts.map(t => (
@@ -853,7 +853,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>MEALS PER DAY</div>
           {mealOpts.map(m => (
@@ -891,7 +891,7 @@ export default function OnboardingScreen({ onComplete }) {
         <Card>
           <StepHeader step={13} total={TOTAL_STEPS} title="Your Motivation" />
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 12,
           }}>HAVE YOU STARTED AND STOPPED BEFORE?</div>
           {quitReasons.map(r => (
@@ -900,7 +900,7 @@ export default function OnboardingScreen({ onComplete }) {
             </OptionBtn>
           ))}
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
             color: 'var(--text3)', letterSpacing: 1.5, marginTop: 20, marginBottom: 12,
           }}>YOUR #1 REASON FOR TRAINING</div>
           {motivations.map(m => (
@@ -953,7 +953,7 @@ export default function OnboardingScreen({ onComplete }) {
                   transition: 'all 0.15s',
                 }}>
                   <span>{d.label}</span>
-                  <span style={{ fontSize: 8, fontWeight: 400 }}>{d.full}</span>
+                  <span style={{ fontSize: 11, fontWeight: 400 }}>{d.full}</span>
                 </button>
               );
             })}

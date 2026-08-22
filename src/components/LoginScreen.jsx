@@ -153,7 +153,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             }}>Enter your email and we'll send you a link to reset your password.</div>
             <label style={{ display: 'block', marginBottom: 20 }}>
               <div style={{
-                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
               }}>EMAIL</div>
               <input
@@ -200,7 +200,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                 width: '100%', marginTop: 12, padding: '10px',
                 border: 'none', background: 'transparent',
                 color: 'var(--text3)', fontFamily: 'var(--font-display)',
-                fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                fontSize: 11, fontWeight: 700, letterSpacing: 1,
                 cursor: 'pointer',
               }}
             >BACK TO SIGN IN</button>
@@ -223,7 +223,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
               style={{
                 marginTop: 14, background: 'none', border: 'none', padding: 0,
                 color: resendCooldown > 0 ? 'var(--text3)' : 'var(--cyan)',
-                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
                 cursor: resendCooldown > 0 ? 'default' : 'pointer',
               }}
             >{resendCooldown > 0 ? `RESEND IN ${resendCooldown}s` : "DIDN'T GET IT? RESEND"}</button>
@@ -246,7 +246,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             {mode === 'signup' && (
               <label style={{ display: 'block', marginBottom: 16 }}>
                 <div style={{
-                  fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                   color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
                 }}>YOUR NAME</div>
                 <input
@@ -269,7 +269,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             )}
             <label style={{ display: 'block', marginBottom: 16 }}>
               <div style={{
-                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
               }}>EMAIL</div>
               <input
@@ -291,7 +291,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
 
             <label style={{ display: 'block', marginBottom: mode === 'signup' ? 16 : mode === 'signin' ? 8 : 20 }}>
               <div style={{
-                fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                 color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
               }}>PASSWORD</div>
               <input
@@ -313,7 +313,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
             {mode === 'signup' && (
               <label style={{ display: 'block', marginBottom: 20 }}>
                 <div style={{
-                  fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700,
+                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                   color: 'var(--text3)', letterSpacing: 1.5, marginBottom: 6,
                 }}>CONFIRM PASSWORD</div>
                 <input
@@ -341,7 +341,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
                   style={{
                     background: 'none', border: 'none', padding: 0,
                     color: 'var(--cyan)', fontFamily: 'var(--font-display)',
-                    fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                    fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
                     cursor: 'pointer', opacity: 0.8,
                   }}
                 >FORGOT PASSWORD?</button>

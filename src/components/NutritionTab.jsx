@@ -524,7 +524,7 @@ Guidelines:
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             <div style={{ flex: 1, height: 1, background: 'var(--color-border-subtle)' }} />
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--color-text-tertiary)', letterSpacing: '0.08em' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--color-text-tertiary)', letterSpacing: '0.08em' }}>
               OR ADD MANUALLY
             </span>
             <div style={{ flex: 1, height: 1, background: 'var(--color-border-subtle)' }} />
@@ -661,7 +661,7 @@ Guidelines:
       {foods.length > 0 && (
         <>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--color-text-tertiary)',
             letterSpacing: '0.1em', marginTop: 'var(--space-5)', marginBottom: 'var(--space-3)',
           }}>
             DETECTED FOODS — ADJUST PORTIONS
@@ -738,7 +738,7 @@ Guidelines:
                         </span>
                         {food.source && (
                           <span style={{
-                            fontSize: 9, fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: 0.5,
+                            fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: 0.5,
                             borderRadius: 4, padding: '1px 5px',
                             ...(food.source === 'reference'
                               ? { color: 'var(--cyan)',   background: 'rgba(0,229,255,0.08)',  border: '1px solid rgba(0,229,255,0.3)'  }
@@ -804,7 +804,7 @@ Guidelines:
                             }}
                           >
                             <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700 }}>{p}</span>
-                            <span style={{ fontFamily: 'var(--font-primary)', fontSize: 9, opacity: 0.8 }}>{previewG}g</span>
+                            <span style={{ fontFamily: 'var(--font-primary)', fontSize: 11, opacity: 0.8 }}>{previewG}g</span>
                           </button>
                         );
                       })}
@@ -910,7 +910,7 @@ Guidelines:
           {!logged && (
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <div style={{
-                fontFamily: 'var(--font-display)', fontSize: 9,
+                fontFamily: 'var(--font-display)', fontSize: 11,
                 color: 'var(--color-text-tertiary)', letterSpacing: '0.1em', marginBottom: 8,
               }}>
                 MISSING SOMETHING?
@@ -970,7 +970,7 @@ Guidelines:
             marginTop: 'var(--space-3)', marginBottom: 'var(--space-4)',
           }}>
             <div style={{
-              fontFamily: 'var(--font-display)', fontSize: 9,
+              fontFamily: 'var(--font-display)', fontSize: 11,
               color: 'var(--color-action)', letterSpacing: '0.1em', marginBottom: 'var(--space-3)',
             }}>
               MEAL TOTAL
