@@ -1501,8 +1501,19 @@ export function useGameState(user) {
     showToast('Progress restored from backup! ✓');
   }, [showToast, userId]);
 
+  /**
+   * Dismiss the cloud-sync splash and run on local data.
+   *
+   * `state` is already hydrated from localStorage by the useState initializer,
+   * so there is something to show. The in-flight cloudGet is left alone — if it
+   * lands later its result is simply ignored for this session, and the next
+   * auto-save pushes local state up. This exists so a stalled network can never
+   * strand the user on a screen with no controls.
+   */
+  const continueOffline = useCallback(() => setCloudLoading(false), []);
+
   return {
-    state, setState, cloudLoading,
+    state, setState, cloudLoading, continueOffline,
     toast, showToast,
     addXP,
     resetAll, resetToday,

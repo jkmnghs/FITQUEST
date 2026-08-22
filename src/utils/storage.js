@@ -85,12 +85,41 @@ export function migrateLegacyStorage(userId) {
 
 // ── Cloud sync (Supabase) ────────────────────────────────────────────────────
 
+/** How long a cold-start cloud read may block the app before we give up. */
+export const CLOUD_GET_TIMEOUT_MS = 8000;
+
+/**
+ * Resolve to `fallback` if `promise` hasn't settled within `ms`.
+ *
+ * A request that hangs is not the same as one that fails. On a stalled mobile
+ * connection the socket stays open and the Supabase client never rejects, so
+ * `await` here simply never returns — which left the splash screen up forever
+ * with no way out but force-quitting the app.
+ */
+function withTimeout(promise, ms, fallback) {
+  let timer;
+  const timeout = new Promise(resolve => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Reads the user's state JSONB from Supabase.
- * Returns the parsed state object, or null if not found / on error.
+ * Returns the parsed state object, or null if not found / on error / on timeout.
+ *
+ * Returning null on timeout is safe: every caller treats null as "no cloud
+ * data" and falls back to whatever localStorage holds, so a slow network
+ * costs the user a merge, not their progress.
  */
 export async function cloudGet(userId) {
   if (!supabase || !userId) return null;
+  return withTimeout(cloudGetInner(userId), CLOUD_GET_TIMEOUT_MS, null);
+}
+
+export { withTimeout as _withTimeout };
+
+async function cloudGetInner(userId) {
   try {
     const { data, error } = await supabase
       .from('user_profiles')

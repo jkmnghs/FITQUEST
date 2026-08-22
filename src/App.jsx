@@ -170,7 +170,7 @@ export default function App() {
   const contentRef = useRef(null);
 
   const {
-    state, cloudLoading, toast, showToast,
+    state, cloudLoading, continueOffline, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting, setState,
     resetAll, resetToday, startSession, backfillWeek,
@@ -216,7 +216,7 @@ export default function App() {
   if (authLoading)  return <SyncIndicator label="LOADING..." />;
   if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} onClearAuthError={clearAuthError} onResendConfirmation={resendConfirmation} /></>;
   if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} onCancel={signOut} /></>;
-  if (cloudLoading) return <SyncIndicator label="SYNCING..." />;
+  if (cloudLoading) return <SyncIndicator label="SYNCING..." onContinueOffline={continueOffline} />;
   if (generatingProgram) return (
     <AIBuilderScreen
       assessment={pendingAssessment}
