@@ -11,7 +11,7 @@ import {
   getRecentPerformances, sessionEstimated1RM, getStrengthTrend,
   sessionsInLastDays, lastSessionDate,
 } from '../utils/exerciseHistory';
-import { getBodyMetrics, formatBodyData, formatCheckinTrend } from '../utils/bodyMetrics';
+import { getBodyMetrics, formatBodyData, formatCheckinTrend, getHeightCm } from '../utils/bodyMetrics';
 
 const DAY_FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
@@ -389,7 +389,7 @@ Analyze the weight trend against that goal. Are the trends appropriate? What sho
 
     case 'physique': {
       const checkins = state.weeklyCheckins || [];
-      if (checkins.length === 0 && !state.assessment?.height) {
+      if (checkins.length === 0 && !getHeightCm(state)) {
         return `${state.name || 'Athlete'} has no check-in data yet. Ask them to log their first Sunday check-in (weight + waist), explain why those metrics matter for physique analysis, and tell them what you'll be able to recommend once you have data.`;
       }
       return userMessage || 'Analyze my physique data and recommend what I should focus on — recomp, fat loss, muscle, or strength.';

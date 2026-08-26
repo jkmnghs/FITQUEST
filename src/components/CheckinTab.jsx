@@ -41,7 +41,7 @@ export default function CheckinTab({ state, onSubmit }) {
     // waist-to-height ratio. Same physiological floor as onboarding: under 30%
     // of height is not a measurement a person can have.
     if (ws > 0) {
-      const heightCm = Number(state.assessment?.height) || 170;
+      const heightCm = getHeightCm(state) || 170;
       const minWaist = Math.max(55, Math.round(heightCm * 0.30));
       if (ws < minWaist || ws > 250) {
         setError(`Enter ${minWaist}–250 cm, or leave blank. Measure in centimetres around your navel — not inches or pant size.`);

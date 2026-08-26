@@ -31,11 +31,25 @@ export function bmiLabel(bmi) {
   return ' (obese)';
 }
 
+/**
+ * Height in centimetres, from whichever key the account actually carries.
+ *
+ * Onboarding writes `assessment.heightCm`. Four call sites read
+ * `assessment.height`, which no code path has ever written — so height was
+ * always missing, BMI was always null, and the coach kept asking users to log
+ * a height they had already given it. Read the real key, keep the other as a
+ * fallback for any row that acquired it.
+ */
+export function getHeightCm(state) {
+  const a = state?.assessment;
+  return Number(a?.heightCm) || Number(a?.height) || 0;
+}
+
 export function getBodyMetrics(state) {
   const checkins = state?.weeklyCheckins || [];
   const lastCheckin = checkins[checkins.length - 1];
   const weight = Number(lastCheckin?.weight) || 0;
-  const height = Number(state?.assessment?.height) || 0;
+  const height = getHeightCm(state);
   const rawWaist = Number(lastCheckin?.waist) || 0;
 
   const waistOk = isPlausibleWaistCm(rawWaist, height);
@@ -76,7 +90,7 @@ export function formatBodyData(state, unit = 'kg') {
 /** Check-in history line, dropping waist values that cannot be real. */
 export function formatCheckinTrend(state, unit = 'kg', limit = 8) {
   const checkins = state?.weeklyCheckins || [];
-  const height = Number(state?.assessment?.height) || 0;
+  const height = getHeightCm(state);
   return checkins.slice(-limit)
     .map(c => {
       const ok = isPlausibleWaistCm(c.waist, height);

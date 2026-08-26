@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isPlausibleWaistCm, bmiLabel, getBodyMetrics, formatBodyData, formatCheckinTrend,
+  isPlausibleWaistCm, bmiLabel, getBodyMetrics, formatBodyData, formatCheckinTrend, getHeightCm,
 } from '../bodyMetrics';
 
 const state = (over = {}) => ({
@@ -126,5 +126,41 @@ describe('formatCheckinTrend', () => {
 
   it('says so when there is no history', () => {
     expect(formatCheckinTrend({ weeklyCheckins: [] })).toBe('No check-ins yet');
+  });
+});
+
+/**
+ * Onboarding writes assessment.heightCm; four call sites read
+ * assessment.height, which nothing ever wrote. Height was therefore always
+ * absent, BMI always null, and the coach kept asking for a height the user had
+ * already entered.
+ */
+describe('getHeightCm', () => {
+  it('reads the key onboarding actually writes', () => {
+    expect(getHeightCm({ assessment: { heightCm: 170 } })).toBe(170);
+  });
+
+  it('still accepts the legacy key for rows that carry it', () => {
+    expect(getHeightCm({ assessment: { height: 178 } })).toBe(178);
+  });
+
+  it('prefers heightCm when a row somehow has both', () => {
+    expect(getHeightCm({ assessment: { heightCm: 170, height: 999 } })).toBe(170);
+  });
+
+  it('returns 0 rather than NaN when there is no height', () => {
+    expect(getHeightCm({ assessment: {} })).toBe(0);
+    expect(getHeightCm({})).toBe(0);
+    expect(getHeightCm(null)).toBe(0);
+  });
+
+  it('makes BMI computable from a real exported account shape', () => {
+    // The shape in the user's own backup: heightCm only, no `height`.
+    const state = {
+      assessment: { heightCm: 170 },
+      weeklyCheckins: [{ week: 28, weight: 64 }],
+    };
+    expect(getBodyMetrics(state).bmi).toBe('22.1');
+    expect(formatBodyData(state, 'kg')).toContain('Height: 170cm');
   });
 });
