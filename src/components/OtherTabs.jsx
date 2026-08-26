@@ -3,6 +3,7 @@ import { ACHIEVEMENTS } from '../data/gameData';
 import { authFetch } from '../lib/authFetch';
 import { exercisesForDay, DAY_ORDER } from '../utils/session';
 import { useConfirm } from './ui/ConfirmDialog';
+import { BackupCard, ExportNudge } from './BackupCard';
 
 // ─── ACHIEVEMENTS TAB ───
 export function AchievementsTab({ state }) {
@@ -230,8 +231,25 @@ export function SummaryTab({ state }) {
 export const getProgramExercisesForDay = exercisesForDay;
 
 // ─── SETTINGS TAB ───
-export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError }) {
+export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfillWeek, notifStatus, onRequestNotif, onImport, userEmail, onSignOut, onShowCycleComplete, onSyncFromCloud, lastSyncedAt, syncing, onChangePassword, authError, onClearAuthError, userId, onRestoreSnapshot, onToast }) {
   const { confirm, confirmDialog } = useConfirm();
+
+  // Recording when a backup was actually taken is what lets the nudge know
+  // whether to appear — without it we would have to nag unconditionally.
+  function handleExport() {
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fitquest-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    onUpdate('lastExportAt', Date.now());
+  }
+
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [backfillW, setBackfillW] = useState(() => Math.max(1, (state.currentWeek || 1) - 1));
@@ -713,6 +731,17 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           Export your progress as a JSON file, or restore from a previous backup.
         </div>
 
+        {/* Server-side snapshot, when a shrinking write triggered one */}
+        <BackupCard
+          userId={userId}
+          confirm={confirm}
+          onRestored={onRestoreSnapshot}
+          onToast={onToast}
+        />
+
+        {/* Nag only once a backup is genuinely stale and there is data to lose */}
+        <ExportNudge state={state} onExport={handleExport} />
+
         {/* Cloud Resync */}
         {onSyncFromCloud && (
           <div style={{ marginBottom: 10 }}>
@@ -743,18 +772,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => {
-              const json = JSON.stringify(state, null, 2);
-              const blob = new Blob([json], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `fitquest-backup-${new Date().toISOString().slice(0, 10)}.json`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            }}
+            onClick={handleExport}
             style={{
               flex: 1, padding: 10, borderRadius: 10,
               background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.28)', color: 'var(--color-action)',

@@ -136,6 +136,7 @@ export const stateSchema = z.object({
   programGenerationsThisWeek: z.number().int().nonnegative(),
   nutritionCallsToday: z.number().int().nonnegative(),
   nutritionCallsDate: z.string(),
+  lastExportAt: z.number().nullable(),
   questMessagesWeekStart: z.string().nullable(),
   assessment: assessmentSchema,
   // New v2 fields
@@ -222,6 +223,7 @@ export function repairState(state) {
   if (repaired.programGenerationsThisWeek == null) repaired.programGenerationsThisWeek = 0;
   if (repaired.nutritionCallsToday == null) repaired.nutritionCallsToday = 0;
   if (repaired.nutritionCallsDate == null) repaired.nutritionCallsDate = '';
+  if (repaired.lastExportAt === undefined) repaired.lastExportAt = null;
 
   return repaired;
 }

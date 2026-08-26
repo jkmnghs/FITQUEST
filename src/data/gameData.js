@@ -141,6 +141,7 @@ export const DEFAULT_STATE = {
   programGenerationsThisWeek: 0,
   nutritionCallsToday: 0,
   nutritionCallsDate: '',
+  lastExportAt: null,
   questMessagesWeekStart: null, // ISO date string — resets every Monday
   // Body composition (populated from assessment)
   bmi: null,

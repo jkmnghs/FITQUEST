@@ -290,3 +290,58 @@ export async function flushCloudDebounce() {
   cancelCloudDebounce();
   await cloudSet(userId, state);
 }
+
+// ── Server-side shrink snapshot ─────────────────────────────────────────────
+// A database trigger copies the previous state into user_profiles.state_backup
+// whenever an update would reduce totalSessions or the log length. It is
+// enforced in Postgres rather than here on purpose: a cached bundle, an old app
+// version or a direct API call all go through it.
+
+/**
+ * The snapshot waiting for this user, if any, described rather than returned in
+ * full — the settings screen only needs to say what is in it.
+ */
+export async function getBackupInfo(userId) {
+  if (!supabase || !userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('state_backup, state_backup_at')
+      .eq('id', userId)
+      .single();
+    if (error || !data?.state_backup) return null;
+    const s = data.state_backup;
+    return {
+      takenAt: data.state_backup_at,
+      totalSessions: Number(s.totalSessions) || 0,
+      level: Number(s.level) || 1,
+      currentWeek: Number(s.currentWeek) || 1,
+      logEntries: Array.isArray(s.log) ? s.log.length : 0,
+    };
+  } catch (e) {
+    console.warn('[FitQuest] getBackupInfo failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Put the snapshot back. Returns the restored state, or null.
+ *
+ * The trigger also fires on this write, so whatever is being replaced becomes
+ * the new snapshot — restoring is itself reversible.
+ */
+export async function restoreFromBackup(userId) {
+  if (!supabase || !userId) return null;
+  try {
+    const { data, error } = await supabase.rpc('restore_state_backup');
+    if (error) {
+      console.warn('[FitQuest] restoreFromBackup failed:', error.message);
+      return null;
+    }
+    markCloudLoadSettled(userId);
+    return data || null;
+  } catch (e) {
+    console.warn('[FitQuest] restoreFromBackup threw:', e);
+    return null;
+  }
+}

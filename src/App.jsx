@@ -473,6 +473,9 @@ export default function App() {
                       onClearAuthError={clearAuthError}
                       onShowCycleComplete={() => setShowCycleComplete(true)}
                       onSyncFromCloud={syncFromCloud}
+                      userId={user?.id}
+                      onRestoreSnapshot={(restored) => setState(() => restored)}
+                      onToast={showToast}
                       lastSyncedAt={lastSyncedAt}
                       syncing={syncing}
                     />
