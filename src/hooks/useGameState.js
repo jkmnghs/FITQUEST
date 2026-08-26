@@ -1518,9 +1518,30 @@ export function useGameState(user) {
     if (!userId) { showToast('Sign in to sync from cloud.'); return; }
     setSyncing(true);
     try {
-      const cloudData = await cloudGet(userId);
+      const result = await cloudGetResult(userId);
+
+      // "No cloud data found" used to be shown for a failed read too, which is
+      // both wrong and alarming — it reads as "your account is empty" when the
+      // truth is we could not reach it.
+      if (!result.ok) {
+        showToast('Could not reach the cloud — nothing changed.');
+        setSyncing(false);
+        return;
+      }
+
+      const cloudData = result.data;
       if (!cloudData || Object.keys(cloudData).length === 0) {
-        showToast('No cloud data found.');
+        // The cloud genuinely has nothing. If this device does, that is the
+        // surviving copy — push it up rather than reporting an empty account.
+        if (!isEmptyState(state)) {
+          markCloudLoadSettled(userId);
+          cancelCloudDebounce();
+          await cloudSet(userId, state);
+          setLastSyncedAt(Date.now());
+          showToast('Cloud was empty — this device\'s progress uploaded ✓');
+        } else {
+          showToast('No cloud data found.');
+        }
         setSyncing(false);
         return;
       }
@@ -1539,7 +1560,9 @@ export function useGameState(user) {
     } finally {
       setSyncing(false);
     }
-  }, [userId, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+    // `state` is read above for the empty-cloud recovery path, so it must be a
+    // dependency — a stale closure would upload an out-of-date snapshot.
+  }, [userId, showToast, state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const importData = useCallback((data) => {
     if (!data || typeof data !== 'object' ||
