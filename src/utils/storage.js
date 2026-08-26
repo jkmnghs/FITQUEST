@@ -298,6 +298,48 @@ export async function flushCloudDebounce() {
 // version or a direct API call all go through it.
 
 /**
+ * The countable contents of a state, for comparing two of them side by side.
+ *
+ * Session count alone is a bad summary: a snapshot can carry a *higher*
+ * totalSessions than the live account while holding no workout log at all.
+ * That is not hypothetical — it is exactly what a restore card once offered a
+ * user whose real history had just been put back, and the card made the junk
+ * copy look like the better one. Anything a restore could destroy belongs here.
+ */
+export function summariseState(s) {
+  const count = (v) => (Array.isArray(v) ? v.length : 0);
+  const keys = (v) => (v && typeof v === 'object' ? Object.keys(v).length : 0);
+  return {
+    totalSessions: Number(s?.totalSessions) || 0,
+    level:         Number(s?.level) || 1,
+    currentWeek:   Number(s?.currentWeek) || 1,
+    logEntries:    count(s?.log),
+    personalRecords: keys(s?.personalRecords),
+    checkins:      count(s?.weeklyCheckins),
+    weeksTracked:  keys(s?.weekProgress),
+    programDays:   keys(s?.dayTemplates),
+  };
+}
+
+/**
+ * Fields a restore would change, and in which direction.
+ *
+ * `losses` is what makes the decision safe to take: it names every count the
+ * snapshot holds *less* of than the live account.
+ */
+export function diffStates(current, snapshot) {
+  const LABELS = {
+    totalSessions: 'Sessions', level: 'Level', currentWeek: 'Week',
+    logEntries: 'Logged workouts', personalRecords: 'Personal records',
+    checkins: 'Check-ins', weeksTracked: 'Weeks tracked', programDays: 'Program days',
+  };
+  const rows = Object.keys(LABELS)
+    .map(key => ({ key, label: LABELS[key], now: current[key] ?? 0, after: snapshot[key] ?? 0 }))
+    .filter(r => r.now !== r.after);
+  return { rows, losses: rows.filter(r => r.after < r.now) };
+}
+
+/**
  * The snapshot waiting for this user, if any, described rather than returned in
  * full — the settings screen only needs to say what is in it.
  */
@@ -310,14 +352,7 @@ export async function getBackupInfo(userId) {
       .eq('id', userId)
       .single();
     if (error || !data?.state_backup) return null;
-    const s = data.state_backup;
-    return {
-      takenAt: data.state_backup_at,
-      totalSessions: Number(s.totalSessions) || 0,
-      level: Number(s.level) || 1,
-      currentWeek: Number(s.currentWeek) || 1,
-      logEntries: Array.isArray(s.log) ? s.log.length : 0,
-    };
+    return { takenAt: data.state_backup_at, ...summariseState(data.state_backup) };
   } catch (e) {
     console.warn('[FitQuest] getBackupInfo failed:', e);
     return null;

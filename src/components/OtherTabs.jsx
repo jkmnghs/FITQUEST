@@ -733,6 +733,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
 
         {/* Server-side snapshot, when a shrinking write triggered one */}
         <BackupCard
+          state={state}
           userId={userId}
           confirm={confirm}
           onRestored={onRestoreSnapshot}
