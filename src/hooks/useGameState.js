@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate } from '../utils/storage';
+import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isEmptyState } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, tomorrow, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
@@ -321,6 +321,28 @@ export function useGameState(user) {
           }
           setStateRaw(merged);
           storageSet(merged, userId);
+        } else if (isEmptyState(cloudData) && !isEmptyState(storageGet(userId))) {
+          // Cloud row is empty but this device still holds real progress.
+          //
+          // The branch below reads "cloud wins over localStorage", which is
+          // right when the cloud copy is the newer one — but it is catastrophic
+          // when the cloud row has been emptied. It would overwrite the last
+          // surviving copy of the user's history with nothing. Recover from the
+          // device instead, and push it back up.
+          const localData = storageGet(userId);
+          const recovered = checkQuestReset(checkDayReset(mergeState(localData)));
+          if (!recovered.assessment?.completed) {
+            recovered.assessment = { ...recovered.assessment, completed: true };
+          }
+          if (!recovered.name && user?.user_metadata?.full_name) {
+            recovered.name = user.user_metadata.full_name;
+          }
+          console.warn('[FitQuest] cloud row is empty but local has progress — restoring from this device');
+          setStateRaw(recovered);
+          storageSet(recovered, userId);
+          markCloudLoadSettled(userId);
+          cloudSet(userId, recovered);
+          setTimeout(() => showToast('Progress restored from this device ✓'), 800);
         } else {
           // Cloud wins over localStorage
           const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
