@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce } from '../utils/storage';
+import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, tomorrow, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
@@ -174,6 +174,12 @@ export function useGameState(user) {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
   const [cloudLoading, setCloudLoading] = useState(!!userId);
+  // True when the cloud read did not complete. The app must not conclude
+  // anything about the account in that case — in particular it must not offer
+  // onboarding, whose completion would write a fresh state over real progress.
+  const [cloudLoadFailed, setCloudLoadFailed] = useState(false);
+  // Bumped by retryCloudLoad to re-run the load effect below.
+  const [retryNonce, setRetryNonce] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const [syncing, setSyncing] = useState(false);
 
@@ -210,13 +216,32 @@ export function useGameState(user) {
       return;
     }
     setCloudLoading(true);
+    // Close the write gate until this load resolves. Nothing may reach the
+    // cloud in the meantime — the auto-save effect fires on mount with the
+    // in-memory default, and its 3s debounce used to beat a slow read and
+    // overwrite the account.
+    resetCloudLoadGate();
+    setCloudLoadFailed(false);
     // Adopt any pre-namespacing local state into this account's namespace, once.
     // Only applies when this account has no local state of its own, so it can't
     // pull a previous user's progress into a different account.
     migrateLegacyStorage(userId);
     hydrateBackfillGuard(storageGet(userId));
 
-    cloudGet(userId).then(cloudData => {
+    cloudGetResult(userId).then(result => {
+      // A failed read is not an empty account. Treating the two the same is
+      // what sent a user with 79 sessions to the onboarding questionnaire and
+      // then saved the answers over their history. Surface the failure and
+      // touch nothing.
+      if (!result.ok) {
+        console.warn('[FitQuest] cloud load failed:', result.reason, '— keeping local state, no cloud write');
+        setCloudLoadFailed(true);
+        setCloudLoading(false);
+        return;
+      }
+
+      markCloudLoadSettled(userId);
+      const cloudData = result.data;
       if (cloudData && Object.keys(cloudData).length > 0) {
         const localData = storageGet(userId);
 
@@ -332,13 +357,22 @@ export function useGameState(user) {
       }
       setLastSyncedAt(Date.now());
       setCloudLoading(false);
-    }).catch(() => setCloudLoading(false));
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch((e) => {
+      // Same rule as an !ok result: an exception tells us nothing about what
+      // is stored, so the gate stays shut.
+      console.warn('[FitQuest] cloud load threw:', e);
+      setCloudLoadFailed(true);
+      setCloudLoading(false);
+    });
+  }, [userId, retryNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-save: localStorage + debounced cloud ─────────────────────────────
+  // localStorage always; the cloud only once the load has settled. cloudSet
+  // enforces that too, but skipping the debounce here avoids arming a timer
+  // whose write will just be refused.
   useEffect(() => {
     storageSet(state, userId);
-    if (userId) {
+    if (userId && !cloudLoading && !cloudLoadFailed) {
       const { success, error } = validateState(state);
       if (success) {
         cloudSetDebounced(userId, state);
@@ -353,7 +387,7 @@ export function useGameState(user) {
         }
       }
     }
-  }, [state, userId]);
+  }, [state, userId, cloudLoading, cloudLoadFailed]);
 
   // Re-run day reset whenever the app becomes visible or the minute ticks over midnight
   useEffect(() => {
@@ -1512,8 +1546,20 @@ export function useGameState(user) {
    */
   const continueOffline = useCallback(() => setCloudLoading(false), []);
 
+  /**
+   * Retry a cloud load that failed, without reloading the app.
+   *
+   * Re-runs the same read the mount effect does. On success the account is
+   * restored and the write gate opens; on failure nothing changes and the
+   * gate stays shut, so a retry can never make things worse.
+   */
+  const retryCloudLoad = useCallback(() => {
+    setCloudLoadFailed(false);
+    setRetryNonce(n => n + 1);
+  }, []);
+
   return {
-    state, setState, cloudLoading, continueOffline,
+    state, setState, cloudLoading, cloudLoadFailed, continueOffline, retryCloudLoad,
     toast, showToast,
     addXP,
     resetAll, resetToday,

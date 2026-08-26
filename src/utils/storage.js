@@ -105,16 +105,36 @@ function withTimeout(promise, ms, fallback) {
 }
 
 /**
- * Reads the user's state JSONB from Supabase.
- * Returns the parsed state object, or null if not found / on error / on timeout.
+ * Reads the user's state from Supabase, distinguishing "there is nothing
+ * there" from "we could not find out".
  *
- * Returning null on timeout is safe: every caller treats null as "no cloud
- * data" and falls back to whatever localStorage holds, so a slow network
- * costs the user a merge, not their progress.
+ * This distinction is the whole point. The old version returned null for
+ * both, and the caller read null as "cloud is empty" — so a network timeout
+ * on a slow connection looked exactly like a brand-new account, the app
+ * offered onboarding, and the resulting fresh state was written over real
+ * progress. A read that failed must never be treated as an empty account.
+ *
+ * @returns {Promise<{ok: true, data: object|null} | {ok: false, reason: string}>}
+ *   ok:true with data:null means the account genuinely has no saved state.
+ */
+export async function cloudGetResult(userId) {
+  if (!supabase) return { ok: false, reason: 'no-client' };
+  if (!userId) return { ok: false, reason: 'no-user' };
+  return withTimeout(
+    cloudGetInner(userId),
+    CLOUD_GET_TIMEOUT_MS,
+    { ok: false, reason: 'timeout' },
+  );
+}
+
+/**
+ * Back-compat wrapper: the state object, or null for empty *or* failed.
+ * Prefer cloudGetResult — callers that cannot tell the two apart are exactly
+ * how the data loss happened.
  */
 export async function cloudGet(userId) {
-  if (!supabase || !userId) return null;
-  return withTimeout(cloudGetInner(userId), CLOUD_GET_TIMEOUT_MS, null);
+  const res = await cloudGetResult(userId);
+  return res.ok ? res.data : null;
 }
 
 export { withTimeout as _withTimeout };
@@ -126,12 +146,35 @@ async function cloudGetInner(userId) {
       .select('state')
       .eq('id', userId)
       .single();
-    if (error || !data) return null;
-    return data.state && Object.keys(data.state).length > 0 ? data.state : null;
+    // PGRST116 = no row matched, which is a real "new account" answer.
+    if (error) {
+      if (error.code === 'PGRST116') return { ok: true, data: null };
+      console.warn('[FitQuest] cloudGet error:', error.message);
+      return { ok: false, reason: error.code || 'query-error' };
+    }
+    if (!data) return { ok: true, data: null };
+    const state = data.state && Object.keys(data.state).length > 0 ? data.state : null;
+    return { ok: true, data: state };
   } catch (e) {
-    console.warn('[FitQuest] cloudGet failed:', e);
-    return null;
+    console.warn('[FitQuest] cloudGet threw:', e);
+    return { ok: false, reason: 'exception' };
   }
+}
+
+/**
+ * True when `state` carries nothing worth persisting.
+ *
+ * Used as a last line of defence before a cloud write: a state with no
+ * sessions, no log and no check-ins is either a brand-new account or the
+ * in-memory default that appears while a load is in flight. Writing that over
+ * a populated row is never correct.
+ */
+export function isEmptyState(state) {
+  if (!state) return true;
+  return (Number(state.totalSessions) || 0) === 0
+    && (state.log?.length || 0) === 0
+    && (state.weeklyCheckins?.length || 0) === 0
+    && (state.totalXp || 0) === 0;
 }
 
 /**
@@ -142,8 +185,46 @@ async function cloudGetInner(userId) {
  * migration hasn't been applied yet), which is still safer than the previous
  * full-blob write because the server-owned keys are excluded either way.
  */
-export async function cloudSet(userId, state) {
+/**
+ * Set once the cloud load for the current user has actually resolved.
+ *
+ * Until then no write may leave the client. The auto-save effect fires on
+ * mount with whatever is in memory — the default state, when localStorage is
+ * empty — and its 3-second debounce beat a cloud read that took longer than
+ * that. The empty default was written over a populated row before the read
+ * even came back, which is how a user lost 79 sessions.
+ */
+let _loadSettledFor = null;
+
+export function markCloudLoadSettled(userId) {
+  _loadSettledFor = userId || null;
+}
+
+export function resetCloudLoadGate() {
+  _loadSettledFor = null;
+}
+
+export async function cloudSet(userId, state, { force = false } = {}) {
   if (!supabase || !userId) return;
+
+  if (!force && _loadSettledFor !== userId) {
+    console.warn('[FitQuest] refusing cloud write before the load settled — this is the guard that prevents overwriting saved progress');
+    return;
+  }
+  // Never let an empty state replace a populated row. A legitimate wipe goes
+  // through cloudClear, which is explicit about it.
+  if (!force && isEmptyState(state)) {
+    const existing = await cloudGetResult(userId);
+    if (!existing.ok) {
+      console.warn('[FitQuest] refusing to write empty state — cannot confirm what is stored:', existing.reason);
+      return;
+    }
+    if (existing.data && !isEmptyState(existing.data)) {
+      console.warn('[FitQuest] refusing to overwrite saved progress with an empty state');
+      return;
+    }
+  }
+
   const patch = stripServerOwned(state);
   try {
     const { error } = await supabase.rpc('merge_user_state', { p_patch: patch });

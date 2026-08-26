@@ -6,6 +6,7 @@ import Toast from './components/Toast';
 import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
 import OnboardingScreen from './components/OnboardingScreen';
+import CloudLoadFailedScreen from './components/CloudLoadFailedScreen';
 import Onboarding from './components/Onboarding';
 import { TrainTabSkeleton, FuelTabSkeleton, ProgressTabSkeleton, ProfileTabSkeleton } from './components/Skeleton';
 import ProgramCompleteModal from './components/ProgramCompleteModal';
@@ -170,7 +171,7 @@ export default function App() {
   const contentRef = useRef(null);
 
   const {
-    state, cloudLoading, continueOffline, toast, showToast,
+    state, cloudLoading, cloudLoadFailed, continueOffline, retryCloudLoad, toast, showToast,
     completeExercise, finishSession,
     submitCheckin, updateSetting, setState,
     resetAll, resetToday, startSession, backfillWeek,
@@ -217,6 +218,12 @@ export default function App() {
   if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} onClearAuthError={clearAuthError} onResendConfirmation={resendConfirmation} /></>;
   if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} onCancel={signOut} /></>;
   if (cloudLoading) return <SyncIndicator label="SYNCING..." onContinueOffline={continueOffline} />;
+  // A failed read tells us nothing about the account, so stop here rather than
+  // falling through to the onboarding check below — answering it would write a
+  // fresh state over whatever is actually stored.
+  if (cloudLoadFailed) return (
+    <><BgFx /><CloudLoadFailedScreen onRetry={retryCloudLoad} onSignOut={signOut} /></>
+  );
   if (generatingProgram) return (
     <AIBuilderScreen
       assessment={pendingAssessment}
