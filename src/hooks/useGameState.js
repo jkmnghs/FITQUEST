@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isEmptyState } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, tomorrow, midnightOf } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, tomorrow, midnightOf, rollElapsedWeeks, commitUnfinishedSession } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -89,9 +89,14 @@ function unionArrays(arr1, arr2, keyFn) {
   return [...map.values()];
 }
 
-function checkDayReset(state) {
+// Exported for tests: the day/week bookkeeping is where a logged session is
+// either kept or lost, so it is worth covering directly.
+export function checkDayReset(state) {
   const t = today();
-  let next = { ...state };
+  // A day's logged exercises are the record that the session happened. Bank
+  // them before the rollover clears them, or a session the user never tapped
+  // FINISH on is lost and the week it belonged to can never complete.
+  let next = { ...commitUnfinishedSession(state) };
   if (next.todayExDate !== t) {
     next.todayExDone = [];
     next.todayExDetails = {};
@@ -110,22 +115,33 @@ function checkDayReset(state) {
     const daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
     if (daysSinceLast > 3) next.streak = 0;
   }
+  // State saved before currentWeekStartDate existed has no anchor for the
+  // program week. Derive one from the week's earliest session so everything
+  // below — the roll-over, and the week strip's calendar — has a date to work
+  // from on the very first pass rather than the one after it.
+  if (!next.currentWeekStartDate) {
+    const wp = next.weekProgress?.[next.currentWeek];
+    const sessionDates = [...(wp?.dates || []), ...(wp?.sessions || []).map(s => s.date).filter(Boolean)];
+    next.currentWeekStartDate = sessionDates.length === 0
+      ? t
+      : new Date(Math.min(...sessionDates.map(d => +new Date(d)))).toDateString();
+  }
+
+  // Close any program week whose seven calendar days have run out. Without
+  // this a single missed training day pinned the user to a week for ever: the
+  // calendar moved on, but the app kept showing the old week, its old sessions
+  // and the day counts that went with them. rollElapsedWeeks sets the anchor
+  // for each week it opens, so nothing below may overwrite it.
+  next = { ...rollElapsedWeeks(next) };
+
   // Auto-advance currentWeek if it's already marked complete (e.g. via backfill)
   let advanced = false;
   while (next.weekProgress?.[next.currentWeek]?.completed && next.currentWeek < 999) {
     next.currentWeek += 1;
     advanced = true;
   }
-  // Keep the persisted "week started on" date in sync: reset it whenever the
-  // week actually changes, and backfill it once for state saved before this
-  // field existed (fall back to the earliest recorded session this week, or today).
-  if (advanced || !next.currentWeekStartDate) {
-    const wp = next.weekProgress?.[next.currentWeek];
-    const sessionDates = [...(wp?.dates || []), ...(wp?.sessions || []).map(s => s.date).filter(Boolean)];
-    next.currentWeekStartDate = advanced || sessionDates.length === 0
-      ? t
-      : new Date(Math.min(...sessionDates.map(d => +new Date(d)))).toDateString();
-  }
+  // A week completed ahead of its calendar window starts the next one today.
+  if (advanced) next.currentWeekStartDate = t;
 
   // Repair state stamped before the anchor fix. A week that advanced the moment
   // its last session was logged recorded that same day as its start, so from
@@ -416,8 +432,13 @@ export function useGameState(user) {
     function maybeDayReset() {
       setStateRaw(prev => {
         const next = checkQuestReset(checkDayReset(prev));
+        // The week can roll over without the day doing so — a week whose
+        // seventh day passes while the app sits open — so the week anchor has
+        // to be part of the comparison or the change is computed and dropped.
         return next.todayExDate !== prev.todayExDate ||
-               next.questMessagesWeekStart !== prev.questMessagesWeekStart
+               next.questMessagesWeekStart !== prev.questMessagesWeekStart ||
+               next.currentWeek !== prev.currentWeek ||
+               next.currentWeekStartDate !== prev.currentWeekStartDate
           ? next : prev;
       });
     }
@@ -860,7 +881,6 @@ export function useGameState(user) {
     if (isFinishingSession.current) return;
     isFinishingSession.current = true;
     let pendingXP = 0;
-    let pendingAdvance = null;
     setState(prev => {
       if (prev.todaySessionFinished) return prev;
       const w = prev.currentWeek;
@@ -924,7 +944,6 @@ export function useGameState(user) {
         } else {
           setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1} 🎉`), 1000);
         }
-        pendingAdvance = nextWeek;
       }
       weekProgress[w] = wp;
 
@@ -988,22 +1007,12 @@ export function useGameState(user) {
       }
     }, 200);
     setTimeout(() => addXP(pendingXP), 100);
-    if (pendingAdvance !== null) {
-      setTimeout(() => {
-        setState(s => {
-          if (s.currentWeek !== pendingAdvance) return s;
-          return {
-            ...s,
-            todayExDone: [], todayExDetails: {},
-            todaySessionFinished: false,
-            sessionStartTime: null, todayExDate: today()
-          };
-        });
-        isFinishingSession.current = false;
-      }, 2500);
-    } else {
-      isFinishingSession.current = false;
-    }
+    // The session that closes a week used to be wiped 2.5s later — todayExDone
+    // emptied and todaySessionFinished set back to false — so the work the user
+    // had just banked disappeared from the Train tab and the day could be
+    // logged a second time into the new week. Today's record stands until the
+    // day itself rolls over; checkDayReset clears it then.
+    isFinishingSession.current = false;
   }, [setState, addXP, showToast, userId]);
 
   const submitCheckin = useCallback((weight, waist, sleep) => {

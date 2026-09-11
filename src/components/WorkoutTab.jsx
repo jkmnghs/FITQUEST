@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Play, Flag, MoreHorizontal, Repeat, Trash2,
   Bot, Moon, Check, Timer, CalendarDays, Trophy,
 } from 'lucide-react';
-import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
+import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek, weekForToday, startOfProgramWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
 import ProgramCompleteModal from './ProgramCompleteModal';
 import { getProgramExercisesForDay } from './OtherTabs';
@@ -23,13 +23,18 @@ const DAY_SHORT = { mon: 'M', tue: 'Tu', wed: 'W', thu: 'Th', fri: 'F', sat: 'Sa
  * Resolves each training day in the viewed week to done / skipped / current.
  *
  * Skipped is calendar-aware: a day only counts as missed once its actual date
- * has passed, anchored to `state.currentWeekStartDate` rather than re-inferred
- * from session data (inferring it pushed earlier skipped days into next week
- * whenever the first training day of a week was missed).
+ * has passed. Each week is anchored to its own seven days (derived from
+ * `state.currentWeekStartDate`) rather than re-inferred from session data —
+ * inferring it pushed earlier skipped days into next week whenever the first
+ * training day of a week was missed.
+ *
+ * `todayWeek` is the week today belongs to, which is not always
+ * `state.currentWeek`: a week closed by today's session anchors the next one
+ * to tomorrow.
  */
-function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
+export function resolveWeekDays(state, viewingWeek, sortedTrainingDays, todayWeek = state.currentWeek) {
   const wp = state.weekProgress?.[viewingWeek] || { count: 0, sessions: [] };
-  const isCurrentWeek = viewingWeek === state.currentWeek;
+  const isCurrentWeek = viewingWeek === todayWeek;
 
   const daysFromSessions = (wp.sessions || [])
     .map(s => s.dayKey || (s.date ? DAY_KEYS[new Date(s.date).getDay()] : null))
@@ -42,15 +47,7 @@ function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
 
-  const weekStartDate = new Date();
-  weekStartDate.setHours(0, 0, 0, 0);
-  if (state.currentWeekStartDate) {
-    const parsed = new Date(state.currentWeekStartDate);
-    if (!isNaN(parsed)) {
-      weekStartDate.setTime(parsed.getTime());
-      weekStartDate.setHours(0, 0, 0, 0);
-    }
-  }
+  const weekStartDate = startOfProgramWeek(state, viewingWeek);
   const weekStartOrd = weekStartDate.getDay();
 
   // Cursor = first undone training day at or after today, so skipped past days
@@ -63,7 +60,7 @@ function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
     : null;
 
   const explicitlySkipped = new Set(wp.skippedDays || []);
-  const weekIsPast = viewingWeek < state.currentWeek;
+  const weekIsPast = viewingWeek < todayWeek;
 
   return sortedTrainingDays.map((dayKey, i) => {
     const done = resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count;
@@ -82,7 +79,7 @@ function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
       skipped: !done && (
         explicitlySkipped.has(dayKey)
         || weekIsPast
-        || (isCurrentWeek && trainingDayDate < todayMidnight)
+        || trainingDayDate < todayMidnight
       ),
       markedSkipped: explicitlySkipped.has(dayKey),
       current: dayKey === currentDayId,
@@ -160,7 +157,7 @@ const FULL_DAY = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday
  * showed the phase twice and pushed the first exercise most of a screen down.
  */
 function SessionHero({
-  state, viewingWeek, isCurrentWeek, sessionTitle, isRestDay, nextTrainingDayKey,
+  state, viewingWeek, todayWeek, isCurrentWeek, sessionTitle, isRestDay, nextTrainingDayKey,
   weekDays, doneCount, totalExercises, sessionFinished,
   onPrevWeek, onNextWeek, onJumpToCurrent, onStartSession, onFinish,
   onMakeUpDay, onOpenCoach, onTrainAnyway,
@@ -174,7 +171,7 @@ function SessionHero({
   // Exactly one primary action, chosen by where the user actually is.
   let cta = null;
   if (!isCurrentWeek) {
-    cta = { label: `BACK TO WEEK ${state.currentWeek}`, onClick: onJumpToCurrent, tone: 'ghost', Icon: CalendarDays };
+    cta = { label: `BACK TO WEEK ${todayWeek}`, onClick: onJumpToCurrent, tone: 'ghost', Icon: CalendarDays };
   } else if (isRestDay) {
     cta = { label: 'ASK YOUR COACH', onClick: onOpenCoach, tone: 'purple', Icon: Bot };
   } else if (sessionFinished) {
@@ -241,13 +238,13 @@ function SessionHero({
 
         <button
           onClick={onNextWeek}
-          disabled={viewingWeek >= state.currentWeek}
+          disabled={viewingWeek >= todayWeek}
           aria-label="Next week"
           style={{
             width: 34, height: 34, borderRadius: 'var(--radius-md)', flexShrink: 0,
             border: '1px solid var(--color-border-medium)', background: 'rgba(255,255,255,0.04)',
             color: 'var(--color-text-secondary)',
-            opacity: viewingWeek >= state.currentWeek ? 0.3 : 1,
+            opacity: viewingWeek >= todayWeek ? 0.3 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         ><ChevronRight size={17} /></button>
@@ -370,7 +367,12 @@ function SessionHero({
 }
 
 export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped, onClearDayProgress }) {
-  const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
+  // The week today's training belongs to. A session that completes a week
+  // anchors the next one to tomorrow, so until tomorrow arrives this is the
+  // week that just closed — showing the empty new week instead is what made a
+  // just-banked session look like it was never logged.
+  const todayWeek = weekForToday(state);
+  const [viewingWeek, setViewingWeek] = useState(todayWeek);
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showProgramComplete, setShowProgramComplete] = useState(false);
@@ -403,8 +405,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
 
   // Keep viewingWeek in sync when the program advances to a new week
   useEffect(() => {
-    setViewingWeek(state.currentWeek);
-  }, [state.currentWeek]);
+    setViewingWeek(todayWeek);
+  }, [todayWeek]);
 
   // Tell App when any modal/overlay is open so it can hide the tab bar
   useEffect(() => {
@@ -417,7 +419,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
   }, [swapTargetId]);
 
   const w = viewingWeek;
-  const isCurrentWeek = w === state.currentWeek;
+  const isCurrentWeek = w === todayWeek;
   const isDeload = isDeloadWeek(w);
   const { unit, liftWeights, todayExDone, todayExDetails, todaySessionFinished, weekProgress, overloadSuggestions } = state;
 
@@ -427,7 +429,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
     ? [...state.trainingDays].sort((a, b) => DAY_KEYS.indexOf(a) - DAY_KEYS.indexOf(b))
     : ['mon', 'wed', 'fri'];
   const totalSessions = sortedTrainingDays.length;
-  const weekDays = resolveWeekDays(state, w, sortedTrainingDays);
+  const weekDays = resolveWeekDays(state, w, sortedTrainingDays, todayWeek);
 
   function jumpToWeek(n) { setViewingWeek(n); }
 
@@ -442,6 +444,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       <SessionHero
         state={state}
         viewingWeek={w}
+        todayWeek={todayWeek}
         isCurrentWeek={isCurrentWeek}
         sessionTitle={currentDayName}
         isRestDay={activeRestDay}
@@ -451,8 +454,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         totalExercises={exercises.length}
         sessionFinished={!!todaySessionFinished}
         onPrevWeek={() => setViewingWeek(v => Math.max(1, v - 1))}
-        onNextWeek={() => setViewingWeek(v => Math.min(state.currentWeek, v + 1))}
-        onJumpToCurrent={() => jumpToWeek(state.currentWeek)}
+        onNextWeek={() => setViewingWeek(v => Math.min(todayWeek, v + 1))}
+        onJumpToCurrent={() => jumpToWeek(todayWeek)}
         onStartSession={() => { haptic('tap'); onStartSession?.(); }}
         onFinish={() => setShowFinishConfirm(true)}
         onMakeUpDay={(onBackfillWeek || onMarkDaySkipped) ? (dayKey) => setMakeUpDay(dayKey) : null}
@@ -500,8 +503,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       {/* 12-week cycle map — collapsed by default. It is a navigation aid, not
           something you need on screen while logging sets. */}
       {(() => {
-        const cycleStart = Math.floor((state.currentWeek - 1) / 12) * 12 + 1;
-        const cycleWeek = state.currentWeek - cycleStart + 1;
+        const cycleStart = Math.floor((todayWeek - 1) / 12) * 12 + 1;
+        const cycleWeek = todayWeek - cycleStart + 1;
         return (
           <div style={{ marginBottom: 'var(--space-4)' }}>
             <button
@@ -540,8 +543,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                   let bg = 'rgba(255,255,255,0.02)', border = 'var(--color-border-medium)', color = 'var(--color-text-tertiary)';
                   if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--color-success)'; }
                   else if (wkp?.count > 0) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--color-premium)'; }
-                  if (wn === state.currentWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.35)'; color = 'var(--color-action)'; }
-                  const isViewing = wn === viewingWeek && wn !== state.currentWeek;
+                  if (wn === todayWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.35)'; color = 'var(--color-action)'; }
+                  const isViewing = wn === viewingWeek && wn !== todayWeek;
                   return (
                     <button
                       key={wn}
@@ -877,8 +880,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         <div style={{ textAlign: 'center', padding: 16, fontSize: 13, color: 'var(--text3)' }}>
           Viewing Week {w} —{' '}
           <span style={{ color: 'var(--cyan)', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => jumpToWeek(state.currentWeek)}>
-            Go to current week ({state.currentWeek})
+            onClick={() => jumpToWeek(todayWeek)}>
+            Go to current week ({todayWeek})
           </span>
         </div>
       )}
@@ -889,7 +892,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           state={state}
           exId={activeExId}
           exercises={exercises}
-          week={state.currentWeek}
+          week={todayWeek}
           unit={unit}
           liftWeights={liftWeights}
           todayExDone={todayExDone || []}
@@ -916,8 +919,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           onConfirm={() => {
             setShowFinishConfirm(false);
             const sessionsNeeded = state.sessionsPerWeek || 3;
-            const cycleWeek = ((state.currentWeek - 1) % 12) + 1;
-            const weekSessions = state.weekProgress?.[state.currentWeek]?.count || 0;
+            const cycleWeek = ((todayWeek - 1) % 12) + 1;
+            const weekSessions = state.weekProgress?.[todayWeek]?.count || 0;
             const isLastSession = cycleWeek === 12 && weekSessions >= sessionsNeeded - 1;
             onFinishSession(sessionDayKey);
             if (isLastSession) setTimeout(() => setShowProgramComplete(true), 2000);

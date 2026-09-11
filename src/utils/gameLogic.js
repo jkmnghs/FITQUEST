@@ -1,4 +1,5 @@
 import { PHASES, RANKS, ACHIEVEMENTS } from '../data/gameData';
+import { DAY_ORDER, exercisesForDay } from './session';
 
 export function today() {
   return new Date().toDateString();
@@ -21,10 +22,223 @@ export function tomorrow() {
 
 /** Midnight timestamp for a date in any of the formats the log has used. */
 export function midnightOf(value) {
+  // `new Date(null)` is the epoch, not an error. Letting that through would
+  // hand the week roll-over a 1970 anchor and march it through five decades
+  // of weeks, so an absent date is unreadable rather than very old.
+  if (value == null || value === '') return NaN;
   const d = new Date(value);
   if (isNaN(d)) return NaN;
   d.setHours(0, 0, 0, 0);
   return d.getTime();
+}
+
+// ── Program week calendar ────────────────────────────────────────────────
+//
+// A program week is seven calendar days long, anchored to
+// `state.currentWeekStartDate`. Completing the prescribed number of sessions
+// closes a week early; running out of days closes it too. Before
+// `rollElapsedWeeks` existed only the first of those happened, so a single
+// missed training day pinned the user to a week for ever: the calendar moved
+// on, the week strip kept showing the old week's sessions, and the day the
+// user was actually training read as one that had already been trained.
+export const WEEK_LENGTH_DAYS = 7;
+
+/** `date` shifted by `n` days, normalised to local midnight (DST-safe). */
+export function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Local midnight on which the given program week starts. */
+export function startOfProgramWeek(state, week, now = new Date()) {
+  const startMs = midnightOf(state?.currentWeekStartDate);
+  const base = Number.isNaN(startMs) ? midnightOf(now) : startMs;
+  return addDays(base, (week - (state?.currentWeek || 1)) * WEEK_LENGTH_DAYS);
+}
+
+/**
+ * The program week today's training belongs to.
+ *
+ * A week that closes mid-day anchors the next one to *tomorrow*, so until that
+ * date arrives today still belongs to the week that just closed. Showing the
+ * new (empty) week instead is what made a session vanish the moment it
+ * completed a week — the ring went back to zero and the day lost its tick, so
+ * a session that had just been banked read as never logged.
+ */
+export function weekForToday(state, now = new Date()) {
+  const week = state?.currentWeek || 1;
+  const startMs = midnightOf(state?.currentWeekStartDate);
+  const todayMs = midnightOf(now);
+  if (Number.isNaN(startMs) || Number.isNaN(todayMs)) return week;
+  return todayMs < startMs && week > 1 ? week - 1 : week;
+}
+
+/** Remove a single occurrence of `value`, leaving parallel history intact. */
+function removeOnce(arr, value) {
+  const out = [...(arr || [])];
+  const i = out.lastIndexOf(value);
+  if (i !== -1) out.splice(i, 1);
+  return out;
+}
+
+function emptyWeek() {
+  return { count: 0, dates: [], completedDays: [], skippedDays: [], sessions: [], completed: false };
+}
+
+/**
+ * Close every program week whose seven calendar days have run out.
+ *
+ * Two rules, both deliberate:
+ *
+ * - A week that holds something (a session, or a day written off as skipped)
+ *   is closed as it stands — incomplete if the user missed a day — and the
+ *   program moves to the next week. The missed day stays on the closed week,
+ *   where it can still be backfilled or marked skipped.
+ * - A week with nothing recorded at all is *not* advanced past. Someone who
+ *   stops training for a month should come back to the week they left, not be
+ *   marched through the deload and peaking blocks they never trained. Its
+ *   anchor slides forward instead, so the strip shows the days ahead of them
+ *   rather than a row of misses.
+ *
+ * Sessions logged after a week's window closed are moved onto the week they
+ * actually belong to. Without that, a week the app failed to roll carries two
+ * calendar weeks of sessions, and the new week opens looking untrained.
+ */
+export function rollElapsedWeeks(state, now = new Date()) {
+  const todayMs = midnightOf(now);
+  let startMs = midnightOf(state?.currentWeekStartDate);
+  if (Number.isNaN(todayMs) || Number.isNaN(startMs)) return state;
+
+  const sessionsNeeded = state?.sessionsPerWeek || 3;
+  let currentWeek = state?.currentWeek || 1;
+  let weekProgress = state?.weekProgress || {};
+  let changed = false;
+
+  // Bounded so a corrupt anchor can never spin: 520 weeks is ten years.
+  for (let guard = 0; guard < 520; guard++) {
+    const nextStartMs = addDays(startMs, WEEK_LENGTH_DAYS).getTime();
+    if (todayMs < nextStartMs) break;
+
+    const wp = weekProgress[currentWeek];
+    const hasRecord = (wp?.count || 0) > 0
+      || (wp?.sessions?.length || 0) > 0
+      || (wp?.skippedDays?.length || 0) > 0;
+
+    if (!hasRecord) {
+      startMs = nextStartMs;
+      changed = true;
+      continue;
+    }
+
+    const sessions = wp.sessions || [];
+    const carried = sessions.filter(s => {
+      const ms = midnightOf(s?.date);
+      return !Number.isNaN(ms) && ms >= nextStartMs;
+    });
+    const closing = { ...emptyWeek(), ...wp, sessions: sessions.filter(s => !carried.includes(s)) };
+    carried.forEach(s => {
+      closing.dates = removeOnce(closing.dates, s.date);
+      if (s.dayKey) closing.completedDays = removeOnce(closing.completedDays, s.dayKey);
+    });
+    closing.count = Math.max(0, (wp.count || 0) - carried.length);
+    closing.completed = closing.count + (closing.skippedDays?.length || 0) >= sessionsNeeded;
+
+    weekProgress = { ...weekProgress, [currentWeek]: closing };
+
+    if (carried.length > 0) {
+      const nextWp = { ...emptyWeek(), ...(weekProgress[currentWeek + 1] || {}) };
+      nextWp.count = (nextWp.count || 0) + carried.length;
+      nextWp.dates = [...nextWp.dates, ...carried.map(s => s.date).filter(Boolean)];
+      nextWp.completedDays = [...nextWp.completedDays, ...carried.map(s => s.dayKey).filter(Boolean)];
+      nextWp.sessions = [...nextWp.sessions, ...carried];
+      nextWp.completed = nextWp.count + (nextWp.skippedDays?.length || 0) >= sessionsNeeded;
+      weekProgress = { ...weekProgress, [currentWeek + 1]: nextWp };
+    }
+
+    currentWeek += 1;
+    startMs = nextStartMs;
+    changed = true;
+  }
+
+  if (!changed) return state;
+  return {
+    ...state,
+    currentWeek,
+    weekProgress,
+    currentWeekStartDate: new Date(startMs).toDateString(),
+  };
+}
+
+/**
+ * Bank a session the user logged but never tapped FINISH on.
+ *
+ * The logged sets are the source of truth that the session happened. Until
+ * now the day rollover simply threw them away: someone who worked through a
+ * session, left one or two exercises out and closed the app came back to a
+ * training day recorded as never logged, and — because the week counts
+ * sessions, not exercises — to a program week that could never complete.
+ *
+ * Missed exercises do not make a session unfinished. The session is recorded
+ * with the completion percentage it actually reached, exactly as FINISH would
+ * have recorded it. Only the finish bonus is withheld: per-exercise XP was
+ * already granted as each exercise was logged, and the bonus is paid for
+ * closing the session out.
+ */
+export function commitUnfinishedSession(state, now = new Date()) {
+  const done = state?.todayExDone || [];
+  if (done.length === 0 || state?.todaySessionFinished) return state;
+
+  const dayMs = midnightOf(state?.todayExDate);
+  const todayMs = midnightOf(now);
+  // Only once the day is actually over — an in-progress session is not late.
+  if (Number.isNaN(dayMs) || Number.isNaN(todayMs) || dayMs >= todayMs) return state;
+
+  const week = state.currentWeek || 1;
+  const dayDate = new Date(dayMs);
+  const dayKey = DAY_ORDER[dayDate.getDay()];
+  const dateStr = dayDate.toDateString();
+
+  const wp = { ...emptyWeek(), ...(state.weekProgress?.[week] || {}) };
+  // Never record the same day twice — it may already have been backfilled.
+  if ((wp.sessions || []).some(s => s?.date === dateStr)) return state;
+
+  const totalEx = exercisesForDay(state, dayKey).length || done.length;
+  const completion = Math.round((done.length / totalEx) * 100);
+  const sessionsNeeded = state.sessionsPerWeek || 3;
+
+  const count = (wp.count || 0) + 1;
+  const nextWp = {
+    ...wp,
+    count,
+    dates: [...wp.dates, dateStr],
+    completedDays: [...wp.completedDays, dayKey],
+    sessions: [...wp.sessions, { date: dateStr, dayKey, exercisesDone: [...done], completion }],
+    completed: count + (wp.skippedDays?.length || 0) >= sessionsNeeded,
+  };
+
+  const logEntry = {
+    name: `Session ${count}/${sessionsNeeded} • ${done.length}/${totalEx} exercises (${completion}%) [auto-recorded]`,
+    xp: 0,
+    date: dateStr,
+    type: 'session',
+    week,
+    dateStr: dayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+    exerciseDetails: { ...(state.todayExDetails || {}) },
+    exercisesDone: [...done],
+    dayKey,
+  };
+
+  return {
+    ...state,
+    weekProgress: { ...state.weekProgress, [week]: nextWp },
+    totalSessions: (state.totalSessions || 0) + 1,
+    perfectWeeks: nextWp.completed && !wp.completed
+      ? (state.perfectWeeks || 0) + 1
+      : state.perfectWeeks,
+    log: [...(state.log || []), logEntry],
+  };
 }
 
 export function getPhase(week) {
