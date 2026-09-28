@@ -12,83 +12,12 @@ import { getPickerCategories } from '../data/exerciseCatalog';
 import { useConfirm } from './ui/ConfirmDialog';
 import { haptic } from '../utils/haptics';
 import { getLastPerformance } from '../utils/exerciseHistory';
+import { resolveWeekDays } from '../utils/week';
 
 // Ceiling from calculateAdherenceXP: 10 (training day) + 8 (RPE) + 20 (overload).
 const MAX_EXERCISE_XP = 38;
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-const DAY_SHORT = { mon: 'M', tue: 'Tu', wed: 'W', thu: 'Th', fri: 'F', sat: 'Sa', sun: 'Su' };
-
-/**
- * Resolves each training day in the viewed week to done / skipped / current.
- *
- * Skipped is calendar-aware: a day only counts as missed once its actual date
- * has passed, anchored to `state.currentWeekStartDate` rather than re-inferred
- * from session data (inferring it pushed earlier skipped days into next week
- * whenever the first training day of a week was missed).
- */
-function resolveWeekDays(state, viewingWeek, sortedTrainingDays) {
-  const wp = state.weekProgress?.[viewingWeek] || { count: 0, sessions: [] };
-  const isCurrentWeek = viewingWeek === state.currentWeek;
-
-  const daysFromSessions = (wp.sessions || [])
-    .map(s => s.dayKey || (s.date ? DAY_KEYS[new Date(s.date).getDay()] : null))
-    .filter(Boolean);
-  const resolvedDays = daysFromSessions.length > 0
-    ? [...new Set([...(wp.completedDays || []), ...daysFromSessions])]
-    : wp.completedDays || null;
-
-  const todayOrd = new Date().getDay();
-  const todayMidnight = new Date();
-  todayMidnight.setHours(0, 0, 0, 0);
-
-  const weekStartDate = new Date();
-  weekStartDate.setHours(0, 0, 0, 0);
-  if (state.currentWeekStartDate) {
-    const parsed = new Date(state.currentWeekStartDate);
-    if (!isNaN(parsed)) {
-      weekStartDate.setTime(parsed.getTime());
-      weekStartDate.setHours(0, 0, 0, 0);
-    }
-  }
-  const weekStartOrd = weekStartDate.getDay();
-
-  // Cursor = first undone training day at or after today, so skipped past days
-  // don't hold it hostage.
-  const currentDayId = (isCurrentWeek && !wp.completed)
-    ? sortedTrainingDays.find(d => {
-        const done = resolvedDays ? resolvedDays.includes(d) : false;
-        return DAY_KEYS.indexOf(d) >= todayOrd && !done;
-      }) ?? null
-    : null;
-
-  const explicitlySkipped = new Set(wp.skippedDays || []);
-  const weekIsPast = viewingWeek < state.currentWeek;
-
-  return sortedTrainingDays.map((dayKey, i) => {
-    const done = resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count;
-    const daysFromStart = (DAY_KEYS.indexOf(dayKey) - weekStartOrd + 7) % 7;
-    const trainingDayDate = new Date(weekStartDate);
-    trainingDayDate.setDate(weekStartDate.getDate() + daysFromStart);
-    return {
-      dayKey,
-      label: DAY_SHORT[dayKey] || dayKey,
-      done,
-      // A training day counts as missed when the user said so, or when the
-      // week it belongs to is behind us. The old rule was gated on
-      // isCurrentWeek alone, so last week's missed Wednesday rendered as a
-      // plain grey pill — indistinguishable from a day still to come, and
-      // with nothing to tap.
-      skipped: !done && (
-        explicitlySkipped.has(dayKey)
-        || weekIsPast
-        || (isCurrentWeek && trainingDayDate < todayMidnight)
-      ),
-      markedSkipped: explicitlySkipped.has(dayKey),
-      current: dayKey === currentDayId,
-    };
-  });
-}
 
 /** Donut showing how much of today's session is logged. */
 function ProgressRing({ done, total, size = 62, restDay = false }) {
@@ -538,7 +467,9 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                   const wn = cycleStart + i;
                   const wkp = weekProgress?.[wn];
                   let bg = 'rgba(255,255,255,0.02)', border = 'var(--color-border-medium)', color = 'var(--color-text-tertiary)';
-                  if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--color-success)'; }
+                  // A week closed with skipped days is finished, not perfect.
+                  if (wkp?.completed && wkp.skippedDays?.length) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--color-premium)'; }
+                  else if (wkp?.completed) { bg = 'var(--green-glow)'; border = 'rgba(0,230,118,0.3)'; color = 'var(--color-success)'; }
                   else if (wkp?.count > 0) { bg = 'var(--gold-glow)'; border = 'rgba(255,214,0,0.3)'; color = 'var(--color-premium)'; }
                   if (wn === state.currentWeek) { bg = 'var(--cyan-glow)'; border = 'rgba(0,229,255,0.35)'; color = 'var(--color-action)'; }
                   const isViewing = wn === viewingWeek && wn !== state.currentWeek;
