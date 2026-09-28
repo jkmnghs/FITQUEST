@@ -37,9 +37,14 @@ async function callAgent(trigger, userId, baseUrl, secret) {
 export default async function handler(req, res) {
   // Vercel cron authenticates via CRON_SECRET header automatically.
   // For manual/n8n calls, also accept x-agent-secret.
+  // Fails closed: with no secret configured this route used to accept anyone,
+  // and every call fans an AI agent run out to every user.
   const secret = process.env.AGENT_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
   const provided = req.headers['x-agent-secret'] || req.headers['authorization']?.replace('Bearer ', '');
-  if (secret && provided !== secret && req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
+  const authorized = (secret && provided === secret)
+    || (cronSecret && req.headers['authorization'] === `Bearer ${cronSecret}`);
+  if (!authorized) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

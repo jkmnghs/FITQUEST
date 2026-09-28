@@ -11,6 +11,7 @@ import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerc
 import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
 import { todayDayKey, exercisesForDay, sortedTrainingDays } from '../utils/session';
 import { closeElapsedWeek } from '../utils/week';
+import { mergeCloudAndLocal } from '../utils/stateMerge';
 
 /**
  * Build a personalized exercise list from a program base by applying
@@ -74,20 +75,6 @@ function pruneOldEntries(arr, dateKey = 'date') {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - PRUNE_DAYS);
   return (arr || []).filter(e => new Date(e[dateKey]) >= cutoff);
-}
-
-function unionArrays(arr1, arr2, keyFn) {
-  const map = new Map();
-  (arr1 || []).forEach(item => {
-    const k = keyFn(item);
-    if (k !== undefined) map.set(k, item);
-  });
-  (arr2 || []).forEach(item => {
-    const k = keyFn(item);
-    if (k !== undefined) map.set(k, item); // arr2 (local) wins on collision
-    else map.set(Symbol(), item);
-  });
-  return [...map.values()];
 }
 
 function checkDayReset(state) {
@@ -252,75 +239,9 @@ export function useGameState(user) {
 
         // Phase 5.2: Conflict resolution — merge when both have data
         if (localData && localData.totalSessions > 0 && cloudData.totalSessions > 0) {
-          const localModified = localData.lastDate || '';
-          const cloudModified = cloudData.lastDate || '';
-          // Simple merge strategy: take whichever is newer, union workout logs
-          const baseData = cloudModified >= localModified ? cloudData : localData;
-          const merged = checkQuestReset(checkDayReset(mergeState(baseData)));
-          // Union log entries (deduplicate by dateStr)
-          const seenDates = new Set();
-          const mergedLog = [...(cloudData.log || []), ...(localData.log || [])].filter(entry => {
-            const key = entry.dateStr || entry.date;
-            if (seenDates.has(key)) return false;
-            seenDates.add(key);
-            return true;
-          });
-          merged.log = mergedLog.slice(-200); // keep last 200
-          // Take higher XP/level
-          merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
-          merged.level = Math.max(cloudData.level || 1, localData.level || 1);
-          // Recalculate xp (progress within current level) from the authoritative totalXp+level
-          // so the XP bar is always consistent after the merge, regardless of which source
-          // provided each value.
-          merged.xp = Math.max(0, merged.totalXp - xpToLevel(merged.level));
-          merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
-          // Week and checkin count should never regress — take the higher value
-          merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
-          // currentWeekStartDate must track whichever side's currentWeek "won" above —
-          // otherwise the date can point at a stale (lower) week after the merge.
-          const weekWinner = (cloudData.currentWeek || 1) >= (localData.currentWeek || 1) ? cloudData : localData;
-          merged.currentWeekStartDate = weekWinner.currentWeekStartDate || merged.currentWeekStartDate || today();
-          merged.checkins = Math.max(cloudData.checkins || 0, localData.checkins || 0);
-          // Union achievements
-          merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
-          // Union check-ins by week — local wins for any given week (most recent edit)
-          const checkinMap = new Map();
-          (cloudData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
-          (localData.weeklyCheckins || []).forEach(c => checkinMap.set(c.week, c));
-          merged.weeklyCheckins = [...checkinMap.values()].sort((a, b) => a.week - b.week);
-          // Union weekProgress — take max session count per week, union completedDays/dates/sessions
-          // without this, a sync conflict silently drops sessions from whichever source loses
-          const mergedWP = { ...(baseData.weekProgress || {}) };
-          const otherWP = (baseData === cloudData ? localData : cloudData).weekProgress || {};
-          for (const [week, other] of Object.entries(otherWP)) {
-            if (!mergedWP[week]) {
-              mergedWP[week] = other;
-            } else {
-              const base = mergedWP[week];
-              const sessionMap = new Map();
-              [...(base.sessions || []), ...(other.sessions || [])].forEach(s => {
-                const key = `${s.dayKey || ''}-${s.date || ''}`;
-                if (!sessionMap.has(key)) sessionMap.set(key, s);
-              });
-              mergedWP[week] = {
-                ...base,
-                count: Math.max(base.count || 0, other.count || 0),
-                completedDays: [...new Set([...(base.completedDays || []), ...(other.completedDays || [])])],
-                dates: [...new Set([...(base.dates || []), ...(other.dates || [])])],
-                completed: base.completed || other.completed,
-                sessions: [...sessionMap.values()],
-              };
-            }
-          }
-          merged.weekProgress = mergedWP;
-          // Union other user-data arrays — both sides contribute, local wins on collision
-          merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
-          merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
-          merged.recoveryScores = unionArrays(cloudData.recoveryScores, localData.recoveryScores, r => r.date).slice(-90);
-          merged.aiCoachHistory = (localData.aiCoachHistory || []).length >= (cloudData.aiCoachHistory || []).length
-            ? (localData.aiCoachHistory || [])
-            : (cloudData.aiCoachHistory || []);
-
+          // Merge first, then apply defaults and the day reset — in the other
+          // order the merge overwrote the week rollover the reset had just done.
+          const merged = applyCloudMerge(localData, cloudData);
           if (!merged.name && user?.user_metadata?.full_name) {
             merged.name = user.user_metadata.full_name;
           }
@@ -349,15 +270,17 @@ export function useGameState(user) {
           cloudSet(userId, recovered);
           setTimeout(() => showToast('Progress restored from this device ✓'), 800);
         } else {
-          // Cloud wins over localStorage
-          const merged = checkQuestReset(checkDayReset(mergeState(cloudData)));
-          // If local has a higher week (e.g., claimed reward locally before cloud save landed),
-          // keep the higher value so the week never regresses on reload.
+          // Cloud wins over localStorage. If local has a higher week (e.g.,
+          // claimed reward locally before cloud save landed), keep it so the
+          // week never regresses on reload — before the day reset, so the
+          // reset's own rollover isn't overwritten.
+          const base = { ...cloudData };
           const localForWeek = storageGet(userId);
-          if (localForWeek && (localForWeek.currentWeek || 1) > (merged.currentWeek || 1)) {
-            merged.currentWeek = localForWeek.currentWeek;
-            merged.currentWeekStartDate = localForWeek.currentWeekStartDate || today();
+          if (localForWeek && (localForWeek.currentWeek || 1) > (base.currentWeek || 1)) {
+            base.currentWeek = localForWeek.currentWeek;
+            base.currentWeekStartDate = localForWeek.currentWeekStartDate || today();
           }
+          const merged = checkQuestReset(checkDayReset(mergeState(base)));
           // Populate name from Supabase auth metadata if not already set
           if (!merged.name && user?.user_metadata?.full_name) {
             merged.name = user.user_metadata.full_name;
@@ -1461,62 +1384,11 @@ export function useGameState(user) {
 
   // ── Helper: apply the full cloud+local merge into a state object ──
   function applyCloudMerge(localData, cloudData) {
-    const cloudModified = cloudData.lastDate || '';
-    const localModified = localData.lastDate || '';
-    const baseData = cloudModified >= localModified ? cloudData : localData;
-    const merged = checkQuestReset(checkDayReset(mergeState(baseData)));
-    // Union log (cloud first so cloud entries win dedup)
-    const seenDates = new Set();
-    merged.log = [...(cloudData.log || []), ...(localData.log || [])].filter(e => {
-      const key = e.dateStr || e.date;
-      if (seenDates.has(key)) return false;
-      seenDates.add(key);
-      return true;
-    }).slice(-200);
-    // Maximums
-    merged.totalXp = Math.max(cloudData.totalXp || 0, localData.totalXp || 0);
-    merged.level = Math.max(cloudData.level || 1, localData.level || 1);
+    const merged = mergeState(mergeCloudAndLocal(localData, cloudData));
+    // Progress within the current level, recomputed from the authoritative
+    // totalXp + level so the XP bar agrees with whichever side supplied each.
     merged.xp = Math.max(0, merged.totalXp - xpToLevel(merged.level));
-    merged.totalSessions = Math.max(cloudData.totalSessions || 0, localData.totalSessions || 0);
-    merged.currentWeek = Math.max(cloudData.currentWeek || 1, localData.currentWeek || 1);
-    merged.checkins = Math.max(cloudData.checkins || 0, localData.checkins || 0);
-    merged.achDone = [...new Set([...(cloudData.achDone || []), ...(localData.achDone || [])])];
-    // Union check-ins
-    const ciMap = new Map();
-    (cloudData.weeklyCheckins || []).forEach(c => ciMap.set(c.week, c));
-    (localData.weeklyCheckins || []).forEach(c => ciMap.set(c.week, c));
-    merged.weeklyCheckins = [...ciMap.values()].sort((a, b) => a.week - b.week);
-    // Union weekProgress — never drop sessions from either source
-    const mergedWP = { ...(baseData.weekProgress || {}) };
-    const otherWP = ((baseData === cloudData) ? localData : cloudData).weekProgress || {};
-    for (const [week, other] of Object.entries(otherWP)) {
-      if (!mergedWP[week]) {
-        mergedWP[week] = other;
-      } else {
-        const base = mergedWP[week];
-        const sMap = new Map();
-        [...(base.sessions || []), ...(other.sessions || [])].forEach(s => {
-          const k = `${s.dayKey || ''}-${s.date || ''}`;
-          if (!sMap.has(k)) sMap.set(k, s);
-        });
-        mergedWP[week] = {
-          ...base,
-          count: Math.max(base.count || 0, other.count || 0),
-          completedDays: [...new Set([...(base.completedDays || []), ...(other.completedDays || [])])],
-          dates: [...new Set([...(base.dates || []), ...(other.dates || [])])],
-          completed: base.completed || other.completed,
-          sessions: [...sMap.values()],
-        };
-      }
-    }
-    merged.weekProgress = mergedWP;
-    // Union arrays
-    merged.mealLogs = unionArrays(cloudData.mealLogs, localData.mealLogs, m => m.id).slice(-500);
-    merged.aiEpisodic = unionArrays(cloudData.aiEpisodic, localData.aiEpisodic, e => e.id);
-    merged.recoveryScores = unionArrays(cloudData.recoveryScores, localData.recoveryScores, r => r.date).slice(-90);
-    merged.aiCoachHistory = (localData.aiCoachHistory || []).length >= (cloudData.aiCoachHistory || []).length
-      ? (localData.aiCoachHistory || []) : (cloudData.aiCoachHistory || []);
-    return merged;
+    return checkQuestReset(checkDayReset(merged));
   }
 
   const syncFromCloud = useCallback(async () => {
