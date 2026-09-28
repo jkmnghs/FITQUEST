@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isCloudLoadSettled, isEmptyState } from '../utils/storage';
+import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isCloudLoadSettled, isEmptyState, getSyncStatus, subscribeSyncStatus } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
@@ -174,6 +174,8 @@ export function useGameState(user) {
   const [retryNonce, setRetryNonce] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  // Auto-saves count as syncs too; "Last synced" used to show only the load.
+  const { lastSavedAt } = useSyncExternalStore(subscribeSyncStatus, getSyncStatus);
 
   const isFinishingSession = useRef(false);
   // Track previous userId so we can distinguish sign-out (value→null)
@@ -1553,6 +1555,6 @@ export function useGameState(user) {
     logRecovery, updateDailyHabits,
     importData, completeAssessment, changeProgram,
     swapExercise, deleteExercise,
-    syncFromCloud, lastSyncedAt, syncing,
+    syncFromCloud, lastSyncedAt: Math.max(lastSyncedAt || 0, lastSavedAt || 0) || null, syncing,
   };
 }

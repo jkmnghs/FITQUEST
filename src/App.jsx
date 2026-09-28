@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Dumbbell, Utensils, TrendingUp, User, X, Zap } from 'lucide-react';
 import BgFx from './components/BgFx';
 import Toast from './components/Toast';
+import CloudSaveBanner from './components/CloudSaveBanner';
 import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
 import OnboardingScreen from './components/OnboardingScreen';
@@ -314,6 +315,7 @@ export default function App() {
     <ErrorBoundary>
       <BgFx />
       <Toast message={toast} />
+      <CloudSaveBanner />
 
       {/* Onboarding tour overlay */}
       {showTour && (

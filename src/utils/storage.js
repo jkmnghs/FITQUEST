@@ -208,7 +208,72 @@ export function isCloudLoadSettled(userId) {
   return !!userId && _loadSettledFor === userId;
 }
 
-export async function cloudSet(userId, state, { force = false } = {}) {
+// ── Save status + retry ─────────────────────────────────────────────────────
+// A failed save used to end in a console warning: the progress stayed on the
+// device, nobody was told, and nothing tried again. Now the last failed state
+// is retried with backoff (and as soon as the browser reports it is back
+// online), and the UI can subscribe to whether the cloud copy is current.
+
+const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 120_000, 300_000];
+
+let _syncStatus = { status: 'idle', lastSavedAt: null, failures: 0 };
+const _statusListeners = new Set();
+let _retry = null; // { userId, state, seq, attempt, timer }
+let _writeSeq = 0;
+
+function setSyncStatus(patch) {
+  _syncStatus = { ..._syncStatus, ...patch };
+  _statusListeners.forEach(fn => fn());
+}
+
+export function getSyncStatus() {
+  return _syncStatus;
+}
+
+export function subscribeSyncStatus(fn) {
+  _statusListeners.add(fn);
+  return () => _statusListeners.delete(fn);
+}
+
+function clearRetry() {
+  if (_retry) clearTimeout(_retry.timer);
+  _retry = null;
+}
+
+function scheduleRetry(userId, state, seq) {
+  const attempt = _retry && _retry.userId === userId ? _retry.attempt + 1 : 0;
+  clearRetry();
+  const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+  _retry = { userId, state, seq, attempt, timer: setTimeout(runRetry, delay) };
+}
+
+function runRetry() {
+  if (!_retry) return;
+  const { userId, state, seq } = _retry;
+  // A load or refresh is in flight — try again once it has settled.
+  if (_loadSettledFor !== userId) {
+    _retry.timer = setTimeout(runRetry, RETRY_DELAYS_MS[0]);
+    return;
+  }
+  cloudSet(userId, state, { retrySeq: seq });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => retryCloudSaveNow());
+}
+
+/** Retry a failed save now instead of waiting out the backoff. */
+export function retryCloudSaveNow() {
+  if (_retry) { clearTimeout(_retry.timer); runRetry(); }
+}
+
+/** Test hook: forget any pending retry and reset the status. */
+export function _resetSyncStatus() {
+  clearRetry();
+  _syncStatus = { status: 'idle', lastSavedAt: null, failures: 0 };
+}
+
+export async function cloudSet(userId, state, { force = false, retrySeq = null } = {}) {
   if (!supabase || !userId) return;
 
   if (!force && _loadSettledFor !== userId) {
@@ -229,31 +294,52 @@ export async function cloudSet(userId, state, { force = false } = {}) {
     }
   }
 
-  const patch = stripServerOwned(state);
+  // Writes are ordered: a retry keeps its original place, so an older state
+  // can never replace a newer one waiting to go up.
+  const seq = retrySeq ?? ++_writeSeq;
+  if (_syncStatus.status !== 'error') setSyncStatus({ status: 'saving' });
+
+  const ok = await writeState(userId, stripServerOwned(state));
+  if (ok) {
+    // A successful write covers every older state still waiting.
+    if (_retry && _retry.seq <= seq) clearRetry();
+    setSyncStatus(_retry
+      ? { lastSavedAt: Date.now() }
+      : { status: 'saved', lastSavedAt: Date.now(), failures: 0 });
+  } else {
+    if (!_retry || _retry.seq <= seq) scheduleRetry(userId, state, seq);
+    setSyncStatus({ status: 'error', failures: _syncStatus.failures + 1 });
+  }
+}
+
+/** One attempt at the write. True when the cloud row now holds `patch`. */
+async function writeState(userId, patch) {
   try {
     const { error } = await supabase.rpc('merge_user_state', { p_patch: patch });
-    if (!error) return;
+    if (!error) return true;
     // Only a missing function justifies the fallback. The upsert replaces the
     // whole column, so running it after a transient RPC failure (timeout, 5xx)
     // erased the server-owned keys — agent messages, quest quota — that the
     // RPC exists to protect.
     if (!MISSING_FUNCTION_CODES.has(error.code)) {
-      console.warn('[FitQuest] merge_user_state failed, not saved this time:', error.message);
-      return;
+      console.warn('[FitQuest] merge_user_state failed, will retry:', error.message);
+      return false;
     }
     console.warn('[FitQuest] merge_user_state unavailable, falling back to upsert:', error.message);
   } catch (e) {
-    console.warn('[FitQuest] merge_user_state threw, not saved this time:', e);
-    return;
+    console.warn('[FitQuest] merge_user_state threw, will retry:', e);
+    return false;
   }
   try {
     const { error } = await supabase
       .from('user_profiles')
       .upsert({ id: userId, state: patch }, { onConflict: 'id' });
-    if (error) console.warn('[FitQuest] cloudSet upsert failed:', error.message);
+    if (!error) return true;
+    console.warn('[FitQuest] cloudSet upsert failed, will retry:', error.message);
   } catch (e) {
-    console.warn('[FitQuest] cloudSet failed:', e);
+    console.warn('[FitQuest] cloudSet failed, will retry:', e);
   }
+  return false;
 }
 
 // PostgREST "function not found in schema cache" / Postgres undefined_function.
@@ -265,6 +351,9 @@ const MISSING_FUNCTION_CODES = new Set(['PGRST202', '42883']);
  */
 export async function cloudClear(userId) {
   if (!supabase || !userId) return;
+  // A queued retry holds pre-reset progress; sending it later would undo the reset.
+  clearRetry();
+  setSyncStatus({ status: 'idle', failures: 0 });
   try {
     await supabase
       .from('user_profiles')
