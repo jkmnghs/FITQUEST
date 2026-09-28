@@ -9,7 +9,8 @@ import { validateState, repairState } from '../utils/stateSchema';
 import { migrateState } from '../utils/stateMigrations';
 import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerciseSubstitutions';
 import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
-import { todayDayKey, exercisesForDay } from '../utils/session';
+import { todayDayKey, exercisesForDay, sortedTrainingDays } from '../utils/session';
+import { closeElapsedWeek } from '../utils/week';
 
 /**
  * Build a personalized exercise list from a program base by applying
@@ -126,6 +127,10 @@ function checkDayReset(state) {
       ? t
       : new Date(Math.min(...sessionDates.map(d => +new Date(d)))).toDateString();
   }
+
+  // A week that ran out its seven days with a missed session closes here, so
+  // the next calendar week isn't judged against the old start date.
+  next = closeElapsedWeek(next, sortedTrainingDays(next));
 
   // Repair state stamped before the anchor fix. A week that advanced the moment
   // its last session was logged recorded that same day as its start, so from
