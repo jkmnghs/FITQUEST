@@ -72,8 +72,29 @@ export function resolveWeekDays(state, viewingWeek, sortedTrainingDays, now = ne
   });
 }
 
+/** Offset of a day key from Monday: mon 0 … sun 6. */
+const fromMonday = dayKey => (DAY_ORDER.indexOf(dayKey) + 6) % 7;
+
 /**
- * Close the current program week once its seven calendar days are over.
+ * The Monday on which the week starting at `startMs` is over.
+ *
+ * Program weeks run Monday to Sunday, so that is normally the Monday after
+ * the start's calendar week. A week that started too late to hold any of its
+ * training days (e.g. an older state anchored to a Saturday) gets the
+ * following calendar week instead, rather than being closed empty.
+ */
+function weekCloseDate(startMs, sortedTrainingDays) {
+  const close = new Date(startMs);
+  const startOffset = fromMonday(DAY_ORDER[close.getDay()]);
+  close.setDate(close.getDate() - startOffset + 7);
+  if (!sortedTrainingDays.some(d => fromMonday(d) >= startOffset)) {
+    close.setDate(close.getDate() + 7);
+  }
+  return close;
+}
+
+/**
+ * Close the current program week once its calendar week is over.
  *
  * A week only advanced when enough sessions (or skips) were logged. Miss one
  * day and the week never closed: currentWeek and currentWeekStartDate stayed
@@ -84,10 +105,10 @@ export function resolveWeekDays(state, viewingWeek, sortedTrainingDays, now = ne
  *
  * Now the untrained days of an elapsed week are recorded as skipped (no
  * session, XP or streak credited — the same honest close markDaySkipped
- * offers) and the program moves on by exactly one week. The new week is
- * anchored to the start of the seven-day window today falls in, so its days
- * line up with the real calendar even after a long absence, instead of
- * burning several program weeks the user never trained.
+ * offers) and the program moves on by exactly one week, on Monday. The new
+ * week starts on the Monday of the calendar week today falls in, so it lines
+ * up with the real calendar even after a long absence, instead of burning
+ * several program weeks the user never trained.
  */
 export function closeElapsedWeek(state, sortedTrainingDays, now = new Date()) {
   const week = state.currentWeek;
@@ -97,9 +118,9 @@ export function closeElapsedWeek(state, sortedTrainingDays, now = new Date()) {
   const startMs = state.currentWeekStartDate ? midnightOf(state.currentWeekStartDate) : NaN;
   if (isNaN(startMs)) return state;
 
-  const todayMs = midnightOf(now);
-  const daysElapsed = Math.round((todayMs - startMs) / DAY_MS);
-  if (daysElapsed < 7) return state;
+  const close = weekCloseDate(startMs, sortedTrainingDays);
+  const daysPastClose = Math.round((midnightOf(now) - close.getTime()) / DAY_MS);
+  if (daysPastClose < 0) return state;
 
   const trained = trainedDays(wp) || [];
   const skippedDays = [...new Set([
@@ -107,8 +128,8 @@ export function closeElapsedWeek(state, sortedTrainingDays, now = new Date()) {
     ...sortedTrainingDays.filter(d => !trained.includes(d)),
   ])];
 
-  const newStart = new Date(startMs);
-  newStart.setDate(newStart.getDate() + Math.floor(daysElapsed / 7) * 7);
+  const newStart = new Date(close);
+  newStart.setDate(newStart.getDate() + Math.floor(daysPastClose / 7) * 7);
 
   return {
     ...state,

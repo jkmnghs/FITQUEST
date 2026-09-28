@@ -19,6 +19,20 @@ export function tomorrow() {
   return d.toDateString();
 }
 
+/**
+ * The next Monday strictly after `now`, in the same format as today().
+ *
+ * Program weeks run Monday to Sunday. A week that closes early starts its
+ * successor on the coming Monday; anchoring it to tomorrow() drifted every
+ * later week off the calendar, so "the week ended" on some Thursday instead
+ * of when the user's week actually turned over.
+ */
+export function nextMonday(now = new Date()) {
+  const d = new Date(now);
+  d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+  return d.toDateString();
+}
+
 /** Midnight timestamp for a date in any of the formats the log has used. */
 export function midnightOf(value) {
   const d = new Date(value);

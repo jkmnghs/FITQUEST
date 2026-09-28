@@ -5,6 +5,7 @@ import {
   removeXP,
   today,
   tomorrow,
+  nextMonday,
   midnightOf,
   getRank,
   getPhase,
@@ -750,6 +751,15 @@ describe('tomorrow / midnightOf', () => {
       dayDate.setDate(start.getDate() + daysFromStart);
       const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
       expect(dayDate.getTime()).toBeGreaterThan(todayMidnight.getTime());
+    }
+  });
+});
+
+describe('nextMonday', () => {
+  it('is the Monday strictly after any day of the week', () => {
+    // Mon 2026-09-21 … Sun 2026-09-27 all roll to Mon 2026-09-28.
+    for (let d = 21; d <= 27; d++) {
+      expect(nextMonday(new Date(2026, 8, d, 15))).toBe(new Date(2026, 8, 28).toDateString());
     }
   });
 });

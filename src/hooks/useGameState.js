@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isEmptyState } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, tomorrow, midnightOf } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -976,9 +976,9 @@ export function useGameState(user) {
         deloadDone: isDeload && wp.count >= sessionsNeeded ? true : prev.deloadDone,
         weekProgress,
         currentWeek: nextWeek,
-        // The new week begins the day *after* the session that closed the old
-        // one; anchoring it to today made today's weekday look missed tomorrow.
-        currentWeekStartDate: nextWeek !== w ? tomorrow() : (prev.currentWeekStartDate || today()),
+        // The new week begins on the coming Monday, never today: anchoring it
+        // to today made today's weekday look missed tomorrow.
+        currentWeekStartDate: nextWeek !== w ? nextMonday() : (prev.currentWeekStartDate || today()),
         sessionStartTime: null,
         dailySessionCount: (prev.dailySessionCount || 0) + 1,
         dailyXPEarned: (prev.dailyXPEarned || 0) + pendingXP,
@@ -1272,7 +1272,7 @@ export function useGameState(user) {
       let currentWeekStartDate = prev.currentWeekStartDate;
       if (completed && week === prev.currentWeek) {
         currentWeek = prev.currentWeek + 1;
-        currentWeekStartDate = tomorrow();
+        currentWeekStartDate = nextMonday();
       } else if (!completed && week < prev.currentWeek && !skipped) {
         // Un-skipping a day that was holding a past week complete reopens it,
         // but we deliberately do not drag currentWeek backwards — later weeks
@@ -1430,7 +1430,7 @@ export function useGameState(user) {
         weekProgress: { ...prev.weekProgress, [week]: newWp },
         liftWeights: { ...prev.liftWeights, ...customWeights },
         currentWeek: nextWeek,
-        currentWeekStartDate: nextWeek !== prev.currentWeek ? tomorrow() : (prev.currentWeekStartDate || today()),
+        currentWeekStartDate: nextWeek !== prev.currentWeek ? nextMonday() : (prev.currentWeekStartDate || today()),
         backfillLock: { ...prev.backfillLock, [week]: [...prevLockDays, dayKey] },
         totalSessions: prev.totalSessions + 1,
         totalMinutes: prev.totalMinutes + durationMins,

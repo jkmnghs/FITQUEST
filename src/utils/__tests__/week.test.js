@@ -49,6 +49,23 @@ describe('closeElapsedWeek', () => {
     expect(days.map(d => d.skipped)).toEqual([true, false, false]);
   });
 
+  it('rolls over on Monday even when the week started mid-week', () => {
+    // Previous week finished early and anchored this one to a Tuesday.
+    const s = { ...stuckWeek(), currentWeek: 36, weekProgress: {}, currentWeekStartDate: at(2026, 9, 22).toDateString() };
+    expect(closeElapsedWeek(s, DAYS, at(2026, 9, 27))).toBe(s);
+    const next = closeElapsedWeek(s, DAYS, at(2026, 9, 28));
+    expect(next.currentWeek).toBe(37);
+    expect(next.currentWeekStartDate).toBe(at(2026, 9, 28).toDateString());
+  });
+
+  it('gives a week anchored after its last training day the following calendar week', () => {
+    const s = { ...stuckWeek(), weekProgress: {}, currentWeekStartDate: at(2026, 9, 26).toDateString() }; // Saturday
+    expect(closeElapsedWeek(s, DAYS, at(2026, 9, 28))).toBe(s);
+    const next = closeElapsedWeek(s, DAYS, at(2026, 10, 5));
+    expect(next.currentWeek).toBe(4);
+    expect(next.currentWeekStartDate).toBe(at(2026, 10, 5).toDateString());
+  });
+
   it('skips every training day of an untouched week', () => {
     const s = { ...stuckWeek(), weekProgress: {} };
     const next = closeElapsedWeek(s, DAYS, at(2026, 9, 28));
