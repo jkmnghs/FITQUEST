@@ -61,3 +61,16 @@ describe('withTimeout, as used by the cloud read', () => {
     expect(timedOut).not.toHaveProperty('data');
   });
 });
+
+describe('write gate status', () => {
+  it('reports settled only for the user whose load resolved', async () => {
+    const { markCloudLoadSettled, resetCloudLoadGate, isCloudLoadSettled } = await import('../storage');
+    resetCloudLoadGate();
+    expect(isCloudLoadSettled('u1')).toBe(false);
+    markCloudLoadSettled('u1');
+    expect(isCloudLoadSettled('u1')).toBe(true);
+    expect(isCloudLoadSettled('u2')).toBe(false);
+    expect(isCloudLoadSettled(null)).toBe(false);
+    resetCloudLoadGate();
+  });
+});

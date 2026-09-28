@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
-import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isEmptyState } from '../utils/storage';
+import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isCloudLoadSettled, isEmptyState } from '../utils/storage';
 import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
@@ -11,7 +11,7 @@ import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerc
 import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
 import { todayDayKey, exercisesForDay, sortedTrainingDays } from '../utils/session';
 import { closeElapsedWeek } from '../utils/week';
-import { mergeCloudAndLocal } from '../utils/stateMerge';
+import { mergeCloudAndLocal, sameProgress } from '../utils/stateMerge';
 
 /**
  * Build a personalized exercise list from a program base by applying
@@ -357,6 +357,65 @@ export function useGameState(user) {
       clearInterval(interval);
     };
   }, []);
+
+  // ── Catch up with the cloud when the app returns to the foreground ────────
+  // The cloud was read only at startup. A device left open in the background
+  // (a PWA, a laptop tab) kept its old state in memory, and the first thing
+  // the user did on it auto-saved that state over sessions logged meanwhile on
+  // another device. Now: flush on hide, and on return shut the write gate,
+  // read the cloud, merge, and only then let writes out again.
+  const loadStatusRef = useRef({ cloudLoading, cloudLoadFailed });
+  loadStatusRef.current = { cloudLoading, cloudLoadFailed };
+  const lastRefreshRef = useRef(Date.now());
+  useEffect(() => {
+    if (!userId) return undefined;
+    let cancelled = false;
+
+    async function refreshFromCloud() {
+      const { cloudLoading: loading, cloudLoadFailed: failed } = loadStatusRef.current;
+      if (loading || failed) return;
+      if (Date.now() - lastRefreshRef.current < 30_000) return;
+      lastRefreshRef.current = Date.now();
+
+      // Our own unsent changes go up first, so the read below includes them.
+      await flushCloudDebounce();
+      const wasSettled = isCloudLoadSettled(userId);
+      resetCloudLoadGate();
+      let result = null;
+      try {
+        result = await cloudGetResult(userId);
+      } catch (e) {
+        result = null;
+      }
+      if (cancelled) return;
+      if (!result?.ok) {
+        // Knowing nothing new, go back to exactly how things were.
+        if (wasSettled) markCloudLoadSettled(userId);
+        return;
+      }
+      const cloudData = result.data;
+      if (cloudData && !isEmptyState(cloudData)) {
+        setStateRaw(prev => {
+          if (sameProgress(prev, cloudData)) return prev;
+          const merged = applyCloudMerge(prev, cloudData);
+          storageSet(merged, userId);
+          return merged;
+        });
+        setLastSyncedAt(Date.now());
+      }
+      markCloudLoadSettled(userId);
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushCloudDebounce();
+      else refreshFromCloud();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fire open notification
   useEffect(() => {

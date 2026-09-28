@@ -204,6 +204,10 @@ export function resetCloudLoadGate() {
   _loadSettledFor = null;
 }
 
+export function isCloudLoadSettled(userId) {
+  return !!userId && _loadSettledFor === userId;
+}
+
 export async function cloudSet(userId, state, { force = false } = {}) {
   if (!supabase || !userId) return;
 
@@ -278,7 +282,13 @@ let _pendingWrite = null;
 export function cloudSetDebounced(userId, state) {
   clearTimeout(_syncTimer);
   _pendingWrite = { userId, state };
-  _syncTimer = setTimeout(() => {
+  // While the write gate is shut (a load or refresh is in flight) the write
+  // waits instead of firing into cloudSet's refusal and being dropped.
+  _syncTimer = setTimeout(function fire() {
+    if (_loadSettledFor !== userId) {
+      _syncTimer = setTimeout(fire, 3000);
+      return;
+    }
     _pendingWrite = null;
     cloudSet(userId, state);
   }, 3000);
