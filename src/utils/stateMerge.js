@@ -68,6 +68,19 @@ function mergeWeek(base, other) {
 }
 
 /**
+ * True when the cloud copy holds nothing this device doesn't already show —
+ * the common case on returning to the app, where a merge would be churn.
+ */
+export function sameProgress(a, b) {
+  const sig = s => [
+    Number(s?.totalSessions) || 0, s?.currentWeek || 1, s?.lastDate || '',
+    s?.log?.length || 0, s?.weeklyCheckins?.length || 0, s?.mealLogs?.length || 0,
+    Object.keys(s?.weekProgress || {}).length, Number(s?.totalXp) || 0,
+  ].join('|');
+  return sig(a) === sig(b);
+}
+
+/**
  * Merge this device's state with the cloud copy. Pure; no defaults, no day
  * reset — the caller runs those on the result, *after* the merge.
  *

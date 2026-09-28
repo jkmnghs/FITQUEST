@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeCloudAndLocal } from '../stateMerge';
+import { mergeCloudAndLocal, sameProgress } from '../stateMerge';
 
 const day = (offset) => {
   const d = new Date(); d.setDate(d.getDate() + offset);
@@ -50,5 +50,17 @@ describe('mergeCloudAndLocal', () => {
     const wp = mergeCloudAndLocal(local, cloud).weekProgress[5];
     expect(wp.completedDays.sort()).toEqual(['mon', 'wed']);
     expect(wp.skippedDays.sort()).toEqual(['fri', 'sat']);
+  });
+});
+
+describe('sameProgress', () => {
+  const base = { totalSessions: 40, currentWeek: 37, lastDate: 'Mon Sep 28 2026', log: [{}, {}], totalXp: 900 };
+
+  it('treats an identical cloud copy as nothing to merge', () => {
+    expect(sameProgress(base, { ...base, unit: 'kg' })).toBe(true);
+  });
+
+  it('notices a session logged on another device', () => {
+    expect(sameProgress(base, { ...base, totalSessions: 41, log: [{}, {}, {}] })).toBe(false);
   });
 });
