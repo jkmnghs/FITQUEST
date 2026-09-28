@@ -229,18 +229,31 @@ export async function cloudSet(userId, state, { force = false } = {}) {
   try {
     const { error } = await supabase.rpc('merge_user_state', { p_patch: patch });
     if (!error) return;
+    // Only a missing function justifies the fallback. The upsert replaces the
+    // whole column, so running it after a transient RPC failure (timeout, 5xx)
+    // erased the server-owned keys — agent messages, quest quota — that the
+    // RPC exists to protect.
+    if (!MISSING_FUNCTION_CODES.has(error.code)) {
+      console.warn('[FitQuest] merge_user_state failed, not saved this time:', error.message);
+      return;
+    }
     console.warn('[FitQuest] merge_user_state unavailable, falling back to upsert:', error.message);
   } catch (e) {
-    console.warn('[FitQuest] merge_user_state threw, falling back to upsert:', e);
+    console.warn('[FitQuest] merge_user_state threw, not saved this time:', e);
+    return;
   }
   try {
-    await supabase
+    const { error } = await supabase
       .from('user_profiles')
       .upsert({ id: userId, state: patch }, { onConflict: 'id' });
+    if (error) console.warn('[FitQuest] cloudSet upsert failed:', error.message);
   } catch (e) {
     console.warn('[FitQuest] cloudSet failed:', e);
   }
 }
+
+// PostgREST "function not found in schema cache" / Postgres undefined_function.
+const MISSING_FUNCTION_CODES = new Set(['PGRST202', '42883']);
 
 /**
  * Resets the user's cloud state to an empty object. Full replace by design —
