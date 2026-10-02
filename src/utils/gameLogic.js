@@ -33,6 +33,13 @@ export function nextMonday(now = new Date()) {
   return d.toDateString();
 }
 
+/** Monday of the calendar week containing `now`, in the same format as today(). */
+export function startOfThisWeek(now = new Date()) {
+  const d = new Date(now);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toDateString();
+}
+
 /** Midnight timestamp for a date in any of the formats the log has used. */
 export function midnightOf(value) {
   const d = new Date(value);

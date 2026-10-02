@@ -6,6 +6,7 @@ import {
   today,
   tomorrow,
   nextMonday,
+  startOfThisWeek,
   midnightOf,
   getRank,
   getPhase,
@@ -761,5 +762,14 @@ describe('nextMonday', () => {
     for (let d = 21; d <= 27; d++) {
       expect(nextMonday(new Date(2026, 8, d, 15))).toBe(new Date(2026, 8, 28).toDateString());
     }
+  });
+});
+
+describe('startOfThisWeek', () => {
+  it('is the Monday of the current calendar week', () => {
+    for (let d = 28; d <= 30; d++) {
+      expect(startOfThisWeek(new Date(2026, 8, d, 15))).toBe(new Date(2026, 8, 28).toDateString());
+    }
+    expect(startOfThisWeek(new Date(2026, 9, 4, 15))).toBe(new Date(2026, 8, 28).toDateString());
   });
 });

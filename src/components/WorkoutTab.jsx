@@ -12,7 +12,7 @@ import { getPickerCategories } from '../data/exerciseCatalog';
 import { useConfirm } from './ui/ConfirmDialog';
 import { haptic } from '../utils/haptics';
 import { getLastPerformance } from '../utils/exerciseHistory';
-import { resolveWeekDays } from '../utils/week';
+import { resolveWeekDays, defaultViewingWeek } from '../utils/week';
 
 // Ceiling from calculateAdherenceXP: 10 (training day) + 8 (RPE) + 20 (overload).
 const MAX_EXERCISE_XP = 38;
@@ -299,7 +299,7 @@ function SessionHero({
 }
 
 export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped, onClearDayProgress }) {
-  const [viewingWeek, setViewingWeek] = useState(state.currentWeek);
+  const [viewingWeek, setViewingWeek] = useState(() => defaultViewingWeek(state));
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showProgramComplete, setShowProgramComplete] = useState(false);
@@ -330,10 +330,11 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
   const touchStartY = useRef(0);
   const mouseStartX = useRef(null);
 
-  // Keep viewingWeek in sync when the program advances to a new week
+  // Keep viewingWeek in sync when the program advances to a new week — on the
+  // week just finished until the new one has begun.
   useEffect(() => {
-    setViewingWeek(state.currentWeek);
-  }, [state.currentWeek]);
+    setViewingWeek(defaultViewingWeek(state));
+  }, [state.currentWeek, state.currentWeekStartDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tell App when any modal/overlay is open so it can hide the tab bar
   useEffect(() => {
