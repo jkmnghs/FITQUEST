@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isCloudLoadSettled, isEmptyState, getSyncStatus, subscribeSyncStatus } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, midnightOf } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, startOfThisWeek, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -10,7 +10,7 @@ import { migrateState } from '../utils/stateMigrations';
 import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerciseSubstitutions';
 import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
 import { todayDayKey, exercisesForDay, sortedTrainingDays } from '../utils/session';
-import { closeElapsedWeek } from '../utils/week';
+import { closeElapsedWeek, repairWeekAnchor } from '../utils/week';
 import { mergeCloudAndLocal, sameProgress } from '../utils/stateMerge';
 
 /**
@@ -117,6 +117,7 @@ function checkDayReset(state) {
 
   // A week that ran out its seven days with a missed session closes here, so
   // the next calendar week isn't judged against the old start date.
+  next = repairWeekAnchor(next, sortedTrainingDays(next));
   next = closeElapsedWeek(next, sortedTrainingDays(next));
 
   // Repair state stamped before the anchor fix. A week that advanced the moment
@@ -1030,7 +1031,16 @@ export function useGameState(user) {
 
   const updateSetting = useCallback((key, value) => {
     let nextState;
-    setState(prev => { nextState = { ...prev, [key]: value }; return nextState; });
+    setState(prev => {
+      nextState = { ...prev, [key]: value };
+      // Choosing a week by hand means "this calendar week is week N". Without a
+      // matching start date the old one was kept, and the auto-close read the
+      // new week as long over.
+      if (key === 'currentWeek' && value !== prev.currentWeek) {
+        nextState.currentWeekStartDate = startOfThisWeek();
+      }
+      return nextState;
+    });
     setTimeout(() => { if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); } }, 50);
   }, [setState, userId]);
 

@@ -147,3 +147,95 @@ export function closeElapsedWeek(state, sortedTrainingDays, now = new Date()) {
     currentWeekStartDate: newStart.toDateString(),
   };
 }
+
+/** Midnight of the Monday after the calendar week containing `ms`. */
+function mondayAfter(ms) {
+  const d = new Date(ms);
+  d.setDate(d.getDate() - fromMonday(DAY_ORDER[d.getDay()]) + 7);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Latest day a week recorded a session on, as a midnight timestamp; NaN if none. */
+function lastSessionMs(wp) {
+  const times = [
+    ...(wp?.dates || []),
+    ...(wp?.sessions || []).map(s => s?.date),
+  ].map(midnightOf).filter(t => !isNaN(t));
+  return times.length ? Math.max(...times) : NaN;
+}
+
+/**
+ * Keep the current week's start date consistent with the week before it.
+ *
+ * Several paths can move currentWeek without a trustworthy start date — a
+ * cloud/local merge that picks the higher week, older app versions, the
+ * week picker in Settings. Paired with a stale start, closeElapsedWeek then
+ * judged a week that had not begun as long over and closed it empty: a user
+ * who finished week 37 on Friday found week 38 marked all ✗ and themselves
+ * on week 39 the same afternoon.
+ *
+ * Two repairs, both keyed on the last session of the week before:
+ * - A week that closed itself with nothing in it, before its calendar week
+ *   could possibly have ended, is reopened — the program steps back to it.
+ * - A start date on or before that last session moves to the following
+ *   Monday, which is where a week that finished on that day starts its
+ *   successor.
+ */
+export function repairWeekAnchor(state, sortedTrainingDays, now = new Date()) {
+  let next = state;
+  const todayMs = midnightOf(now);
+
+  // 1. Undo an empty week that auto-closed before it could have elapsed.
+  const cw = next.currentWeek;
+  const closed = next.weekProgress?.[cw - 1];
+  const current = next.weekProgress?.[cw];
+  if (closed?.autoClosed && !(closed.count > 0) && !(closed.sessions || []).length
+      && !(current?.count > 0)) {
+    const lastBefore = lastSessionMs(next.weekProgress?.[cw - 2]);
+    if (!isNaN(lastBefore)) {
+      const earliestStart = mondayAfter(lastBefore);
+      const earliestClose = weekCloseDate(earliestStart.getTime(), sortedTrainingDays);
+      if (todayMs < earliestClose.getTime()) {
+        const weekProgress = { ...next.weekProgress };
+        delete weekProgress[cw - 1];
+        if (current && !(current.count > 0)) delete weekProgress[cw];
+        next = {
+          ...next,
+          weekProgress,
+          currentWeek: cw - 1,
+          currentWeekStartDate: earliestStart.toDateString(),
+        };
+      }
+    }
+  }
+
+  // 2. A start date can never precede the previous week's last session.
+  // Left alone once the current week holds sessions of its own.
+  const startMs = next.currentWeekStartDate ? midnightOf(next.currentWeekStartDate) : NaN;
+  const lastPrev = lastSessionMs(next.weekProgress?.[next.currentWeek - 1]);
+  const currentEmpty = !(next.weekProgress?.[next.currentWeek]?.count > 0);
+  if (currentEmpty && !isNaN(startMs) && !isNaN(lastPrev) && startMs <= lastPrev) {
+    next = { ...next, currentWeekStartDate: mondayAfter(lastPrev).toDateString() };
+  }
+
+  return next;
+}
+
+/**
+ * The week the workout screen opens on.
+ *
+ * Finishing a week moves the program to the next one straight away, but that
+ * week starts on the coming Monday. Opening on it showed an empty week with
+ * the session just logged nowhere in sight, as if it had been lost. Until the
+ * new week begins, open on the one just finished.
+ */
+export function defaultViewingWeek(state, now = new Date()) {
+  const cw = state.currentWeek || 1;
+  const startMs = state.currentWeekStartDate ? midnightOf(state.currentWeekStartDate) : NaN;
+  if (cw > 1 && !isNaN(startMs) && startMs > midnightOf(now)
+      && !(state.weekProgress?.[cw]?.count > 0)) {
+    return cw - 1;
+  }
+  return cw;
+}

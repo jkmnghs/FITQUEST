@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { closeElapsedWeek, resolveWeekDays } from '../week';
+import { closeElapsedWeek, resolveWeekDays, repairWeekAnchor, defaultViewingWeek } from '../week';
 
 const DAYS = ['mon', 'wed', 'fri'];
 // Monday 2026-09-21 .. Sunday 2026-09-27; next Monday 2026-09-28.
@@ -87,5 +87,72 @@ describe('resolveWeekDays', () => {
     // Monday of the next calendar week read every day as behind us.
     const days = resolveWeekDays(stuckWeek(), 3, DAYS, at(2026, 9, 28));
     expect(days.find(d => d.dayKey === 'wed').skipped).toBe(true);
+  });
+});
+
+describe('repairWeekAnchor', () => {
+  // The reported account, Friday 2026-10-02: week 37 finished today, week 38
+  // closed itself empty the same afternoon, the program sat on week 39.
+  const reported = () => ({
+    currentWeek: 39,
+    currentWeekStartDate: 'Fri Oct 02 2026',
+    weekProgress: {
+      37: {
+        count: 3, completed: true, completedDays: ['mon', 'wed', 'fri'],
+        dates: ['Mon Sep 28 2026', '2026-09-30', 'Fri Oct 02 2026'],
+        sessions: [
+          { date: 'Mon Sep 28 2026', dayKey: 'mon' },
+          { date: '2026-09-30', dayKey: 'wed' },
+          { date: 'Fri Oct 02 2026', dayKey: 'fri' },
+        ],
+      },
+      38: { count: 0, sessions: [], completed: true, autoClosed: true, skippedDays: ['mon', 'wed', 'fri'] },
+    },
+  });
+
+  it('reopens a week that closed itself before it could have begun', () => {
+    const fixed = repairWeekAnchor(reported(), DAYS, at(2026, 10, 2));
+    expect(fixed.currentWeek).toBe(38);
+    expect(fixed.currentWeekStartDate).toBe(at(2026, 10, 5).toDateString());
+    expect(fixed.weekProgress[38]).toBeUndefined();
+    expect(fixed.weekProgress[37].count).toBe(3);
+  });
+
+  it('does not close the repaired week again on the same day', () => {
+    const fixed = repairWeekAnchor(reported(), DAYS, at(2026, 10, 2));
+    expect(closeElapsedWeek(fixed, DAYS, at(2026, 10, 2))).toBe(fixed);
+  });
+
+  it('leaves a legitimately elapsed empty week closed', () => {
+    // Week 38 really ran Oct 5–11 with nothing logged; on Oct 12 it stays closed.
+    const s = reported();
+    s.currentWeekStartDate = 'Mon Oct 12 2026';
+    expect(repairWeekAnchor(s, DAYS, at(2026, 10, 12)).currentWeek).toBe(39);
+  });
+
+  it('moves a start date that precedes the previous week\'s last session', () => {
+    const s = { ...reported(), currentWeek: 38, currentWeekStartDate: 'Mon Sep 21 2026' };
+    delete s.weekProgress[38];
+    const fixed = repairWeekAnchor(s, DAYS, at(2026, 10, 2));
+    expect(fixed.currentWeekStartDate).toBe(at(2026, 10, 5).toDateString());
+  });
+
+  it('leaves the start alone once the current week has sessions', () => {
+    const s = { ...reported(), currentWeek: 38, currentWeekStartDate: 'Mon Sep 21 2026' };
+    s.weekProgress = { ...s.weekProgress, 38: { count: 1, sessions: [{ date: 'Fri Oct 02 2026', dayKey: 'fri' }] } };
+    expect(repairWeekAnchor(s, DAYS, at(2026, 10, 2)).currentWeekStartDate).toBe('Mon Sep 21 2026');
+  });
+});
+
+describe('defaultViewingWeek', () => {
+  it('opens on the week just finished until the next one begins', () => {
+    const s = { currentWeek: 38, currentWeekStartDate: 'Mon Oct 05 2026', weekProgress: {} };
+    expect(defaultViewingWeek(s, at(2026, 10, 2))).toBe(37);
+    expect(defaultViewingWeek(s, at(2026, 10, 5))).toBe(38);
+  });
+
+  it('opens on the current week when it is under way', () => {
+    const s = { currentWeek: 38, currentWeekStartDate: 'Mon Sep 28 2026', weekProgress: {} };
+    expect(defaultViewingWeek(s, at(2026, 10, 2))).toBe(38);
   });
 });
