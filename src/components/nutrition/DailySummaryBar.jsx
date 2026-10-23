@@ -1,113 +1,99 @@
 import React from 'react';
+import CountUp from '../CountUp';
 
 const MACROS = [
-  { key: 'protein', label: 'Protein', color: 'var(--color-action)',    bg: 'rgba(0,229,255,0.10)'   },
-  { key: 'carbs',   label: 'Carbs',   color: 'var(--color-premium)',   bg: 'rgba(255,214,0,0.10)'   },
-  { key: 'fat',     label: 'Fat',     color: 'var(--color-warning)',   bg: 'rgba(255,145,0,0.10)'   },
+  { key: 'protein', label: 'Protein', color: 'var(--color-action)',  track: 'rgba(0,229,255,0.10)',   glow: 'rgba(0,229,255,0.7)'   },
+  { key: 'carbs',   label: 'Carbs',   color: 'var(--color-accent-purple)', track: 'rgba(179,136,255,0.12)', glow: 'rgba(179,136,255,0.7)' },
+  { key: 'fat',     label: 'Fat',     color: 'var(--color-premium)', track: 'rgba(255,214,0,0.12)',   glow: 'rgba(255,214,0,0.6)'   },
 ];
+
+const RING_R = 52;
+const RING_C = 2 * Math.PI * RING_R;
 
 export default function DailySummaryBar({ dayTotals, goals, mealCount }) {
   const calPct = goals.calories > 0
     ? Math.min(100, (dayTotals.calories / goals.calories) * 100)
     : 0;
   const calOver = dayTotals.calories > goals.calories;
+  const calLeft = Math.max(0, goals.calories - dayTotals.calories);
+  const ringColor = calOver ? 'var(--color-destructive)' : 'var(--color-warning)';
 
   return (
-    <div style={{
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-border-medium)',
-      borderRadius: 'var(--radius-lg)',
+    <div className="fq-cut" style={{
+      background: 'linear-gradient(160deg, #141b36, #0c1226)',
+      border: '1px solid rgba(255,145,0,0.3)',
+      '--fq-cut-border': 'rgba(255,145,0,0.3)',
       padding: 'var(--space-4)',
       marginBottom: 'var(--space-4)',
+      display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
     }}>
-      {/* Calorie row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-2)' }}>
-        <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 11,
-          color: 'var(--color-text-tertiary)', letterSpacing: '0.1em',
-        }}>TODAY</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      {/* Calorie ring — sweeps from empty to today's total each time Fuel opens. */}
+      <div style={{ position: 'relative', width: 124, height: 124, flexShrink: 0 }}>
+        <svg
+          role="img"
+          aria-label={`${dayTotals.calories} of ${goals.calories} kcal eaten${mealCount > 0 ? `, ${mealCount} meal${mealCount !== 1 ? 's' : ''}` : ''}`}
+          width="124" height="124" viewBox="0 0 124 124" style={{ transform: 'rotate(-90deg)' }}
+        >
+          <circle cx="62" cy="62" r={RING_R} fill="none" stroke="rgba(255,145,0,0.12)" strokeWidth="10" />
+          <circle
+            key={goals.calories}
+            className="fq-ring"
+            cx="62" cy="62" r={RING_R} fill="none"
+            stroke={ringColor} strokeWidth="10"
+            strokeDasharray={RING_C}
+            strokeDashoffset={RING_C * (1 - calPct / 100)}
+            style={{
+              '--fq-ring-from': RING_C,
+              transition: 'stroke-dashoffset 0.5s ease',
+              filter: `drop-shadow(0 0 6px ${calOver ? 'rgba(255,23,68,0.7)' : 'rgba(255,109,0,0.8)'})`,
+            }}
+          />
+        </svg>
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        }}>
           <span style={{
-            fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
-            color: calOver ? 'var(--color-warning)' : 'var(--color-action)',
+            fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 900,
+            color: calOver ? 'var(--color-destructive)' : '#fff', fontVariantNumeric: 'tabular-nums',
           }}>
-            {dayTotals.calories}
+            <CountUp
+              value={calOver ? dayTotals.calories - goals.calories : calLeft}
+              from={calOver ? 0 : goals.calories}
+              duration={1200}
+              format={n => n.toLocaleString()}
+            />
           </span>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            / {goals.calories} kcal
+          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+            {calOver ? 'kcal over' : 'kcal left'}
           </span>
-          {mealCount > 0 && (
-            <span style={{
-              marginLeft: 6, fontSize: 10, color: 'var(--color-text-tertiary)',
-              background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)',
-              padding: '1px 7px',
-            }}>
-              {mealCount} meal{mealCount !== 1 ? 's' : ''}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Calorie bar */}
-      <div style={{
-        height: 6, background: 'var(--color-surface-3)',
-        borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-4)', overflow: 'hidden',
-      }}>
-        <div style={{
-          height: '100%',
-          width: `${calPct}%`,
-          background: calOver
-            ? 'linear-gradient(90deg, var(--color-warning), var(--color-fire))'
-            : 'linear-gradient(90deg, var(--color-action), var(--color-accent-purple))',
-          borderRadius: 'var(--radius-full)',
-          transition: 'width 0.4s ease',
-          boxShadow: calOver ? 'none' : '0 0 8px rgba(0,229,255,0.35)',
-        }} />
-      </div>
-
-      {/* Macro row */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        {MACROS.map(m => {
+      {/* Macro bars */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {MACROS.map((m, i) => {
           const val = dayTotals[m.key] || 0;
           const goal = goals[m.key] || 1;
           const pct = Math.min(100, (val / goal) * 100);
           const over = val > goal;
           return (
-            <div key={m.key} style={{
-              flex: 1, padding: 'var(--space-2) var(--space-3)',
-              background: m.bg, borderRadius: 'var(--radius-md)',
-              border: `1px solid ${over ? 'rgba(255,23,68,0.2)' : 'transparent'}`,
-            }}>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'baseline', marginBottom: 5,
-              }}>
-                <span style={{
-                  fontFamily: 'var(--font-display)', fontSize: 11,
-                  color: 'var(--color-text-tertiary)', letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                }}>{m.label}</span>
-                <span style={{
-                  fontFamily: 'var(--font-primary)', fontSize: 11, fontWeight: 700,
-                  color: over ? 'var(--color-destructive)' : m.color,
-                }}>
-                  {Math.round(val)}g
+            <div key={m.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{m.label}</span>
+                <span style={{ color: over ? 'var(--color-destructive)' : 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                  <CountUp value={Math.round(val)} from={0} duration={1100} /> / {goal} g
                 </span>
               </div>
-              <div style={{
-                height: 3, background: 'rgba(255,255,255,0.08)',
-                borderRadius: 'var(--radius-full)', overflow: 'hidden',
-              }}>
-                <div style={{
+              <div style={{ height: 6, background: m.track, overflow: 'hidden' }}>
+                <div className="fq-grow-x" style={{
                   height: '100%', width: `${pct}%`,
                   background: over ? 'var(--color-destructive)' : m.color,
-                  borderRadius: 'var(--radius-full)',
+                  boxShadow: `0 0 8px ${over ? 'rgba(255,23,68,0.6)' : m.glow}`,
                   transition: 'width 0.4s ease',
+                  animationDelay: `${0.15 * (i + 1)}s`,
                 }} />
               </div>
-              <div style={{
-                fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, textAlign: 'right',
-              }}>/ {goal}g</div>
             </div>
           );
         })}

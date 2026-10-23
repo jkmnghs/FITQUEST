@@ -4,9 +4,37 @@ import { authFetch } from '../lib/authFetch';
 import { exercisesForDay, DAY_ORDER } from '../utils/session';
 import { useConfirm } from './ui/ConfirmDialog';
 import { BackupCard, ExportNudge } from './BackupCard';
+import { Lock } from 'lucide-react';
+import { achievementIcon } from '../data/achievementIcons';
 
 // ─── ACHIEVEMENTS TAB ───
+/** Ping-pong index over `count` slots (0 → count-1 → 0 …), or -1 when there's nothing to sweep. */
+function usePingPong(count, stepMs = 320, delayMs = 1000) {
+  const [idx, setIdx] = useState(-1);
+  useEffect(() => {
+    if (count < 2) { setIdx(-1); return; }
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let i = 0, dir = 1, interval;
+    const kick = setTimeout(() => {
+      setIdx(0);
+      interval = setInterval(() => {
+        if (i + dir < 0 || i + dir >= count) dir = -dir;
+        i += dir;
+        setIdx(i);
+      }, stepMs);
+    }, delayMs);
+    return () => { clearTimeout(kick); clearInterval(interval); };
+  }, [count, stepMs, delayMs]);
+  return idx;
+}
+
 export function AchievementsTab({ state }) {
+  const unlockedIds = ACHIEVEMENTS.filter(a => state.achDone.includes(a.id)).map(a => a.id);
+  // Only earned badges take part in the sweep — a locked one lighting up would
+  // read as "you have this".
+  const litSlot = usePingPong(unlockedIds.length);
+  const litId = litSlot >= 0 ? unlockedIds[litSlot] : null;
+
   return (
     <div>
       {/* ProfileTab supplies the "Achievements" heading; only the count is
@@ -18,26 +46,36 @@ export function AchievementsTab({ state }) {
         {state.achDone.length}/{ACHIEVEMENTS.length} UNLOCKED
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-        {ACHIEVEMENTS.map(a => {
+        {ACHIEVEMENTS.map((a, i) => {
           const unlocked = state.achDone.includes(a.id);
+          const [Icon, color] = achievementIcon(a.id);
+          const lit = a.id === litId;
           return (
-            <div key={a.id} style={{
-              background: 'var(--card)',
-              border: `1px solid ${unlocked ? 'rgba(0,229,255,0.15)' : 'var(--card-border)'}`,
-              borderRadius: 14, padding: '12px 6px', textAlign: 'center',
-              backdropFilter: 'blur(20px)', opacity: unlocked ? 1 : 0.3,
-              transition: 'all 0.3s'
+            <div key={a.id} className="fq-rise" style={{
+              background: unlocked ? 'linear-gradient(160deg, #141b36, #0c1226)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${unlocked ? `${color}40` : 'var(--card-border)'}`,
+              borderRadius: 4, padding: '14px 6px 12px', textAlign: 'center',
+              animationDelay: `${0.04 * i}s`,
             }}>
-              <div style={{
-                fontSize: 26, marginBottom: 4,
-                filter: unlocked ? 'none' : 'grayscale(1) brightness(0.5)'
-              }}>{unlocked ? a.icon : '❓'}</div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: unlocked ? 'var(--text)' : 'var(--text2)', letterSpacing: 0.2 }}>
-                {unlocked ? a.name : 'Unknown'}
+              <div
+                className="fq-badge"
+                data-lit={lit ? 'true' : 'false'}
+                style={{
+                  width: 46, height: 52, margin: '0 auto 8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+                  background: unlocked ? `${color}26` : 'rgba(255,255,255,0.05)',
+                  color: unlocked ? color : 'var(--color-text-tertiary)',
+                }}
+              >
+                {unlocked
+                  ? <Icon size={22} strokeWidth={2.2} aria-hidden="true" />
+                  : <Lock size={18} strokeWidth={2.2} aria-hidden="true" style={{ opacity: 0.6 }} />}
               </div>
-              {unlocked && (
-                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{a.desc}</div>
-              )}
+              <div style={{ fontSize: 11, fontWeight: 700, color: unlocked ? 'var(--text)' : 'var(--text3)', letterSpacing: 0.2 }}>
+                {unlocked ? a.name : 'Locked'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2, lineHeight: 1.35 }}>{a.desc}</div>
             </div>
           );
         })}
