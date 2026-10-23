@@ -540,21 +540,35 @@ select, textarea {
    is the convention on both platforms, and it is what lets a reader scan for
    the row they want instead of reading every one. */
 .fq-set-group {
-  background: var(--color-surface-1);
-  border: 1px solid var(--color-border-medium);
-  border-radius: var(--radius-lg);
+  position: relative;
+  background: linear-gradient(160deg, #121a34, #0c1226);
+  border: 1px solid rgba(0,229,255,0.16);
+  border-radius: 4px;
   overflow: hidden;
 }
-.fq-set-group--danger { border-color: rgba(255,23,68,0.22); }
+/* Corner bracket: the HUD frame motif, without clipping row content. */
+.fq-set-group::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 14px; height: 14px; pointer-events: none;
+  border-top: 2px solid var(--color-action); border-left: 2px solid var(--color-action);
+}
+.fq-set-group--danger { border-color: rgba(255,23,68,0.3); }
+.fq-set-group--danger::before { border-color: var(--color-destructive); }
 
 .fq-set-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  color: var(--color-action);
   padding: 0 var(--space-1) var(--space-2);
   text-transform: uppercase;
+}
+.fq-set-header::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, rgba(0,229,255,0.3), transparent);
 }
 
 .fq-set-row {
@@ -562,7 +576,7 @@ select, textarea {
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: var(--tap-target);
+  min-height: 52px;
   padding: 10px var(--space-4);
   background: transparent;
   border: none;
@@ -570,9 +584,12 @@ select, textarea {
   color: var(--color-text-primary);
   font-family: var(--font-primary);
   font-size: var(--text-base);
+  transition: background var(--transition-fast);
 }
+button.fq-set-row:active { background: rgba(0,229,255,0.06); }
+@media (hover: hover) { button.fq-set-row:hover { background: rgba(0,229,255,0.04); } }
 .fq-set-row + .fq-set-row,
-.fq-set-panel + .fq-set-row { border-top: 1px solid var(--color-border-medium); }
+.fq-set-panel + .fq-set-row { border-top: 1px solid rgba(255,255,255,0.06); }
 .fq-set-group--danger .fq-set-row + .fq-set-row { border-top-color: rgba(255,23,68,0.16); }
 .fq-set-row:disabled { opacity: 1; }
 
@@ -581,7 +598,8 @@ select, textarea {
    separate card. */
 .fq-set-panel {
   padding: 0 var(--space-4) var(--space-4);
-  border-top: 1px solid var(--color-border-medium);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  background: rgba(5,7,15,0.35);
 }
 
 /* ── Shared surfaces ── */

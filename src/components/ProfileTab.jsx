@@ -7,15 +7,22 @@ import ProgramEditorTab from './ProgramEditorTab';
 function SectionHeader({ icon: Icon, title }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 8,
+      display: 'flex', alignItems: 'center', gap: 10,
       padding: '0 var(--space-4)',
       marginBottom: 'var(--space-3)',
     }}>
-      <Icon size={16} color="var(--color-text-tertiary)" />
-      <span style={{
-        fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)', fontWeight: 600,
-        color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase',
-      }}>{title}</span>
+      <span className="fq-hex" aria-hidden="true" style={{
+        width: 26, height: 29, flexShrink: 0,
+        background: 'rgba(0,229,255,0.14)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon size={14} color="var(--color-action)" strokeWidth={2.4} />
+      </span>
+      <h2 style={{
+        margin: 0, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 900,
+        color: '#fff', letterSpacing: '0.16em', textTransform: 'uppercase',
+      }}>{title}</h2>
+      <span aria-hidden="true" style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(0,229,255,0.35), transparent)' }} />
     </div>
   );
 }
