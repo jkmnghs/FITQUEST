@@ -635,9 +635,9 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 setActiveExId(ex.id);
               }}
               style={{
-                background: isDone ? 'rgba(0,230,118,0.05)' : 'var(--color-surface-1)',
-                border: `1px solid ${isDone ? 'rgba(0,230,118,0.18)' : isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--color-border-subtle)'}`,
-                borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+                background: isDone ? 'linear-gradient(90deg, rgba(0,230,118,0.10), rgba(0,230,118,0.03))' : 'linear-gradient(160deg, #121a34, #0d1328)',
+                border: `1px solid ${isDone ? 'rgba(0,230,118,0.3)' : isSwiped ? 'rgba(0,229,255,0.45)' : 'rgba(0,229,255,0.12)'}`,
+                borderRadius: 4, padding: 'var(--space-4)',
                 cursor: tappable ? 'pointer' : 'default',
                 opacity: isDone ? 0.75 : 1,
                 position: 'relative', zIndex: 3,
@@ -648,8 +648,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)', marginBottom: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 600,
-                    color: 'var(--color-text-primary)',
+                    fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 700,
+                    color: '#fff',
                     display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
                   }}>
                     {isDone && <Check size={15} color="var(--color-success)" strokeWidth={3} />}
@@ -667,15 +667,15 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                   {isDone ? (
                     <span style={{
                       fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-                      color: 'var(--color-success)', background: 'var(--green-glow)',
-                      padding: '4px 9px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
-                      border: '1px solid rgba(0,230,118,0.25)',
+                      color: '#05070f', background: 'var(--color-success)',
+                      padding: '4px 9px', whiteSpace: 'nowrap', letterSpacing: '0.12em',
+                      boxShadow: '0 0 10px rgba(0,230,118,0.45)',
                     }}>DONE</span>
                   ) : (
                     <span style={{
                       fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-                      color: 'var(--color-warning)', background: 'var(--fire-glow)',
-                      padding: '4px 9px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
+                      color: 'var(--color-success)', background: 'rgba(0,230,118,0.10)',
+                      padding: '4px 9px', whiteSpace: 'nowrap',
                     }}>+{isDeload ? 10 : MAX_EXERCISE_XP} XP</span>
                   )}
 
@@ -689,7 +689,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                       aria-expanded={menuOpen}
                       aria-haspopup="menu"
                       style={{
-                        width: 32, height: 32, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                        width: 44, height: 44, flexShrink: 0, margin: '-6px -6px -6px 0',
                         border: '1px solid var(--color-border-medium)',
                         background: menuOpen ? 'var(--color-action-muted)' : 'rgba(255,255,255,0.04)',
                         color: menuOpen ? 'var(--color-action)' : 'var(--color-text-tertiary)',

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X as XIcon } from 'lucide-react';
+import { X as XIcon, Sparkles, Inbox, ArrowRight, Loader2 } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
@@ -701,18 +701,24 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
   const modeMessages = messages.filter(m => m.mode === activeMode);
 
   const headerSection = (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
-      border: '1px solid rgba(0,229,255,0.12)',
-      borderRadius: 14, padding: '14px 16px', marginBottom: 14
+    <div className="fq-cut" style={{
+      background: 'linear-gradient(160deg, #141b36, #0c1226)',
+      border: '1px solid rgba(179,136,255,0.28)',
+      '--fq-cut-border': 'rgba(179,136,255,0.28)',
+      padding: '14px 16px', marginBottom: 14
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-        <span style={{ fontSize: 22 }}>🤖</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div className="fq-hex" aria-hidden="true" style={{
+          width: 38, height: 42, flexShrink: 0,
+          background: 'linear-gradient(135deg, var(--color-accent-purple), var(--color-action))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}><Sparkles size={18} color="#05070f" strokeWidth={2.4} /></div>
         <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: 'var(--cyan)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 900, letterSpacing: '0.08em', color: '#fff' }}>
             AI COACH
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-success)' }}>
+            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }} />
             Powered by Claude · Knows your data
           </div>
         </div>
@@ -728,14 +734,14 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             }}
             title="Quest inbox — proactive messages from your agent"
             style={{
-              position: 'relative', padding: '4px 10px', borderRadius: 8,
+              position: 'relative', padding: '4px 10px', minHeight: 36,
               border: showInbox ? '1px solid rgba(179,136,255,0.4)' : '1px solid rgba(255,255,255,0.1)',
               background: showInbox ? 'rgba(179,136,255,0.1)' : 'rgba(255,255,255,0.04)',
               color: showInbox ? 'var(--purple)' : 'var(--text3)',
               fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 700, cursor: 'pointer',
               transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
             }}>
-            📬 INBOX
+            <Inbox size={13} aria-hidden="true" /> INBOX
             {unreadAgentCount > 0 && (
               <span style={{
                 background: 'var(--red)', color: '#fff', borderRadius: '50%',
@@ -745,7 +751,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             )}
           </button>
           <button onClick={handleCopyReport} title="Copy a human-readable training report to paste into any AI coach" style={{
-            padding: '4px 10px', borderRadius: 8,
+            padding: '4px 10px', minHeight: 36,
             border: `1px solid ${copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.4)' : 'rgba(0,229,255,0.25)'}`,
             background: copyLabel === 'COPIED!' ? 'rgba(0,230,118,0.1)' : 'rgba(0,229,255,0.06)',
             color: copyLabel === 'COPIED!' ? 'var(--green)' : 'var(--cyan)',
@@ -754,7 +760,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
           }}>{copyLabel}</button>
           {messages.length > 0 && (
             <button onClick={clearHistory} style={{
-              padding: '4px 10px', borderRadius: 8,
+              padding: '4px 10px', minHeight: 36,
               border: '1px solid rgba(255,255,255,0.1)',
               background: 'rgba(255,255,255,0.04)',
               color: 'var(--text3)', fontSize: 10, fontFamily: 'var(--font-display)',
@@ -766,7 +772,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
         {COACH_MODES.map(m => (
           <button key={m.id} onClick={() => setActiveMode(m.id)} style={{
-            padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
+            padding: '6px 12px', minHeight: 36, cursor: 'pointer',
             border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
             background: activeMode === m.id ? m.bg : 'transparent',
             color: activeMode === m.id ? m.color : 'var(--text3)',
@@ -805,8 +811,8 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
 
   const inputSection = (
     <div style={{
-      background: 'var(--card)', border: '1px solid var(--card-border)',
-      borderRadius: 14, padding: 14, backdropFilter: 'blur(20px)'
+      background: 'rgba(14,20,40,0.92)', border: '1px solid rgba(179,136,255,0.22)',
+      padding: 14, backdropFilter: 'blur(20px)'
     }}>
       <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontFamily: 'var(--font-primary)', lineHeight: 1.5 }}>
         {getInputHint(activeMode)}
@@ -819,9 +825,9 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
           placeholder={getPlaceholder(activeMode)}
           style={{
-            flex: 1, height: 42, borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: 'rgba(255,255,255,0.04)',
+            flex: 1, minWidth: 0, height: 48,
+            border: '1px solid rgba(179,136,255,0.3)',
+            background: '#05070f',
             color: 'var(--text)', fontFamily: 'var(--font-primary)',
             fontSize: 14, fontWeight: 600, padding: '0 12px'
           }}
@@ -829,9 +835,11 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
         <button
           onClick={() => sendMessage()}
           disabled={loading || cooldownLeft > 0}
+          aria-label={loading ? 'Sending' : cooldownLeft > 0 ? `Wait ${cooldownLeft} seconds` : 'Send'}
           style={{
-            width: 42, height: 42, borderRadius: 10, border: 'none',
-            background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, ${mode.color}cc)`,
+            width: 48, height: 48, border: 'none',
+            background: (loading || cooldownLeft > 0) ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${mode.color}, var(--color-action))`,
+            boxShadow: (loading || cooldownLeft > 0) ? 'none' : `0 0 16px ${mode.color}66`,
             color: (loading || cooldownLeft > 0) ? 'var(--text3)' : 'var(--bg)',
             fontSize: cooldownLeft > 0 ? 11 : 18,
             fontFamily: 'var(--font-display)', fontWeight: 700,
@@ -840,7 +848,9 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             transition: 'all 0.2s', flexShrink: 0
           }}
         >
-          {loading ? '⏳' : cooldownLeft > 0 ? `${cooldownLeft}s` : '→'}
+          {loading
+            ? <Loader2 size={18} style={{ animation: 'fqSpin 1s linear infinite' }} aria-hidden="true" />
+            : cooldownLeft > 0 ? `${cooldownLeft}s` : <ArrowRight size={20} strokeWidth={2.6} aria-hidden="true" />}
         </button>
       </div>
       <div style={{
@@ -852,10 +862,10 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       }}>
         {getQuickPrompts(activeMode).map((q, i) => (
           <button key={i} onClick={() => sendMessage(q)} style={{
-            padding: '4px 10px', borderRadius: 8, flexShrink: 0,
-            border: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(255,255,255,0.03)',
-            color: 'var(--text3)', fontSize: 12, fontFamily: 'var(--font-primary)',
+            padding: '6px 12px', minHeight: 36, flexShrink: 0,
+            border: '1px solid rgba(179,136,255,0.35)',
+            background: 'transparent',
+            color: '#c5b3ff', fontSize: 12, fontFamily: 'var(--font-primary)',
             fontWeight: 600, cursor: 'pointer',
             whiteSpace: 'nowrap',
             transition: 'all 0.2s'
@@ -884,10 +894,11 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
           aria-label="AI Coach"
           onClick={e => e.stopPropagation()}
           style={{
-            background: 'rgba(15,21,40,0.96)',
+            background: 'linear-gradient(180deg, rgba(14,20,42,0.98), rgba(7,10,20,0.98))',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            border: '1px solid rgba(179,136,255,0.25)',
+            borderBottom: 'none',
             boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
             display: 'flex', flexDirection: 'column',
             overscrollBehavior: 'contain',
@@ -913,9 +924,9 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
               onClick={onClose}
               aria-label="Close AI Coach"
               style={{
-                width: 32, height: 32, borderRadius: 8, border: 'none',
-                background: 'rgba(255,255,255,0.08)',
-                color: 'var(--color-text-tertiary)',
+                width: 44, height: 44, border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)',
+                color: 'var(--color-text-secondary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer',
               }}
@@ -960,7 +971,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
                 position: 'sticky', bottom: 0,
                 padding: '8px 16px',
                 paddingBottom: 'calc(var(--safe-area-bottom) + 16px)',
-                background: 'rgba(15,21,40,0.96)',
+                background: 'linear-gradient(180deg, rgba(7,10,20,0), rgba(7,10,20,0.97) 20%)',
               }}>
                 {inputSection}
               </div>
@@ -1136,10 +1147,12 @@ function MessageBubble({ msg, onConfirmProgram }) {
   if (isUser) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-        <div style={{
-          maxWidth: '75%', padding: '10px 14px', borderRadius: '14px 14px 4px 14px',
-          background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.15)',
-          fontSize: 13, color: 'var(--text)', lineHeight: 1.5
+        <div className="fq-rise" style={{
+          maxWidth: '78%', padding: '10px 14px',
+          clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)',
+          background: 'linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.08))',
+          boxShadow: 'inset 0 0 0 1px rgba(0,229,255,0.4)',
+          fontSize: 14, color: '#fff', lineHeight: 1.5
         }}>
           {msg.displayText || msg.content}
         </div>
@@ -1157,19 +1170,19 @@ function MessageBubble({ msg, onConfirmProgram }) {
     .replace(/\*(.*?)\*/g, '<em>$1</em>');
 
   return (
-    <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
+    <div className="fq-rise" style={{ marginBottom: 14 }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: mode?.bg || 'var(--cyan-glow)',
-        border: `1px solid ${mode?.border || 'rgba(0,229,255,0.2)'}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16
-      }}>{mode?.icon || '🤖'}</div>
+        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+        fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 800, letterSpacing: '0.24em',
+        color: mode?.color || 'var(--color-accent-purple)',
+      }}>
+        <span aria-hidden="true">{mode?.icon}</span> [ SYSTEM ]
+      </div>
       <div style={{
-        flex: 1, padding: '12px 14px', borderRadius: '4px 14px 14px 14px',
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
-        backdropFilter: 'blur(20px)'
+        padding: '12px 14px',
+        clipPath: 'polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+        background: '#121a36', boxShadow: 'inset 0 0 0 1px rgba(179,136,255,0.3)',
+        fontSize: 14, color: '#d5d9f0', lineHeight: 1.65,
       }}
         dangerouslySetInnerHTML={{ __html: formatted.replace(/\n/g, '<br/>') }}
       />
@@ -1179,21 +1192,19 @@ function MessageBubble({ msg, onConfirmProgram }) {
 
 function ThinkingBubble() {
   return (
-    <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
+    <div role="status" aria-label="Coach is thinking" style={{ marginBottom: 14 }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: 'var(--cyan-glow)', border: '1px solid rgba(0,229,255,0.2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
-      }}>🤖</div>
+        fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 800, letterSpacing: '0.24em',
+        color: 'var(--color-accent-purple)', marginBottom: 6,
+      }}>[ SYSTEM ] ANALYZING</div>
       <div style={{
-        padding: '12px 16px', borderRadius: '4px 14px 14px 14px',
-        background: 'var(--card)', border: '1px solid var(--card-border)',
-        backdropFilter: 'blur(20px)'
+        display: 'inline-block', padding: '12px 16px',
+        background: '#121a36', boxShadow: 'inset 0 0 0 1px rgba(179,136,255,0.25)',
       }}>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           {[0, 0.2, 0.4].map((d, i) => (
             <div key={i} style={{
-              width: 8, height: 8, borderRadius: '50%', background: 'var(--cyan)',
+              width: 7, height: 7, background: 'var(--color-accent-purple)',
               animation: `shimmer 1.2s ${d}s infinite`
             }} />
           ))}

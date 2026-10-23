@@ -299,10 +299,11 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
           aria-modal="true"
           aria-label={ex.name}
           style={{
-            background: 'rgba(15,21,40,0.94)',
+            background: 'linear-gradient(180deg, rgba(14,20,42,0.97), rgba(7,10,20,0.98))',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            border: '1px solid rgba(0,229,255,0.25)',
+            borderBottom: 'none',
             overflowY: 'auto', WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             boxShadow: '0 -8px 40px rgba(0,0,0,0.45)',
@@ -312,21 +313,31 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
           <div className="fq-sheet__handle" style={{ width: 34, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 4, margin: '10px auto 0' }} />
 
           {/* Header */}
-          <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontFamily: 'var(--font-primary)', fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>{ex.name}</h2>
+          <div style={{ padding: '14px 18px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.26em', color: 'var(--color-action)', marginBottom: 4 }}>
+                {isDeload ? 'DELOAD · EXERCISE' : 'EXERCISE'}
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 900, color: '#fff', letterSpacing: '0.02em', textTransform: 'uppercase', minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.15 }}>{ex.name}</h2>
+            </div>
             <button onClick={onClose} aria-label="Close" style={{
-              width: 32, height: 32, borderRadius: 8, border: 'none',
-              background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-tertiary)',
+              width: 44, height: 44, border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-secondary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', minWidth: 32,
-            }}><X size={15} /></button>
+              cursor: 'pointer', flexShrink: 0,
+            }}><X size={18} /></button>
           </div>
 
           <div style={{ padding: '0 18px 18px' }}>
             {/* Note */}
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>
-              {ex.note} • Target: RPE {isDeload ? '5-6' : ex.rpe} • Rest: {ex.rest}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {[`RPE ${isDeload ? '5-6' : ex.rpe}`, ex.rest && `Rest ${ex.rest}`].filter(Boolean).map(t => (
+                <span key={t} style={{ fontSize: 11, fontWeight: 600, padding: '4px 8px', background: 'rgba(0,229,255,0.08)', color: 'var(--color-text-secondary)' }}>{t}</span>
+              ))}
             </div>
+            {ex.note && (
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.5 }}>{ex.note}</div>
+            )}
 
             {/* Form tip — persistent banner, rotates per tip index */}
             {formTips.length > 0 && (
@@ -334,11 +345,12 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
                 display: 'flex', alignItems: 'flex-start', gap: 10,
                 padding: 'var(--space-3) var(--space-4)',
                 marginBottom: 14,
-                background: 'rgba(179,136,255,0.08)',
-                borderLeft: '3px solid var(--color-accent-purple)',
-                borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+                background: 'rgba(179,136,255,0.07)',
+                border: '1px solid rgba(179,136,255,0.25)',
               }}>
-                <Lightbulb size={16} color="var(--color-accent-purple)" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, marginTop: 2, fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', color: 'var(--color-accent-purple)' }}>
+                  <Lightbulb size={13} aria-hidden="true" /> FORM
+                </span>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                   {formTips[tipIdx % formTips.length]}
                 </div>
@@ -348,7 +360,10 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
             {alreadyDone && det ? (
               // Already completed
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+                <div className="fq-pop fq-hex" style={{
+                  width: 64, height: 72, margin: '0 auto 12px', background: 'var(--green)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}><Check size={30} strokeWidth={3} color="#05070f" aria-hidden="true" /></div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>
                   COMPLETED
                 </div>
@@ -394,7 +409,7 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
                 )}
 
                 {/* Sets */}
-                <div style={{ background: 'var(--card)', borderRadius: 12, padding: 12, marginBottom: 12, border: '1px solid var(--card-border)' }}>
+                <div style={{ background: 'rgba(14,20,40,0.85)', padding: 12, marginBottom: 12, border: '1px solid rgba(0,229,255,0.14)' }}>
                   {ex.isPlank ? (
                     <PlankSets sets={sets} onToggle={toggleSetDone} onUpdate={updateSet} />
                   ) : (
@@ -403,10 +418,11 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
                   )}
                   <button onClick={addExtraSet} style={{
                     width: '100%', padding: 8, marginTop: 6,
-                    border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 9,
-                    background: 'transparent', color: 'var(--text3)',
-                    fontSize: 13, fontWeight: 600
-                  }}>+ Add Extra Set</button>
+                    minHeight: 'var(--tap-target)',
+                    border: '1px dashed rgba(0,229,255,0.3)',
+                    background: 'transparent', color: 'var(--color-action)',
+                    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, letterSpacing: '0.16em',
+                  }}>+ EXTRA SET</button>
                 </div>
 
                 {/* Sticky action footer — with six sets and the plate panel
@@ -415,27 +431,36 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
                 <div style={{
                   position: 'sticky', bottom: 0, zIndex: 2,
                   margin: '0 -18px', padding: '12px 18px calc(4px + var(--safe-area-bottom))',
-                  background: 'linear-gradient(180deg, rgba(15,21,40,0), rgba(15,21,40,0.95) 28%)',
+                  background: 'linear-gradient(180deg, rgba(7,10,20,0), rgba(7,10,20,0.96) 28%)',
                   backdropFilter: 'blur(8px)',
                   WebkitBackdropFilter: 'blur(8px)',
                 }}>
+                  <div aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: `repeat(${sets.length}, minmax(0, 1fr))`, gap: 4, marginBottom: 6 }}>
+                    {sets.map((st, i) => (
+                      <div key={i} style={{
+                        height: 4,
+                        background: st.done ? 'var(--color-success)' : 'rgba(255,255,255,0.08)',
+                        boxShadow: st.done ? '0 0 8px rgba(0,230,118,0.6)' : 'none',
+                        transition: 'background 0.25s, box-shadow 0.25s',
+                      }} />
+                    ))}
+                  </div>
                   <div style={{
                     textAlign: 'center', marginBottom: 10,
                     fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)',
                   }}>
                     {doneCount}/{sets.length} sets checked
                   </div>
-                  <button onClick={() => setShowConfirm(true)} style={{
-                    width: '100%', minHeight: 50, padding: 14, border: 'none',
-                    borderRadius: 'var(--radius-lg)',
+                  <button onClick={() => setShowConfirm(true)} className="fq-press fq-skew" style={{
+                    width: '100%', minHeight: 52, padding: 14, border: 'none',
                     background: doneCount > 0
-                      ? 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))'
+                      ? 'linear-gradient(90deg, var(--color-action), #00b8d4)'
                       : 'rgba(255,255,255,0.06)',
-                    fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
-                    color: doneCount > 0 ? 'var(--color-bg-primary)' : 'var(--color-text-tertiary)',
-                    letterSpacing: 0.8,
+                    fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 900,
+                    color: doneCount > 0 ? '#05070f' : 'var(--color-text-tertiary)',
+                    letterSpacing: '0.16em',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: doneCount > 0 ? '0 4px 18px rgba(0,229,255,0.16)' : 'none',
+                    boxShadow: doneCount > 0 ? '0 0 24px rgba(0,229,255,0.4)' : 'none',
                     transition: 'background var(--transition-normal), color var(--transition-normal)',
                   }}>
                     <Check size={16} /> COMPLETE EXERCISE
@@ -477,7 +502,7 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
   return (
     <>
       <div style={{
-        display: 'grid', gridTemplateColumns: '20px 3fr 3fr 2fr 36px',
+        display: 'grid', gridTemplateColumns: '20px 3fr 3fr 2fr 40px',
         gap: 6, marginBottom: 6, paddingBottom: 6,
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
@@ -486,7 +511,13 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
         ))}
       </div>
       {sets.map((s, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 3fr 3fr 2fr 36px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+        <div key={i} style={{
+          display: 'grid', gridTemplateColumns: '20px 3fr 3fr 2fr 40px', gap: 6, marginBottom: 6, alignItems: 'center',
+          padding: '4px 2px', margin: '0 -2px 6px',
+          background: s.done ? 'rgba(0,230,118,0.07)' : 'transparent',
+          boxShadow: s.done ? 'inset 0 0 0 1px rgba(0,230,118,0.25)' : 'none',
+          transition: 'background 0.25s, box-shadow 0.25s',
+        }}>
           <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>
             {i + 1}{s.isExtra ? '+' : ''}
           </span>
@@ -508,14 +539,15 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
             <option value="">-</option>
             {[6,7,8,9,10].map(v => <option key={v} value={v}>{v}</option>)}
           </select>
-          <button onClick={() => onToggle(i)} style={{
-            width: 36, height: 38, borderRadius: 9, flexShrink: 0,
-            border: `2px solid ${s.done ? 'var(--green)' : 'rgba(255,255,255,0.1)'}`,
+          <button onClick={() => onToggle(i)} aria-label={`${s.done ? 'Undo' : 'Complete'} set ${i + 1}`} aria-pressed={s.done} style={{
+            width: 40, height: 48, flexShrink: 0,
+            border: `2px solid ${s.done ? 'var(--green)' : 'rgba(0,229,255,0.35)'}`,
             background: s.done ? 'var(--green)' : 'transparent',
-            color: s.done ? 'var(--bg)' : 'var(--text3)',
-            fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: s.done ? '#05070f' : 'var(--color-action)',
+            boxShadow: s.done ? '0 0 12px rgba(0,230,118,0.5)' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'all 0.2s'
-          }}>✓</button>
+          }}><Check size={18} strokeWidth={3} aria-hidden="true" /></button>
         </div>
       ))}
     </>
@@ -550,7 +582,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
   return (
     <>
       <div style={{
-        display: 'grid', gridTemplateColumns: '20px 1fr 56px 36px',
+        display: 'grid', gridTemplateColumns: '20px 1fr 56px 40px',
         gap: 6, marginBottom: 6, paddingBottom: 6,
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}>
@@ -562,7 +594,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
         const isRunning = activeTimer?.setIdx === i;
         const elapsed = isRunning ? activeTimer.elapsed : null;
         return (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 56px 36px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 56px 40px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
             <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center' }}>
               {i + 1}{s.isExtra ? '+' : ''}
             </span>
@@ -573,7 +605,7 @@ function PlankSets({ sets, onToggle, onUpdate }) {
               style={inputStyle}
             />
             <button onClick={() => startTimer(i)} style={{
-              height: 38, borderRadius: 9, fontSize: isRunning ? 13 : 11,
+              height: 48, fontSize: isRunning ? 13 : 11,
               border: `1px solid ${isRunning ? 'rgba(255,109,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
               background: isRunning ? 'rgba(255,109,0,0.12)' : 'rgba(255,255,255,0.04)',
               color: isRunning ? 'var(--fire2)' : 'var(--text3)',
@@ -582,13 +614,14 @@ function PlankSets({ sets, onToggle, onUpdate }) {
             }}>
               {isRunning ? `${elapsed}s` : '▶'}
             </button>
-            <button onClick={() => onToggle(i)} style={{
-              width: 36, height: 38, borderRadius: 9,
-              border: `2px solid ${s.done ? 'var(--green)' : 'rgba(255,255,255,0.1)'}`,
+            <button onClick={() => onToggle(i)} aria-label={`${s.done ? 'Undo' : 'Complete'} set ${i + 1}`} aria-pressed={s.done} style={{
+              width: 40, height: 48,
+              border: `2px solid ${s.done ? 'var(--green)' : 'rgba(0,229,255,0.35)'}`,
               background: s.done ? 'var(--green)' : 'transparent',
-              color: s.done ? 'var(--bg)' : 'var(--text3)',
-              fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>✓</button>
+              color: s.done ? '#05070f' : 'var(--color-action)',
+              boxShadow: s.done ? '0 0 12px rgba(0,230,118,0.5)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}><Check size={18} strokeWidth={3} aria-hidden="true" /></button>
           </div>
         );
       })}
@@ -634,18 +667,18 @@ function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConf
 }
 
 const inputStyle = {
-  width: '100%', height: 48, borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border-medium)',
-  background: 'var(--color-surface-1)',
-  color: 'var(--color-text-primary)', fontFamily: 'var(--font-primary)',
+  width: '100%', height: 48, borderRadius: 0,
+  border: '1px solid rgba(0,229,255,0.22)',
+  background: '#05070f',
+  color: '#fff', fontFamily: 'var(--font-display)',
   fontSize: 20, fontWeight: 600, textAlign: 'center', padding: '0 4px',
   transition: 'border-color var(--transition-normal)',
 };
 
 const selectStyle = {
-  width: '100%', height: 48, borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border-medium)',
-  background: 'var(--color-surface-1)',
+  width: '100%', height: 48, borderRadius: 0,
+  border: '1px solid rgba(0,229,255,0.22)',
+  background: '#05070f',
   color: 'var(--color-text-primary)', fontFamily: 'var(--font-primary)',
   fontSize: 16, fontWeight: 600, textAlign: 'center',
   WebkitAppearance: 'none', appearance: 'none', padding: '0 4px'
