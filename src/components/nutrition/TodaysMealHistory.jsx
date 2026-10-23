@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 
 export default function TodaysMealHistory({ todayMeals, onDeleteMeal }) {
   if (todayMeals.length === 0) return null;
@@ -34,12 +35,14 @@ export default function TodaysMealHistory({ todayMeals, onDeleteMeal }) {
               onClick={() => onDeleteMeal(meal.id)}
               style={{
                 background: 'none', border: 'none',
-                color: 'rgba(255,68,68,0.6)', fontSize: 16,
-                cursor: 'pointer', padding: '4px 2px', flexShrink: 0,
-                lineHeight: 1,
+                color: 'rgba(255,107,107,0.85)',
+                cursor: 'pointer', padding: 0, flexShrink: 0,
+                lineHeight: 1, minWidth: 44, minHeight: 44,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
               title="Delete meal"
-            >🗑️</button>
+              aria-label="Delete meal"
+            ><Trash2 size={18} aria-hidden="true" /></button>
           )}
         </div>
       ))}

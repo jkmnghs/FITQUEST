@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Mail } from 'lucide-react';
 
 export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPassword, onClearAuthError, onResendConfirmation }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
@@ -134,7 +135,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
 
         {resetDone ? (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>📧</div>
+            <div className="fq-hex" aria-hidden="true" style={{ width: 56, height: 62, margin: '0 auto 12px', background: 'rgba(0,229,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mail size={26} color="var(--cyan)" /></div>
             <div style={{
               fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: 'var(--cyan)', marginBottom: 8,
@@ -216,7 +217,7 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
           </form>
         ) : signUpDone ? (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>📧</div>
+            <div className="fq-hex" aria-hidden="true" style={{ width: 56, height: 62, margin: '0 auto 12px', background: 'rgba(0,229,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mail size={26} color="var(--cyan)" /></div>
             <div style={{
               fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700,
               color: 'var(--cyan)', marginBottom: 8,

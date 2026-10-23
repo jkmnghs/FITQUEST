@@ -4,7 +4,7 @@ import { authFetch } from '../lib/authFetch';
 import { exercisesForDay, DAY_ORDER } from '../utils/session';
 import { useConfirm } from './ui/ConfirmDialog';
 import { BackupCard, ExportNudge } from './BackupCard';
-import { Lock } from 'lucide-react';
+import { Lock, Trophy, RefreshCw, CloudDownload } from 'lucide-react';
 import { achievementIcon } from '../data/achievementIcons';
 
 // ─── ACHIEVEMENTS TAB ───
@@ -398,8 +398,8 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           border: '1px solid rgba(0,229,255,0.2)',
           borderRadius: 13, padding: 14, marginBottom: 8,
         }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyan)', marginBottom: 4 }}>
-            🏆 Cycle End Reached!
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--cyan)', marginBottom: 4 }}>
+            <Trophy size={15} aria-hidden="true" /> Cycle End Reached!
           </div>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.5 }}>
             Week {state.currentWeek} is the final week of your current cycle. Claim your reward and choose your next program.
@@ -413,7 +413,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
               color: 'var(--bg)', letterSpacing: 0.5, cursor: 'pointer',
               boxShadow: '0 4px 18px var(--cyan-glow)',
             }}
-          >CLAIM CYCLE REWARD 🏆</button>
+          >CLAIM CYCLE REWARD</button>
         </div>
       )}
 
@@ -799,7 +799,9 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
-              {syncing ? '⟳ SYNCING...' : '☁ RESYNC FROM CLOUD'}
+              {syncing
+                ? <><RefreshCw size={13} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6, animation: 'fqSpin 1s linear infinite' }} />SYNCING...</>
+                : <><CloudDownload size={13} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} />RESYNC FROM CLOUD</>}
             </button>
             {lastSyncedAt && (
               <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginTop: 5 }}>

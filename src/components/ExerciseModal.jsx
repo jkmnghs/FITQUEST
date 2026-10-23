@@ -646,7 +646,7 @@ function ConfirmModal({ exName, doneCount, totalSets, baseSets, onCancel, onConf
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>{exName}</p>
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 18, lineHeight: 1.6 }}>
           {doneCount}/{totalSets} sets checked
-          {missed > 0 ? `\n⚠️ ${missed} prescribed set${missed > 1 ? 's' : ''} not checked` : ''}
+          {missed > 0 ? `\nHeads up: ${missed} prescribed set${missed > 1 ? 's' : ''} not checked` : ''}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onCancel} style={{

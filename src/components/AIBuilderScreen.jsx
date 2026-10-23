@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { TriangleAlert } from 'lucide-react';
 
 const NAVY   = '#0a1628';
 const NAVY2  = '#111827';
@@ -521,7 +522,7 @@ export default function AIBuilderScreen({ assessment, apiReady = false, onDismis
                silently falling through to the generic full-body program left a
                user who explicitly picked PPL wondering why they got full body. */
             <div style={{ textAlign: 'center', padding: '20px 8px' }}>
-              <div style={{ fontSize: 34, marginBottom: 12 }}>⚠️</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><TriangleAlert size={34} color="#ffd600" aria-hidden="true" /></div>
               <div style={{ fontFamily: ORBITRON, fontSize: 13, fontWeight: 700, color: CYAN, marginBottom: 8, letterSpacing: 1 }}>
                 COULDN'T BUILD YOUR CUSTOM SPLIT
               </div>

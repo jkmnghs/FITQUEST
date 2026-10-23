@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   ChevronLeft, ChevronRight, Play, Flag, MoreHorizontal, Repeat, Trash2,
   Bot, Moon, Check, Timer, CalendarDays, Trophy,
+  Compass, BatteryCharging, TrendingUp, Zap, TriangleAlert,
 } from 'lucide-react';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
@@ -85,6 +86,19 @@ function useElapsed(startTime) {
 }
 
 const FULL_DAY = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+
+/**
+ * Line icon and colour for a week's phase. The phase data still carries emoji
+ * (used in coach exports); on screen they are replaced by icons in the HUD style.
+ */
+function phaseVisual(week) {
+  const w = ((week - 1) % 12) + 1;
+  if (w === 12) return { Icon: Trophy, color: 'var(--color-premium)' };
+  if (w === 4 || w === 8) return { Icon: BatteryCharging, color: 'var(--color-success)' };
+  if (w <= 3) return { Icon: Compass, color: 'var(--color-action)' };
+  if (w <= 7) return { Icon: TrendingUp, color: 'var(--color-accent-purple)' };
+  return { Icon: Zap, color: 'var(--color-warning)' };
+}
 
 /**
  * One card answering "what am I doing right now, and what do I press?".
@@ -172,12 +186,19 @@ function SessionHero({
           }}>
             WEEK {viewingWeek}{!isCurrentWeek ? ' · VIEWING' : ''}
           </div>
-          <div style={{
-            fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {phase.icon} {phase.name}
-          </div>
+          {(() => {
+            const { Icon: PhaseIcon, color } = phaseVisual(viewingWeek);
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 4,
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
+                color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                <PhaseIcon size={12} strokeWidth={2.6} aria-hidden="true" />
+                {phase.name}
+              </div>
+            );
+          })()}
         </div>
 
         <button
@@ -414,7 +435,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           marginBottom: 'var(--space-4)',
         }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-3)' }}>
-            ⚠️ <strong style={{ color: 'var(--color-premium)' }}>Rest days are when muscle is built.</strong>{' '}
+            <TriangleAlert size={14} color="var(--color-premium)" aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} /><strong style={{ color: 'var(--color-premium)' }}>Rest days are when muscle is built.</strong>{' '}
             Training through one usually costs more than it earns, and raises injury risk.
             Your coach can tell you whether today is an exception.
           </div>
@@ -514,12 +535,13 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
       {/* Deload week banner */}
       {isDeload && isCurrentWeek && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(0,229,255,0.06), rgba(179,136,255,0.06))',
-          border: '1px solid rgba(0,229,255,0.2)',
-          borderRadius: 12, padding: '12px 16px', marginBottom: 14
+          background: 'linear-gradient(135deg, rgba(0,230,118,0.08), rgba(0,229,255,0.04))',
+          border: '1px solid rgba(0,230,118,0.3)',
+          padding: '12px 16px', marginBottom: 14
         }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--cyan)', marginBottom: 5, letterSpacing: 0.8 }}>
-            🧘 DELOAD WEEK — RECOVERY MODE
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, color: 'var(--color-success)', marginBottom: 6, letterSpacing: '0.14em' }}>
+            <BatteryCharging size={14} strokeWidth={2.6} aria-hidden="true" />
+            DELOAD WEEK — RECOVERY MODE
           </div>
           <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
             80% weight, one less set per exercise. This week <strong style={{ color: 'var(--text)' }}>rebuilds your tendons and CNS</strong> — lighter loads now unlock stronger lifts next block. Don't skip it.
@@ -1112,7 +1134,7 @@ function FinishArea({ state, exercises, onFinish }) {
         color: 'var(--bg)', letterSpacing: 0.8, cursor: 'pointer',
         boxShadow: allDone ? '0 4px 18px var(--green-glow)' : '0 4px 18px var(--fire-glow)'
       }}>
-        {allDone && completionPct >= 95 ? 'FINISH SESSION ⚔️ (PERFECT!)' : 'FINISH SESSION ⚔️'}
+        {allDone && completionPct >= 95 ? 'FINISH SESSION · PERFECT!' : 'FINISH SESSION'}
       </button>
     </div>
   );
@@ -1246,7 +1268,7 @@ function FinishConfirmModal({ state, exercises, onCancel, onConfirm }) {
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
             color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
-          }}>FINISH ⚔️</button>
+          }}>FINISH</button>
         </div>
       </div>
     </div>

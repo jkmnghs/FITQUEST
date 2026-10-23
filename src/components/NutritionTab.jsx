@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, ImagePlus, ChevronRight, Info, Search, Utensils } from 'lucide-react';
+import { Camera, ImagePlus, ChevronRight, Info, Search, Utensils, Trash2 } from 'lucide-react';
 import { searchUSDA, validateUSDAMacros, validateUSDAAgainstClaude, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
 import { findFoodReference } from '../utils/foodReference';
 import DailySummaryBar from './nutrition/DailySummaryBar';
@@ -714,10 +714,12 @@ Guidelines:
                     }}
                     style={{
                       background: 'none', border: 'none',
-                      color: 'white', fontSize: 22, cursor: 'pointer',
-                      padding: 0, lineHeight: 1,
+                      color: 'white', cursor: 'pointer',
+                      padding: 0, lineHeight: 1, minWidth: 44, minHeight: 44,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
-                  >🗑️</button>
+                    aria-label="Remove food"
+                  ><Trash2 size={22} aria-hidden="true" /></button>
                 </div>
                 )}
 
@@ -854,7 +856,7 @@ Guidelines:
                                   fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600,
                                   cursor: 'pointer', textAlign: 'left',
                                 }}
-                              ><span>🗑️</span> Delete</button>
+                              ><Trash2 size={16} aria-hidden="true" /> Delete</button>
                             </div>
                           )}
                         </div>

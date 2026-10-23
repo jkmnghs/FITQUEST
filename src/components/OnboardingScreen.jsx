@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TriangleAlert, Zap, Stethoscope } from 'lucide-react';
 
 const DAYS = [
   { id: 'mon', label: 'M', full: 'Mon' },
@@ -162,7 +163,7 @@ function NumInput({ label, value, onChange, placeholder, unit, isText, error }) 
       />
       {error && (
         <div style={{ fontSize: 11, color: 'var(--fire2)', marginTop: 5, lineHeight: 1.4 }}>
-          ⚠ {error}
+          <TriangleAlert size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{error}
         </div>
       )}
     </div>
@@ -298,7 +299,7 @@ export default function OnboardingScreen({ onComplete }) {
         background: 'var(--bg)', textAlign: 'center',
         padding: 'calc(var(--safe-area-top) + 32px) 32px calc(var(--safe-area-bottom) + 32px)',
       }}>
-        <div style={{ fontSize: 36, marginBottom: 24 }}>⚡</div>
+        <div className="fq-hex" aria-hidden="true" style={{ width: 64, height: 72, margin: '0 auto 24px', background: 'rgba(0,229,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={30} color="var(--cyan)" /></div>
         <div style={{
           fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700,
           color: 'var(--cyan)', letterSpacing: 2, marginBottom: 8,
@@ -404,7 +405,7 @@ export default function OnboardingScreen({ onComplete }) {
               background: 'rgba(255,170,0,0.08)', border: '1px solid rgba(255,170,0,0.25)',
               fontSize: 13, color: '#ffaa00', lineHeight: 1.6,
             }}>
-              ⚠️ <strong>Heads up:</strong> We recommend getting clearance from your doctor before starting a new exercise program. You can still use FitQuest — just consult a healthcare provider before your first session.
+              <TriangleAlert size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} /><strong>Heads up:</strong> We recommend getting clearance from your doctor before starting a new exercise program. You can still use FitQuest — just consult a healthcare provider before your first session.
             </div>
           )}
           <NavButtons step={step} onBack={handleBack} onNext={handleNext}
@@ -549,7 +550,7 @@ export default function OnboardingScreen({ onComplete }) {
               background: 'rgba(255,50,50,0.08)', border: '1px solid rgba(255,50,50,0.25)',
               fontSize: 13, color: '#ff5555', lineHeight: 1.6,
             }}>
-              🏥 <strong>Important:</strong> You indicated severe pain in one or more areas. We strongly recommend getting medical clearance before starting any exercise program. FitQuest will automatically substitute safer exercises for affected areas.
+              <Stethoscope size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} /><strong>Important:</strong> You indicated severe pain in one or more areas. We strongly recommend getting medical clearance before starting any exercise program. FitQuest will automatically substitute safer exercises for affected areas.
             </div>
           )}
           <div style={{ marginTop: 16 }}>
@@ -726,7 +727,7 @@ export default function OnboardingScreen({ onComplete }) {
                 }}>{label}</button>
               ))}
             </div>
-            {fe.sex && <div style={{ fontSize: 11, color: 'var(--fire2)', marginTop: 5 }}>⚠ {fe.sex}</div>}
+            {fe.sex && <div style={{ fontSize: 11, color: 'var(--fire2)', marginTop: 5 }}><TriangleAlert size={12} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />{fe.sex}</div>}
           </div>
 
           <NumInput label="WEIGHT" value={data.weightKg} onChange={v => set('weightKg', v)}
