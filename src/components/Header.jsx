@@ -60,19 +60,24 @@ export default function Header({ state, scrollY = 0 }) {
         </div>
 
         {/* Name + rank pill (fades out on scroll) */}
-        <div style={{ flex: 1, opacity: nameOpacity, overflow: 'hidden', transition: 'opacity 0.1s' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        {/* Name over rank tag. Side by side, a long name pushed the tag into the
+            streak counter and its text was cut off. */}
+        <div style={{ flex: 1, minWidth: 0, opacity: nameOpacity, maxHeight: nameOpacity > 0 ? 60 : 0, overflow: 'hidden', transition: 'opacity 0.1s' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
             <span style={{
-              fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 600,
-              color: 'var(--color-text-primary)', whiteSpace: 'nowrap',
+              maxWidth: '100%',
+              fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 700,
+              color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2,
             }}>{state.name}</span>
             <span style={{
-              fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+              maxWidth: '100%',
+              fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 800,
               padding: '3px 10px',
               clipPath: 'polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%)',
               background: `${rank.color}1f`, color: rank.color,
               boxShadow: `inset 0 0 0 1px ${rank.color}55`,
-              letterSpacing: '0.14em', flexShrink: 0, textTransform: 'uppercase',
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3,
             }}>{rank.l}-RANK · {rank.name}</span>
           </div>
         </div>
@@ -96,7 +101,13 @@ export default function Header({ state, scrollY = 0 }) {
 
       {/* XP Bar (always visible) */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        {/* Labels fold away as the header collapses so the bar itself stays
+            inside the 44px collapsed height instead of being clipped. */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', overflow: 'hidden',
+          maxHeight: Math.round(16 * (1 - raw)), marginBottom: Math.round(3 * (1 - raw)),
+          opacity: 1 - raw,
+        }}>
           <span style={{
             fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
             color: 'var(--color-text-primary)',

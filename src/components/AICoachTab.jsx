@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X as XIcon, Sparkles, Inbox, ArrowRight, Loader2 } from 'lucide-react';
+import { X as XIcon, Sparkles, Inbox, ArrowRight, Loader2, CalendarRange, Check } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
@@ -422,9 +422,13 @@ function AgentInbox({ messages, onMarkAllRead }) {
   if (!messages || messages.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text3)' }}>
-        <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: 1 }}>NO MESSAGES YET</div>
-        <div style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+        <div className="fq-hex" aria-hidden="true" style={{
+          width: 64, height: 72, margin: '0 auto 14px',
+          background: 'rgba(179,136,255,0.14)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}><Inbox size={28} color="var(--color-accent-purple)" /></div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 800, letterSpacing: '0.2em', color: '#fff' }}>NO MESSAGES YET</div>
+        <div style={{ fontSize: 13, marginTop: 8, lineHeight: 1.6, color: 'var(--text2)' }}>
           Quest will message you automatically after workouts, milestones, and on Mondays.
         </div>
       </div>
@@ -432,52 +436,64 @@ function AgentInbox({ messages, onMarkAllRead }) {
   }
 
   const sorted = [...messages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const unread = sorted.filter(m => !m.read).length;
 
   return (
     <div>
-      {sorted.some(m => !m.read) && (
-        <button onClick={onMarkAllRead} style={{
-          width: '100%', padding: '8px', borderRadius: 10, border: 'none',
-          background: 'rgba(0,229,255,0.06)', color: 'var(--cyan)',
-          fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-          cursor: 'pointer', marginBottom: 12,
-        }}>MARK ALL READ</button>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.24em', color: 'var(--color-accent-purple)' }}>
+          QUEST INBOX{unread > 0 ? ` · ${unread} NEW` : ''}
+        </div>
+        {unread > 0 && (
+          <button onClick={onMarkAllRead} style={{
+            minHeight: 36, padding: '0 12px',
+            border: '1px solid rgba(0,229,255,0.35)', background: 'rgba(0,229,255,0.06)', color: 'var(--cyan)',
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
+            cursor: 'pointer',
+          }}>MARK ALL READ</button>
+        )}
+      </div>
       {sorted.map(msg => {
         const escaped = (msg.message || '')
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const formatted = escaped
-          .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
+          .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#fff">$1</strong>')
           .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        const accent = msg.read ? 'rgba(255,255,255,0.12)' : 'var(--color-accent-purple)';
         return (
-          <div key={msg.id} style={{
-            display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-start',
-            opacity: msg.read ? 0.6 : 1, transition: 'opacity 0.3s',
+          <div key={msg.id} className="fq-rise" style={{
+            marginBottom: 12, opacity: msg.read ? 0.65 : 1, transition: 'opacity 0.3s',
           }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-              background: msg.read ? 'rgba(255,255,255,0.04)' : 'rgba(0,229,255,0.08)',
-              border: msg.read ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,229,255,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-            }}>{msg.emoji || '🤖'}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <div style={{
-                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-                  color: msg.read ? 'var(--text3)' : 'var(--cyan)', letterSpacing: 1,
-                  textTransform: 'uppercase',
-                }}>{msg.trigger?.replace(/_/g, ' ') || 'QUEST'}{!msg.read && <span style={{ marginLeft: 6, color: 'var(--cyan)' }}>● NEW</span>}</div>
-                <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                  {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
-                </div>
-              </div>
-              <div style={{
-                padding: '10px 12px', borderRadius: '4px 12px 12px 12px',
-                background: 'var(--card)', border: '1px solid var(--card-border)',
-                fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
-                backdropFilter: 'blur(20px)',
-              }} dangerouslySetInnerHTML={{ __html: formatted.replace(/\n/g, '<br/>') }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span className="fq-hex" aria-hidden="true" style={{
+                width: 24, height: 27, flexShrink: 0, fontSize: 13,
+                background: msg.read ? 'rgba(255,255,255,0.06)' : 'rgba(179,136,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{msg.emoji || <Sparkles size={13} color="var(--color-accent-purple)" />}</span>
+              <span style={{
+                flex: 1, minWidth: 0,
+                fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+                color: msg.read ? 'var(--text3)' : 'var(--color-accent-purple)', letterSpacing: '0.18em',
+                textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>[ {msg.trigger?.replace(/_/g, ' ') || 'QUEST'} ]</span>
+              {!msg.read && (
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 900, letterSpacing: '0.14em',
+                  padding: '2px 6px', background: 'var(--cyan)', color: '#05070f',
+                  boxShadow: '0 0 10px rgba(0,229,255,0.5)',
+                }}>NEW</span>
+              )}
+              <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0 }}>
+                {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+              </span>
             </div>
+            <div style={{
+              padding: '12px 14px',
+              clipPath: 'polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+              background: '#121a36', boxShadow: `inset 0 0 0 1px ${msg.read ? 'rgba(255,255,255,0.08)' : 'rgba(179,136,255,0.35)'}`,
+              borderTop: `2px solid ${accent}`,
+              fontSize: 14, color: '#d5d9f0', lineHeight: 1.65,
+            }} dangerouslySetInnerHTML={{ __html: formatted.replace(/\n/g, '<br/>') }} />
           </div>
         );
       })}
@@ -1005,16 +1021,21 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
 
 function ModePrompt({ mode, state }) {
   return (
-    <div style={{
-      padding: '20px 16px', textAlign: 'center',
-      background: mode.bg, border: `1px solid ${mode.border}`,
-      borderRadius: 14, marginBottom: 14
+    <div className="fq-cut" style={{
+      padding: '22px 16px', textAlign: 'center',
+      background: `linear-gradient(160deg, ${mode.bg}, rgba(12,18,38,0.9))`,
+      border: `1px solid ${mode.border}`, '--fq-cut-border': mode.border,
+      marginBottom: 14
     }}>
-      <div style={{ fontSize: 32, marginBottom: 10 }}>{mode.icon}</div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: mode.color, marginBottom: 6 }}>
+      <div className="fq-hex" aria-hidden="true" style={{
+        width: 56, height: 62, margin: '0 auto 12px', fontSize: 26,
+        background: mode.bg, boxShadow: `inset 0 0 0 1px ${mode.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>{mode.icon}</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 900, letterSpacing: '0.16em', color: mode.color, marginBottom: 8 }}>
         {mode.label.toUpperCase()}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+      <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
         {getModeDescription(mode.id, state)}
       </div>
     </div>
@@ -1023,22 +1044,23 @@ function ModePrompt({ mode, state }) {
 
 function ExerciseList({ exercises }) {
   return (
-    <div style={{ padding: '8px 0' }}>
+    <div style={{ padding: '6px 0' }}>
       {exercises.map((ex, i) => (
         <div key={i} style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '6px 14px',
-          borderBottom: i < exercises.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+          padding: '8px 14px',
+          borderBottom: i < exercises.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
         }}>
-          <div style={{
-            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-            background: 'rgba(255,255,255,0.05)',
+          <div aria-hidden="true" style={{
+            width: 22, height: 25, flexShrink: 0,
+            clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+            background: 'rgba(0,229,255,0.16)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)',
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 900, color: 'var(--cyan)',
           }}>{i + 1}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>{ex.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>{ex.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
               {ex.isBodyweight ? 'BW' : `${ex.startKg ?? 0}kg`}
               {' · '}{ex.sets}×{ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}–${ex.repMax}` : ex.reps}
               {' · '}{ex.restSec >= 60 ? `${Math.round(ex.restSec / 60)}min` : `${ex.restSec}s`}
@@ -1058,80 +1080,99 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
   const inputs = msg.toolInputs || (msg.toolInput ? [msg.toolInput] : []);
   const totalExercises = inputs.reduce((n, t) => n + (t.exercises?.length || 0), 0);
   const isMultiDay = inputs.length > 1;
+  const accent = isSaved ? 'var(--green)' : 'var(--cyan)';
+  const accentLine = isSaved ? 'rgba(0,230,118,0.45)' : 'rgba(0,229,255,0.4)';
 
   return (
-    <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
+    <div className="fq-rise" style={{ marginBottom: 14 }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: 'rgba(179,255,94,0.08)', border: '1px solid rgba(179,255,94,0.25)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-      }}>🗓️</div>
-      <div style={{ flex: 1 }}>
-        {content ? (
-          <div style={{
-            padding: '10px 14px', borderRadius: '4px 14px 14px 14px',
-            background: 'var(--card)', border: '1px solid var(--card-border)',
-            fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
-            marginBottom: 10, backdropFilter: 'blur(20px)',
-          }}>{content}</div>
-        ) : null}
+        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+        fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 800, letterSpacing: '0.24em',
+        color: 'var(--color-accent-purple)',
+      }}>[ SYSTEM ] PROGRAM BUILDER</div>
+      {content ? (
         <div style={{
-          borderRadius: 14, overflow: 'hidden',
-          border: isSaved ? '1px solid rgba(0,230,118,0.4)' : '1px solid rgba(179,255,94,0.3)',
-          background: isSaved ? 'rgba(0,230,118,0.06)' : 'rgba(179,255,94,0.05)',
+          padding: '12px 14px', marginBottom: 10,
+          clipPath: 'polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+          background: '#121a36', boxShadow: 'inset 0 0 0 1px rgba(179,136,255,0.3)',
+          fontSize: 14, color: '#d5d9f0', lineHeight: 1.65,
+        }}>{content}</div>
+      ) : null}
+      <div className="fq-cut" style={{
+        overflow: 'hidden',
+        border: `1px solid ${accentLine}`, '--fq-cut-border': accentLine,
+        background: isSaved ? 'linear-gradient(160deg, rgba(0,230,118,0.08), #0c1226)' : 'linear-gradient(160deg, #141b36, #0c1226)',
+        boxShadow: isSaved ? 'none' : 'inset 0 0 30px rgba(0,229,255,0.06)',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '12px 14px',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          {/* Header */}
-          <div style={{
-            padding: '10px 14px',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          <span className="fq-hex" aria-hidden="true" style={{
+            width: 30, height: 34, flexShrink: 0,
+            background: isSaved ? 'var(--green)' : 'rgba(0,229,255,0.18)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, color: isSaved ? 'var(--green)' : '#b3ff5e', letterSpacing: 1 }}>
+            {isSaved
+              ? <Check size={16} strokeWidth={3} color="#05070f" />
+              : <CalendarRange size={16} color="var(--cyan)" />}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 900, color: accent, letterSpacing: '0.14em' }}>
               {isSaved
-                ? `✓ SAVED — ${inputs.map(t => (DAY_FULL[t.day] || t.day || '').toUpperCase()).join(' · ')}`
+                ? 'PROGRAM SAVED'
                 : `${isMultiDay ? `${inputs.length}-DAY` : (DAY_FULL[inputs[0]?.day] || inputs[0]?.day || '?').toUpperCase()} PROGRAM PROPOSAL`}
             </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)' }}>{totalExercises} exercises</div>
-          </div>
-
-          {/* Day sections */}
-          {inputs.map((t, di) => {
-            const dayLabel = DAY_FULL[t.day] || t.day || '?';
-            return (
-              <div key={di}>
-                {isMultiDay && (
-                  <div style={{
-                    padding: '8px 14px 4px',
-                    borderTop: di > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: '#b3ff5e', letterSpacing: 1 }}>
-                      {dayLabel.toUpperCase()}
-                    </div>
-                    {t.title && <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t.title}</div>}
-                  </div>
-                )}
-                {!isMultiDay && t.title && (
-                  <div style={{ padding: '4px 14px 0', fontSize: 11, color: 'var(--text3)' }}>{t.title}</div>
-                )}
-                <ExerciseList exercises={t.exercises || []} />
-              </div>
-            );
-          })}
-
-          {!isSaved && (
-            <div style={{ padding: '10px 14px' }}>
-              <button onClick={() => onConfirm(msg)} style={{
-                width: '100%', padding: '10px', borderRadius: 10, border: 'none',
-                background: 'linear-gradient(135deg, #b3ff5e, #69e04a)',
-                color: '#0a1a0a', fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-                cursor: 'pointer', letterSpacing: 1,
-              }}>
-                {isMultiDay ? `✓ SAVE ALL ${inputs.length} DAYS TO MY PROGRAM` : '✓ SAVE TO MY PROGRAM'}
-              </button>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+              {isSaved
+                ? inputs.map(t => DAY_FULL[t.day] || t.day || '').join(' · ')
+                : `${totalExercises} exercise${totalExercises === 1 ? '' : 's'}`}
             </div>
-          )}
+          </div>
         </div>
+
+        {/* Day sections */}
+        {inputs.map((t, di) => {
+          const dayLabel = DAY_FULL[t.day] || t.day || '?';
+          return (
+            <div key={di}>
+              {isMultiDay && (
+                <div style={{
+                  padding: '10px 14px 4px',
+                  borderTop: di > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8,
+                }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 900, color: accent, letterSpacing: '0.2em' }}>
+                    {dayLabel.toUpperCase()}
+                  </div>
+                  {t.title && <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'right' }}>{t.title}</div>}
+                </div>
+              )}
+              {!isMultiDay && t.title && (
+                <div style={{ padding: '8px 14px 0', fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>{t.title}</div>
+              )}
+              <ExerciseList exercises={t.exercises || []} />
+            </div>
+          );
+        })}
+
+        {!isSaved && (
+          <div style={{ padding: '12px 14px 14px' }}>
+            <button onClick={() => onConfirm(msg)} className="fq-press fq-skew" style={{
+              width: '100%', minHeight: 50, border: 'none',
+              background: 'linear-gradient(90deg, var(--cyan), #00b8d4)',
+              boxShadow: '0 0 22px rgba(0,229,255,0.4)',
+              color: '#05070f', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 900,
+              cursor: 'pointer', letterSpacing: '0.14em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <Check size={15} strokeWidth={3} aria-hidden="true" />
+              {isMultiDay ? `SAVE ALL ${inputs.length} DAYS TO MY PROGRAM` : 'SAVE TO MY PROGRAM'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
