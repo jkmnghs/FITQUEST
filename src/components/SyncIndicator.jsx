@@ -11,6 +11,7 @@ const MONO    = "'SF Mono', ui-monospace, Menlo, monospace";
 const SUBLABELS = {
   'LOADING...':  'Checking your session',
   'SYNCING...':  'Pulling your data from the cloud',
+  'READY':       'Tap anywhere to enter',
 };
 
 // The boot log is honest about what is actually happening: each line is a
@@ -25,6 +26,11 @@ const BOOT_STEPS = {
     { text: 'Loading quest log', done: true },
     { text: 'Syncing with cloud', done: false },
   ],
+  READY: [
+    { text: 'Hunter authenticated', done: true },
+    { text: 'Quest log synced', done: true },
+    { text: 'System ready', done: true },
+  ],
 };
 
 // How long before the screen admits something is wrong. The cloud read gives up
@@ -38,7 +44,7 @@ function randomTip() {
   return all.length ? all[Math.floor(Math.random() * all.length)] : null;
 }
 
-export default function SyncIndicator({ label = 'LOADING...', onContinueOffline }) {
+export default function SyncIndicator({ label = 'LOADING...', onContinueOffline, onSkip }) {
   const [dots, setDots] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const tip = useMemo(randomTip, []);
@@ -59,8 +65,9 @@ export default function SyncIndicator({ label = 'LOADING...', onContinueOffline 
   }, []);
 
   const ellipsis = '.'.repeat(dots);
-  const isSlow  = elapsed >= SLOW_AFTER_MS;
-  const isStuck = elapsed >= STUCK_AFTER_MS;
+  const isReady = label === 'READY';
+  const isSlow  = !isReady && elapsed >= SLOW_AFTER_MS;
+  const isStuck = !isReady && elapsed >= STUCK_AFTER_MS;
 
   const sublabel = isStuck
     ? 'Still waiting on the network.'
@@ -77,7 +84,9 @@ export default function SyncIndicator({ label = 'LOADING...', onContinueOffline 
       role="status"
       aria-live="polite"
       aria-label={`${label.replace('...', '')}. ${sublabel || ''}`}
+      onClick={isReady ? onSkip : undefined}
       style={{
+        cursor: isReady ? 'pointer' : 'default',
         position: 'fixed', inset: 0, overflow: 'hidden',
         background: '#05070f',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -161,7 +170,7 @@ export default function SyncIndicator({ label = 'LOADING...', onContinueOffline 
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontFamily: DISPLAY }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.24em', color: '#e8eaf6' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.24em', color: isReady ? '#00e676' : '#e8eaf6' }}>
             {label.replace('...', '')}
           </span>
         </div>
@@ -170,15 +179,28 @@ export default function SyncIndicator({ label = 'LOADING...', onContinueOffline 
           position: 'relative', height: 8, overflow: 'hidden',
           background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.25)',
         }}>
+          {isReady ? (
+            <div className="fq-grow-x" style={{
+              position: 'absolute', inset: 0,
+              background: `linear-gradient(90deg, ${CYAN}, ${PURPLE})`,
+              boxShadow: `0 0 14px ${CYAN}`,
+              animationDuration: '0.8s',
+            }} />
+          ) : (
           <div style={{
             position: 'absolute', top: 0, bottom: 0, width: '40%',
             background: `linear-gradient(90deg, transparent, ${CYAN}, ${PURPLE})`,
             boxShadow: `0 0 14px ${CYAN}`,
             animation: 'fqIndeterminate 1.4s cubic-bezier(.45,.05,.55,.95) infinite',
           }} />
+          )}
         </div>
         {sublabel && (
-          <div style={{ fontFamily: BODY, fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.4 }}>
+          <div style={{
+            fontFamily: BODY, fontSize: 13, lineHeight: 1.4,
+            color: isReady ? CYAN : 'rgba(255,255,255,0.62)',
+            animation: isReady ? 'fqBlink 1.6s ease-in-out infinite' : 'none',
+          }}>
             {sublabel}
           </div>
         )}
@@ -197,6 +219,19 @@ export default function SyncIndicator({ label = 'LOADING...', onContinueOffline 
               {tip}
             </p>
           </div>
+        )}
+
+        {isReady && onSkip && (
+          <button
+            onClick={onSkip}
+            className="fq-press fq-skew"
+            style={{
+              alignSelf: 'stretch', minHeight: 52, border: 'none',
+              background: `linear-gradient(90deg, ${CYAN}, #00b8d4)`, color: '#05070f',
+              fontFamily: DISPLAY, fontSize: 13, fontWeight: 900, letterSpacing: '0.24em',
+              boxShadow: '0 0 24px rgba(0,229,255,0.45)', animation: 'fqRise 0.4s ease-out both',
+            }}
+          >ENTER</button>
         )}
 
         {/* Escape hatch. Local state is already hydrated by the time this screen

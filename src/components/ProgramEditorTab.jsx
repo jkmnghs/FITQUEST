@@ -35,24 +35,23 @@ function repLabel(ex) {
 }
 
 const inputSt = {
-  width: '100%', background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8,
-  color: 'var(--text1)', fontFamily: 'var(--font-primary)', fontSize: 14,
+  width: '100%', minHeight: 44, background: '#05070f',
+  border: '1px solid rgba(0,229,255,0.22)',
+  color: '#fff', fontFamily: 'var(--font-primary)', fontSize: 16,
   padding: '8px 10px', outline: 'none', boxSizing: 'border-box',
 };
 const selectSt = { ...inputSt, cursor: 'pointer', appearance: 'none', paddingRight: 6 };
 
 function FieldLabel({ children }) {
-  return <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-display)', letterSpacing: 1, marginBottom: 4 }}>{children}</div>;
+  return <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text2)', fontFamily: 'var(--font-display)', letterSpacing: '0.18em', marginBottom: 6 }}>{children}</div>;
 }
 
 function ExForm({ ex, onChange, onDone }) {
   return (
     <div style={{
       padding: '14px 14px 12px',
-      background: 'rgba(0,229,255,0.03)',
-      borderTop: '1px solid rgba(0,229,255,0.12)',
-      borderRadius: '0 0 12px 12px',
+      background: 'rgba(0,229,255,0.04)',
+      borderTop: '1px solid rgba(0,229,255,0.18)',
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {!ex.isBodyweight && (
@@ -99,9 +98,10 @@ function ExForm({ ex, onChange, onDone }) {
       </div>
       {onDone && (
         <button onClick={onDone} style={{
-          marginTop: 10, padding: '7px 16px', borderRadius: 8, border: 'none',
-          background: 'rgba(0,229,255,0.12)', color: 'var(--cyan)',
-          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
+          marginTop: 12, padding: '7px 20px', minHeight: 44, border: 'none',
+          background: 'var(--cyan)', color: '#05070f',
+          clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 900, cursor: 'pointer', letterSpacing: '0.16em',
         }}>DONE</button>
       )}
     </div>
@@ -254,17 +254,18 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           const hasEx = (drafts[d]?.exercises || []).length > 0;
           return (
             <button key={d} onClick={() => { setActiveDay(d); setEditingIdx(null); setAddForm(null); }} style={{
-              padding: '8px 16px', borderRadius: 20,
+              padding: '8px 16px', minHeight: 44, minWidth: 56,
               border: `1px solid ${active ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}`,
-              background: active ? 'rgba(0,229,255,0.12)' : 'transparent',
-              color: active ? 'var(--cyan)' : 'var(--text3)',
-              fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: 1,
+              background: active ? 'var(--cyan)' : 'transparent',
+              boxShadow: active ? '0 0 14px rgba(0,229,255,0.45)' : 'none',
+              color: active ? '#05070f' : 'var(--text2)',
+              fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 900, letterSpacing: '0.12em',
               cursor: 'pointer', WebkitTapHighlightColor: 'transparent', position: 'relative',
             }}>
               {DAY_SHORT[d]}
               {hasEx && <span style={{
-                position: 'absolute', top: 2, right: 4, width: 5, height: 5,
-                borderRadius: '50%', background: active ? 'var(--cyan)' : 'var(--green)',
+                position: 'absolute', top: 4, right: 4, width: 5, height: 5,
+                background: active ? '#05070f' : 'var(--green)',
               }} />}
             </button>
           );
@@ -295,8 +296,8 @@ export default function ProgramEditorTab({ state, updateSetting }) {
       {exList.length === 0 && !addForm && (
         <div style={{
           padding: '28px 20px', textAlign: 'center',
-          border: '1px dashed rgba(255,255,255,0.08)',
-          borderRadius: 14, marginBottom: 14,
+          border: '1px dashed rgba(0,229,255,0.2)',
+          marginBottom: 14,
           color: 'var(--text3)', fontSize: 13,
         }}>
           No exercises yet for {DAY_FULL[activeDay]}.<br />
@@ -310,16 +311,18 @@ export default function ProgramEditorTab({ state, updateSetting }) {
         return (
           <div key={idx} style={{
             marginBottom: 8,
-            border: `1px solid ${isEditing ? 'rgba(0,229,255,0.3)' : 'rgba(255,255,255,0.07)'}`,
-            borderRadius: 12, overflow: 'hidden',
-            background: 'rgba(255,255,255,0.02)',
+            border: `1px solid ${isEditing ? 'rgba(0,229,255,0.45)' : 'rgba(0,229,255,0.12)'}`,
+            boxShadow: isEditing ? '0 0 16px rgba(0,229,255,0.15)' : 'none',
+            overflow: 'hidden',
+            background: 'linear-gradient(160deg, #121a34, #0d1328)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 12px' }}>
               <div style={{
-                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                background: 'rgba(255,255,255,0.06)',
+                width: 24, height: 27, flexShrink: 0,
+                clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+                background: 'rgba(0,229,255,0.16)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700, color: 'var(--text3)',
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 900, color: 'var(--cyan)',
               }}>{idx + 1}</div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -327,7 +330,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
                     393px phone, which truncated "Romanian Deadlift" and
                     "DB Overhead Press" mid-word. Wrapping costs a line only
                     on the long names; ellipsis cost information on every one. */}
-                <div style={{ fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 700, color: 'var(--text1)', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
+                <div style={{ fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
                   {ex.name}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
@@ -362,20 +365,21 @@ export default function ProgramEditorTab({ state, updateSetting }) {
       {!addForm ? (
         <button onClick={() => setAddForm('searching')} style={{
           width: '100%', padding: '13px', marginBottom: 16,
-          border: '1px dashed rgba(0,229,255,0.25)', borderRadius: 12,
-          background: 'rgba(0,229,255,0.03)', color: 'var(--cyan)',
-          fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-          letterSpacing: 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+          minHeight: 48,
+          border: '1px dashed rgba(0,229,255,0.4)',
+          background: 'rgba(0,229,255,0.04)', color: 'var(--cyan)',
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800,
+          letterSpacing: '0.16em', cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
         }}>
           + ADD EXERCISE
         </button>
       ) : addForm === 'searching' ? (
         <div style={{
           marginBottom: 16, padding: '14px',
-          border: '1px solid rgba(0,229,255,0.2)', borderRadius: 14,
-          background: 'rgba(0,229,255,0.03)',
+          border: '1px solid rgba(0,229,255,0.3)',
+          background: 'linear-gradient(160deg, #121a34, #0d1328)',
         }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--cyan)', letterSpacing: 1, marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, color: 'var(--cyan)', letterSpacing: '0.22em', marginBottom: 10 }}>
             SEARCH EXERCISE LIBRARY
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -402,7 +406,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
                 background: 'rgba(255,255,255,0.04)', textAlign: 'left',
                 WebkitTapHighlightColor: 'transparent',
               }}>
-                <span style={{ fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600, color: 'var(--text1)' }}>{s.name}</span>
+                <span style={{ fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600, color: '#fff' }}>{s.name}</span>
                 <span style={{ fontSize: 11, color: 'var(--text3)' }}>{s.isBodyweight ? 'BW' : `${s.startKg}kg`}</span>
               </button>
             ))}
@@ -420,7 +424,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           background: 'rgba(0,229,255,0.03)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontFamily: 'var(--font-primary)', fontSize: 15, fontWeight: 700, color: 'var(--text1)' }}>{addForm.name}</div>
+            <div style={{ fontFamily: 'var(--font-primary)', fontSize: 15, fontWeight: 700, color: '#fff' }}>{addForm.name}</div>
             <button onClick={() => setAddForm('searching')} style={{
               padding: '3px 8px', borderRadius: 6, border: 'none',
               background: 'rgba(255,255,255,0.06)', color: 'var(--text3)',
@@ -451,21 +455,23 @@ export default function ProgramEditorTab({ state, updateSetting }) {
       {/* Save / Clear */}
       <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
         <button onClick={saveProgram} style={{
-          flex: 1, padding: '14px', borderRadius: 12, border: saved ? '1px solid var(--green)' : 'none',
-          background: saved ? 'rgba(0,230,118,0.15)' : 'linear-gradient(135deg, var(--cyan), var(--purple))',
-          color: saved ? 'var(--green)' : 'var(--bg)',
-          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-          cursor: 'pointer', letterSpacing: 1, transition: 'all 0.3s',
+          flex: 1, padding: '14px', minHeight: 52, border: 'none',
+          clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%)',
+          background: saved ? 'var(--green)' : 'linear-gradient(90deg, var(--cyan), var(--purple))',
+          boxShadow: saved ? '0 0 22px rgba(0,230,118,0.45)' : '0 0 22px rgba(0,229,255,0.35)',
+          color: '#05070f',
+          fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 900,
+          cursor: 'pointer', letterSpacing: '0.16em', transition: 'all 0.3s',
         }}>
           {saved ? '✓ SAVED' : 'SAVE PROGRAM'}
         </button>
         {exList.length > 0 && (
           <button onClick={clearDay} style={{
-            padding: '14px 18px', borderRadius: 12,
-            border: '1px solid rgba(255,50,68,0.2)',
-            background: 'rgba(255,50,68,0.07)', color: 'var(--red)',
-            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-            cursor: 'pointer', letterSpacing: 1, flexShrink: 0,
+            padding: '14px 18px', minHeight: 52,
+            border: '1px solid rgba(255,50,68,0.4)',
+            background: 'rgba(255,50,68,0.08)', color: '#ff8a9b',
+            fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800,
+            cursor: 'pointer', letterSpacing: '0.14em', flexShrink: 0,
           }}>CLEAR DAY</button>
         )}
       </div>
@@ -486,8 +492,8 @@ function actionBtn(color) {
     // Four of these sit side by side on every exercise row. At 28px they were
     // under the 44px touch guideline and easy to mis-hit — deleting an
     // exercise when you meant to reorder it.
-    width: 38, height: 38, borderRadius: 'var(--radius-md)', border: 'none',
-    background: 'rgba(255,255,255,0.06)',
+    width: 38, height: 38, border: `1px solid ${color ? color : 'rgba(0,229,255,0.18)'}`,
+    background: 'rgba(5,7,15,0.6)',
     color: color || 'var(--text3)', fontSize: 15,
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     WebkitTapHighlightColor: 'transparent', padding: 0, flexShrink: 0,

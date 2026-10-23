@@ -27,6 +27,9 @@ const FuelTab     = lazy(() => import('./components/NutritionTab'));
 const ProgressTab = lazy(() => import('./components/ProgressTab'));
 const ProfileTab  = lazy(() => import('./components/ProfileTab'));
 
+/** Minimum time the boot screen is shown on app open. */
+const BOOT_MIN_MS = 5000;
+
 const NAV_TABS = [
   { id: 'train',    Icon: Dumbbell,   label: 'Train',    hint: "Today's session",  accent: '#00e5ff' },
   { id: 'fuel',     Icon: Utensils,   label: 'Fuel',     hint: 'Meals & macros',   accent: '#ff9100' },
@@ -208,6 +211,16 @@ export default function App() {
     }
   }, []);
 
+  // The boot screen stays up for at least BOOT_MIN_MS on app open, even when
+  // auth and sync finish sooner, so it reads as an intro rather than a flash.
+  // Tapping it once everything is loaded skips the rest of the wait.
+  const [bootHold, setBootHold] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setBootHold(false), BOOT_MIN_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const skipBoot = useCallback(() => setBootHold(false), []);
+
   // Level-up celebration. The first level we see after loading is the
   // baseline, so opening the app never "levels you up" to where you already were.
   const [levelUp, setLevelUp] = useState(null);
@@ -237,6 +250,7 @@ export default function App() {
   if (!user)        return <><BgFx /><LoginScreen authError={authError} onSignIn={signIn} onSignUp={signUp} onResetPassword={resetPassword} onClearAuthError={clearAuthError} onResendConfirmation={resendConfirmation} /></>;
   if (user && passwordRecovery) return <><BgFx /><SetPasswordScreen authError={authError} onUpdate={updatePassword} onCancel={signOut} /></>;
   if (cloudLoading) return <SyncIndicator label="SYNCING..." onContinueOffline={continueOffline} />;
+  if (bootHold && !cloudLoadFailed) return <SyncIndicator label="READY" onSkip={skipBoot} />;
   // A failed read tells us nothing about the account, so stop here rather than
   // falling through to the onboarding check below — answering it would write a
   // fresh state over whatever is actually stored.

@@ -974,7 +974,7 @@ function SettingRow({ label, sub, value, children, onClick, tone, chevron }) {
       {children}
       {chevron && (
         <span aria-hidden="true" style={{
-          color: 'var(--color-text-tertiary)', flexShrink: 0,
+          color: 'var(--color-action)', flexShrink: 0, fontSize: 20,
           transition: 'transform var(--transition-normal)',
           transform: chevron === 'open' ? 'rotate(90deg)' : 'none',
           lineHeight: 1,
@@ -1001,25 +1001,26 @@ function SettingsGroup({ title, tone, children }) {
 }
 
 const navBtnStyle = {
-  width: 32, height: 32, borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.1)',
-  background: 'rgba(255,255,255,0.04)',
+  width: 44, height: 44,
+  border: '1px solid rgba(0,229,255,0.25)',
+  background: 'rgba(0,229,255,0.05)',
   color: 'var(--text2)', fontSize: 18, cursor: 'pointer',
   display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
 
 function accountBtn(background, color) {
   return {
-    padding: '9px 18px', borderRadius: 10, border: 'none',
+    padding: '9px 20px', minHeight: 44, border: 'none',
     background, color,
-    fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-    cursor: 'pointer', letterSpacing: 0.5,
+    clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)',
+    fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+    cursor: 'pointer', letterSpacing: '0.14em',
   };
 }
 
 const inputStyle = {
-  height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.04)', color: 'var(--text)',
-  fontFamily: 'var(--font-primary)', fontSize: 14, fontWeight: 600,
+  height: 40, border: '1px solid rgba(0,229,255,0.25)',
+  background: '#05070f', color: '#fff',
+  fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600,
   textAlign: 'center', width: 110, padding: '0 8px'
 };
