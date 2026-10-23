@@ -2,7 +2,7 @@ import React from 'react';
 import { EXERCISES } from '../data/gameData';
 import { EX_CATALOG, lookupExName } from '../data/exerciseCatalog';
 import { convertWeight } from '../utils/gameLogic';
-import { Zap, Dumbbell, Weight, Flame } from 'lucide-react';
+import { Zap, Dumbbell, Weight, Flame, TrendingDown, Ruler, Medal, Moon } from 'lucide-react';
 import CountUp from './CountUp';
 
 // Combined lookup: program defaults + full catalog, keyed by id
@@ -134,7 +134,7 @@ function WeightChart({ checkins, unit }) {
         background: 'var(--card)', border: '1px solid var(--card-border)',
         borderRadius: 14, padding: '18px 16px', marginBottom: 16, textAlign: 'center'
       }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>📈</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><TrendingDown size={28} color="var(--cyan)" aria-hidden="true" /></div>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>
           {checkins.length === 0 ? 'No check-ins yet' : 'Need one more check-in'}
         </div>
@@ -213,7 +213,7 @@ function WaistChart({ checkins }) {
         background: 'var(--card)', border: '1px solid var(--card-border)',
         borderRadius: 14, padding: '18px 16px', marginBottom: 16, textAlign: 'center'
       }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>📏</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Ruler size={28} color="var(--purple)" aria-hidden="true" /></div>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>
           {withWaist.length === 0 ? 'No waist data yet' : 'Need one more waist entry'}
         </div>
@@ -290,7 +290,7 @@ function PRSection({ prs, unit, liftWeights }) {
       background: 'var(--card)', border: '1px solid rgba(255,214,0,0.15)',
       borderRadius: 14, padding: '14px 16px', marginBottom: 16, backdropFilter: 'blur(20px)'
     }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 10 }}>🏅 Personal Records</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 10 }}><Medal size={16} aria-hidden="true" /> Personal Records</div>
       {!hasPRs ? (
         <div style={{ textAlign: 'center', padding: 10, color: 'var(--text3)', fontSize: 12 }}>
           Complete workouts to set your first PRs!
@@ -329,7 +329,7 @@ function SleepChart({ checkins }) {
         background: 'var(--card)', border: '1px solid var(--card-border)',
         borderRadius: 14, padding: '18px 16px', marginBottom: 16, textAlign: 'center'
       }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>😴</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Moon size={28} color="var(--purple)" aria-hidden="true" /></div>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>No sleep data yet</div>
         <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 }}>
           Log your average nightly sleep hours in your Sunday check-in to track recovery trends.

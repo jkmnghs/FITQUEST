@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { TriangleAlert } from 'lucide-react';
 import { getBackupInfo, restoreFromBackup, summariseState, diffStates } from '../utils/storage';
 
 /**
@@ -45,7 +46,7 @@ export function ExportNudge({ state, onExport }) {
         borderRadius: 10, cursor: 'pointer',
       }}
     >
-      <span aria-hidden="true" style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+      <TriangleAlert size={18} color="var(--color-premium)" aria-hidden="true" style={{ flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{
           display: 'block', fontFamily: 'var(--font-primary)', fontSize: 13,

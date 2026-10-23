@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Trophy } from 'lucide-react';
 import { PROGRAMS } from '../data/programs';
 
 // onContinue: called when user picks "continue same program" — lets the caller advance the week.
@@ -23,7 +24,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
         boxShadow: '0 0 60px rgba(0,229,255,0.15)',
         maxHeight: '90dvh', overflowY: 'auto',
       }}>
-        <div style={{ fontSize: 48, marginBottom: 10 }}>🏆</div>
+        <div className="fq-hex fq-pop" aria-hidden="true" style={{ width: 76, height: 86, margin: '0 auto 12px', background: 'rgba(255,214,0,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'drop-shadow(0 0 14px rgba(255,214,0,0.5))' }}><Trophy size={38} color="#ffd600" /></div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 900, color: 'var(--cyan)', marginBottom: 6, letterSpacing: 1 }}>
           CYCLE {cycle} COMPLETE
         </div>
@@ -56,7 +57,7 @@ export default function ProgramCompleteModal({ state, onClose, onContinue, onCha
               color: 'var(--bg)', letterSpacing: 0.8, cursor: 'pointer',
               boxShadow: '0 4px 20px var(--cyan-glow)'
             }}>
-              CONTINUE SAME PROGRAM ⚔️
+              CONTINUE SAME PROGRAM
             </button>
             <button onClick={() => setPicking(true)} style={{
               width: '100%', padding: 13, border: '1px solid rgba(179,136,255,0.4)', borderRadius: 12,

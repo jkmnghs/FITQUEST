@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
 
 const CHECKLIST_ITEMS = [
   { id: 'ck1', text: '3/3 workouts completed' },
@@ -121,8 +122,8 @@ export default function CheckinTab({ state, onSubmit }) {
             <InputRow label="Sleep" value={sleep} onChange={v => { setSleep(v); setError(null); }}
               placeholder="Optional" unit="hrs/night" inputMode="decimal" step="0.5" min="0" max="24" />
             {error && (
-              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
-                ⚠ {error}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--red)', marginTop: 4, marginBottom: 4, fontWeight: 600 }}>
+                <TriangleAlert size={14} aria-hidden="true" style={{ flexShrink: 0 }} /> {error}
               </div>
             )}
             {showOverwrite && !error && (
@@ -131,7 +132,7 @@ export default function CheckinTab({ state, onSubmit }) {
                 padding: '8px 10px', borderRadius: 8,
                 background: 'rgba(255,214,0,0.07)', border: '1px solid rgba(255,214,0,0.2)'
               }}>
-                ⚠ Already checked in Week {thisWeekCheckin.week} ({thisWeekCheckin.weight} {state.unit}). Tap again to overwrite.
+                <TriangleAlert size={13} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />Already checked in Week {thisWeekCheckin.week} ({thisWeekCheckin.weight} {state.unit}). Tap again to overwrite.
               </div>
             )}
             <button onClick={handleSubmit} className="fq-press fq-skew" style={{

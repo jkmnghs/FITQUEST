@@ -486,11 +486,11 @@ export function useGameState(user) {
       const { xp, totalXp, level, leveledUp } = applyXP(prev, amount);
       const newlyUnlocked = checkAchievements({ ...prev, xp, totalXp, level });
       const nextAchDone = [...prev.achDone, ...newlyUnlocked];
-      showToast(leveledUp ? `+${amount} XP — LEVEL UP! 🎉` : (message || `+${amount} XP`));
+      showToast(leveledUp ? `+${amount} XP — LEVEL UP!` : (message || `+${amount} XP`));
       if (newlyUnlocked.length > 0) {
         newlyUnlocked.forEach((id, idx) => {
           const ach = ACHIEVEMENTS.find(a => a.id === id);
-          setTimeout(() => showToast(`🏆 ${ach?.name || 'Achievement'} unlocked!`), 1500 + idx * 2000);
+          setTimeout(() => showToast(`ACHIEVEMENT UNLOCKED: ${ach?.name || 'Achievement'}`), 1500 + idx * 2000);
         });
       }
       return { ...prev, xp, totalXp, level, achDone: nextAchDone };
@@ -842,7 +842,7 @@ export function useGameState(user) {
         const reasonStr = pendingReasons.length > 0 ? `\n${pendingReasons[0]}` : '';
         addXP(pendingXP, `+${pendingXP} XP${reasonStr}`);
       }
-      if (pendingPR) setTimeout(() => showToast(`🏅 NEW PR: ${lookupExName(exId)}!`), 1200);
+      if (pendingPR) setTimeout(() => showToast(`NEW PR: ${lookupExName(exId)}!`), 1200);
     }, 50);
   }, [setState, addXP, showToast]);
 
@@ -906,13 +906,13 @@ export function useGameState(user) {
       let nextWeek = w;
       if (wp.count >= sessionsNeeded && !wp.completed) {
         wp.completed = true;
-        if (isDeload) setTimeout(() => showToast('🧘 Deload complete! Great recovery week.'), 500);
+        if (isDeload) setTimeout(() => showToast('Deload complete! Great recovery week.'), 500);
         nextWeek = w + 1;
         const cycleWeek = ((w - 1) % 12) + 1;
         if (cycleWeek === 12) {
-          setTimeout(() => showToast('🏆 CYCLE COMPLETE! Week ' + (w + 1) + ' begins — keep lifting! ⚔️'), 1000);
+          setTimeout(() => showToast('CYCLE COMPLETE! Week ' + (w + 1) + ' begins — keep lifting!'), 1000);
         } else {
-          setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1} 🎉`), 1000);
+          setTimeout(() => showToast(`Week ${w} COMPLETE! → Week ${w + 1}`), 1000);
         }
         pendingAdvance = nextWeek;
       }
@@ -1438,7 +1438,7 @@ export function useGameState(user) {
         updatedState.achDone = [...(prev.achDone || []), ...newlyUnlocked];
         newlyUnlocked.forEach((id, idx) => {
           const ach = ACHIEVEMENTS.find(a => a.id === id);
-          setTimeout(() => showToast(`🏆 ${ach?.name || 'Achievement'} unlocked!`), 1500 + idx * 2000);
+          setTimeout(() => showToast(`ACHIEVEMENT UNLOCKED: ${ach?.name || 'Achievement'}`), 1500 + idx * 2000);
         });
       }
 

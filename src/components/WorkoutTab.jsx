@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   ChevronLeft, ChevronRight, Play, Flag, MoreHorizontal, Repeat, Trash2,
   Bot, Moon, Check, Timer, CalendarDays, Trophy,
-  Compass, BatteryCharging, TrendingUp, Zap,
+  Compass, BatteryCharging, TrendingUp, Zap, TriangleAlert,
 } from 'lucide-react';
 import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeloadWeek } from '../utils/gameLogic';
 import ExerciseModal from './ExerciseModal';
@@ -435,7 +435,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           marginBottom: 'var(--space-4)',
         }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-3)' }}>
-            ⚠️ <strong style={{ color: 'var(--color-premium)' }}>Rest days are when muscle is built.</strong>{' '}
+            <TriangleAlert size={14} color="var(--color-premium)" aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} /><strong style={{ color: 'var(--color-premium)' }}>Rest days are when muscle is built.</strong>{' '}
             Training through one usually costs more than it earns, and raises injury risk.
             Your coach can tell you whether today is an exception.
           </div>
@@ -1134,7 +1134,7 @@ function FinishArea({ state, exercises, onFinish }) {
         color: 'var(--bg)', letterSpacing: 0.8, cursor: 'pointer',
         boxShadow: allDone ? '0 4px 18px var(--green-glow)' : '0 4px 18px var(--fire-glow)'
       }}>
-        {allDone && completionPct >= 95 ? 'FINISH SESSION ⚔️ (PERFECT!)' : 'FINISH SESSION ⚔️'}
+        {allDone && completionPct >= 95 ? 'FINISH SESSION · PERFECT!' : 'FINISH SESSION'}
       </button>
     </div>
   );
@@ -1268,7 +1268,7 @@ function FinishConfirmModal({ state, exercises, onCancel, onConfirm }) {
             flex: 1, padding: 12, borderRadius: 12, border: 'none',
             background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
             color: 'var(--bg)', fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700
-          }}>FINISH ⚔️</button>
+          }}>FINISH</button>
         </div>
       </div>
     </div>

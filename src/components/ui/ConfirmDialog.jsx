@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { haptic } from '../../utils/haptics';
 
 /**
@@ -82,7 +82,7 @@ export function ConfirmDialog({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto var(--space-3)',
           }}>
-            <AlertTriangle size={21} color="var(--color-destructive)" />
+            <TriangleAlert size={21} color="var(--color-destructive)" />
           </div>
         )}
 
