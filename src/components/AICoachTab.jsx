@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X as XIcon, Sparkles, Inbox, ArrowRight, Loader2, CalendarRange, Check } from 'lucide-react';
+import { X as XIcon, Sparkles, Inbox, ArrowRight, Loader2, CalendarRange, Check, Zap, ChartColumn, TrendingUp, Target, ClipboardCheck, ScanSearch } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach } from '../utils/coachExport';
@@ -58,13 +58,13 @@ function getExercises(state) {
 }
 
 const COACH_MODES = [
-  { id: 'pep',      icon: '⚡', label: 'Pre-Workout',    color: 'var(--fire2)',   bg: 'rgba(255,109,0,0.08)',   border: 'rgba(255,109,0,0.2)' },
-  { id: 'analysis', icon: '📊', label: 'Post-Session',   color: 'var(--cyan)',    bg: 'var(--cyan-glow)',       border: 'rgba(0,229,255,0.2)' },
-  { id: 'overload', icon: '📈', label: 'Overload Plan',  color: 'var(--green)',   bg: 'var(--green-glow)',      border: 'rgba(0,230,118,0.2)' },
-  { id: 'form',     icon: '🎯', label: 'Form Tips',      color: 'var(--purple)',  bg: 'var(--purple-glow)',     border: 'rgba(179,136,255,0.2)' },
-  { id: 'checkin',  icon: '📋', label: 'Check-in Review',color: 'var(--gold)',    bg: 'var(--gold-glow)',       border: 'rgba(255,214,0,0.2)' },
-  { id: 'build',    icon: '🗓️', label: 'Program Builder', color: '#b3ff5e',       bg: 'rgba(179,255,94,0.07)', border: 'rgba(179,255,94,0.25)' },
-  { id: 'physique', icon: '🔬', label: 'Physique Analysis', color: '#ff6f91',     bg: 'rgba(255,111,145,0.07)', border: 'rgba(255,111,145,0.25)' },
+  { id: 'pep',      icon: Zap, label: 'Pre-Workout',    color: 'var(--fire2)',   bg: 'rgba(255,109,0,0.08)',   border: 'rgba(255,109,0,0.2)' },
+  { id: 'analysis', icon: ChartColumn, label: 'Post-Session',   color: 'var(--cyan)',    bg: 'var(--cyan-glow)',       border: 'rgba(0,229,255,0.2)' },
+  { id: 'overload', icon: TrendingUp, label: 'Overload Plan',  color: 'var(--green)',   bg: 'var(--green-glow)',      border: 'rgba(0,230,118,0.2)' },
+  { id: 'form',     icon: Target, label: 'Form Tips',      color: 'var(--purple)',  bg: 'var(--purple-glow)',     border: 'rgba(179,136,255,0.2)' },
+  { id: 'checkin',  icon: ClipboardCheck, label: 'Check-in Review',color: 'var(--gold)',    bg: 'var(--gold-glow)',       border: 'rgba(255,214,0,0.2)' },
+  { id: 'build',    icon: CalendarRange, label: 'Program Builder', color: '#b3ff5e',       bg: 'rgba(179,255,94,0.07)', border: 'rgba(179,255,94,0.25)' },
+  { id: 'physique', icon: ScanSearch, label: 'Physique Analysis', color: '#ff6f91',     bg: 'rgba(255,111,145,0.07)', border: 'rgba(255,111,145,0.25)' },
 ];
 
 // One-shot modes don't benefit from conversation history — each call is independent
@@ -785,20 +785,33 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
           )}
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-        {COACH_MODES.map(m => (
-          <button key={m.id} onClick={() => setActiveMode(m.id)} style={{
-            padding: '6px 12px', minHeight: 36, cursor: 'pointer',
-            border: `1px solid ${activeMode === m.id ? m.border : 'rgba(255,255,255,0.08)'}`,
-            background: activeMode === m.id ? m.bg : 'transparent',
-            color: activeMode === m.id ? m.color : 'var(--text3)',
-            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-            letterSpacing: 0.3, transition: 'all 0.2s',
-            display: 'flex', alignItems: 'center', gap: 5
-          }}>
-            <span>{m.icon}</span> {m.label}
-          </button>
-        ))}
+      <div role="group" aria-label="Coach mode" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, marginTop: 10 }}>
+        {COACH_MODES.map(m => {
+          const on = activeMode === m.id;
+          const ModeIcon = m.icon;
+          return (
+            <button key={m.id} onClick={() => setActiveMode(m.id)} aria-pressed={on} className="fq-press" style={{
+              padding: '6px 10px', minHeight: 44, cursor: 'pointer', textAlign: 'left',
+              border: `1px solid ${on ? m.color : 'rgba(255,255,255,0.08)'}`,
+              background: on ? m.bg : 'rgba(5,7,15,0.4)',
+              boxShadow: on ? `0 0 14px ${m.border}, inset 0 0 0 1px ${m.border}` : 'none',
+              color: on ? m.color : 'var(--text2)',
+              fontFamily: 'var(--font-primary)', fontSize: 13, fontWeight: 700,
+              transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', gap: 8, minWidth: 0,
+            }}>
+              <span aria-hidden="true" style={{
+                width: 24, height: 27, flexShrink: 0,
+                clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+                background: on ? m.color : m.bg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <ModeIcon size={13} strokeWidth={2.4} color={on ? '#05070f' : m.color} />
+              </span>
+              <span style={{ minWidth: 0, lineHeight: 1.2 }}>{m.label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1028,10 +1041,10 @@ function ModePrompt({ mode, state }) {
       marginBottom: 14
     }}>
       <div className="fq-hex" aria-hidden="true" style={{
-        width: 56, height: 62, margin: '0 auto 12px', fontSize: 26,
+        width: 56, height: 62, margin: '0 auto 12px',
         background: mode.bg, boxShadow: `inset 0 0 0 1px ${mode.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>{mode.icon}</div>
+      }}><mode.icon size={26} color={mode.color} strokeWidth={2} /></div>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 900, letterSpacing: '0.16em', color: mode.color, marginBottom: 8 }}>
         {mode.label.toUpperCase()}
       </div>
@@ -1217,7 +1230,7 @@ function MessageBubble({ msg, onConfirmProgram }) {
         fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 800, letterSpacing: '0.24em',
         color: mode?.color || 'var(--color-accent-purple)',
       }}>
-        <span aria-hidden="true">{mode?.icon}</span> [ SYSTEM ]
+        {mode?.icon && <mode.icon size={12} strokeWidth={2.6} aria-hidden="true" />} [ SYSTEM ]
       </div>
       <div style={{
         padding: '12px 14px',
