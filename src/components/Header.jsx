@@ -26,7 +26,6 @@ export default function Header({ state, scrollY = 0 }) {
   // Heights
   const headerHeight = Math.round(72 - raw * 28); // 72 → 44
   const avatarSize   = Math.round(40 - raw * 8);  // 40 → 32
-  const avatarRadius = Math.round(12 - raw * 4);  // 12 → 8
   const nameOpacity  = Math.max(0, 1 - raw * 2.5);
 
   return (
@@ -34,10 +33,10 @@ export default function Header({ state, scrollY = 0 }) {
       style={{
         height: headerHeight,
         padding: '0 var(--space-4)',
-        background: 'rgba(10,14,26,0.85)',
+        background: 'rgba(7,10,20,0.88)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--color-border-subtle)',
+        borderBottom: '1px solid rgba(0,229,255,0.12)',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
         position: 'sticky', top: 0, zIndex: 50,
         willChange: 'height',
@@ -49,12 +48,12 @@ export default function Header({ state, scrollY = 0 }) {
         {/* Avatar */}
         <div style={{
           width: avatarSize, height: avatarSize, flexShrink: 0,
-          borderRadius: avatarRadius,
-          background: 'linear-gradient(135deg, var(--color-action), var(--color-accent-purple))',
+          clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+          background: 'linear-gradient(135deg, var(--color-action), #7c4dff)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: 'var(--font-display)', fontWeight: 900,
-          fontSize: Math.round(avatarSize * 0.45),
-          color: '#fff',
+          fontSize: Math.round(avatarSize * 0.42),
+          color: '#05070f',
           transition: 'width 0.1s, height 0.1s',
         }}>
           {initial}
@@ -68,27 +67,30 @@ export default function Header({ state, scrollY = 0 }) {
               color: 'var(--color-text-primary)', whiteSpace: 'nowrap',
             }}>{state.name}</span>
             <span style={{
-              fontFamily: 'var(--font-display)', fontSize: 'var(--text-xs)', fontWeight: 700,
-              padding: '2px 8px', borderRadius: 'var(--radius-full)',
-              background: `${rank.color}18`, color: rank.color,
-              letterSpacing: '0.04em', flexShrink: 0,
-            }}>{rank.l} · {rank.name}</span>
+              fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+              padding: '3px 10px',
+              clipPath: 'polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%)',
+              background: `${rank.color}1f`, color: rank.color,
+              boxShadow: `inset 0 0 0 1px ${rank.color}55`,
+              letterSpacing: '0.14em', flexShrink: 0, textTransform: 'uppercase',
+            }}>{rank.l}-RANK · {rank.name}</span>
           </div>
         </div>
 
         {/* Streak counter */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
-          background: 'rgba(255,109,0,0.1)',
-          border: `1px solid ${state.streak >= 3 ? 'rgba(255,109,0,0.3)' : 'rgba(255,109,0,0.15)'}`,
-          padding: '5px 10px', borderRadius: 'var(--radius-md)',
+          background: 'linear-gradient(135deg, rgba(255,109,0,0.22), rgba(255,145,0,0.06))',
+          border: `1px solid ${state.streak >= 3 ? 'rgba(255,109,0,0.5)' : 'rgba(255,109,0,0.2)'}`,
+          boxShadow: state.streak >= 3 ? '0 0 16px rgba(255,109,0,0.28)' : 'none',
+          padding: '5px 10px',
           flexShrink: 0,
         }}>
-          <Flame size={14} color="var(--color-fire)" strokeWidth={2} />
+          <Flame size={14} color="var(--color-fire)" fill={state.streak >= 3 ? 'var(--color-fire)' : 'none'} strokeWidth={2} />
           <span style={{
-            fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 700,
-            color: 'var(--color-fire)',
-          }}>{state.streak}</span>
+            fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 900,
+            color: 'var(--color-warning)',
+          }}><CountUp value={state.streak} from={0} duration={900} /></span>
         </div>
       </div>
 
@@ -96,29 +98,30 @@ export default function Header({ state, scrollY = 0 }) {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
           <span style={{
-            fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)', fontWeight: 500,
-            color: 'var(--color-text-tertiary)',
-          }}>LVL {state.level}</span>
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
+            color: 'var(--color-text-primary)',
+          }}>LV {state.level}</span>
           <span style={{
-            fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)',
-            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+            color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums',
           }}>
-            <CountUp value={state.xp} /> / {xpNeeded} XP
+            <CountUp value={state.xp} from={0} duration={1200} format={n => n.toLocaleString()} /> / {xpNeeded.toLocaleString()} XP
           </span>
         </div>
         <div style={{
-          height: 3, background: 'rgba(0,229,255,0.08)', borderRadius: 2, overflow: 'hidden',
+          height: 5, background: 'rgba(0,229,255,0.08)', overflow: 'hidden',
         }}>
-          <div style={{
-            height: '100%', borderRadius: 2, width: `${xpPct}%`,
+          <div className="fq-grow-x" style={{
+            height: '100%', width: `${xpPct}%`,
             background: 'linear-gradient(90deg, var(--color-action), var(--color-accent-purple))',
+            boxShadow: '0 0 10px rgba(0,229,255,0.6)',
             transition: 'width 0.6s cubic-bezier(0.25,0.46,0.45,0.94)',
             position: 'relative', overflow: 'hidden',
           }}>
             <div style={{
-              position: 'absolute', right: 0, top: 0, bottom: 0, width: 20,
-              background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.25))',
-              animation: 'shimmer 2s infinite',
+              position: 'absolute', top: 0, bottom: 0, width: '30%',
+              background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',
+              animation: 'fqShine 2.6s 1.2s ease-in-out infinite',
             }} />
           </div>
         </div>

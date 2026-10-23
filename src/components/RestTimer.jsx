@@ -76,31 +76,58 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
 
   if (!visible) return null;
 
+  const ghostBtn = {
+    padding: '12px 28px', minHeight: 'var(--tap-target)', minWidth: 120,
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.14)',
+    color: 'var(--color-text-primary)', fontFamily: 'var(--font-display)',
+    fontSize: 12, fontWeight: 800, letterSpacing: '0.16em',
+  };
+
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(10,14,26,0.85)', backdropFilter: 'blur(12px)',
+    <div role="dialog" aria-modal="true" aria-label={`Rest timer, ${timeStr} left`} style={{
+      position: 'fixed', inset: 0, zIndex: 9999, overflow: 'hidden',
+      background: 'rgba(5,7,15,0.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexDirection: 'column', gap: 0
+      flexDirection: 'column', gap: 0, padding: '0 20px',
     }}>
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: 'linear-gradient(rgba(0,229,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.04) 1px,transparent 1px)',
+        backgroundSize: '26px 26px',
+      }} />
+      <div aria-hidden="true" style={{
+        position: 'absolute', left: '50%', top: '50%', width: 460, height: 460, marginLeft: -230, marginTop: -260,
+        borderRadius: '50%', background: `radial-gradient(circle, ${isDone ? 'rgba(0,230,118,0.18)' : isWarning ? 'rgba(255,145,0,0.18)' : 'rgba(0,229,255,0.16)'}, transparent 65%)`,
+        transition: 'background 0.4s',
+      }} />
+
       <div style={{
-        fontFamily: 'var(--font-primary)', fontSize: 'var(--text-md)', fontWeight: 600,
-        color: 'var(--color-text-primary)', marginBottom: 6, textAlign: 'center', padding: '0 20px'
+        position: 'relative', fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+        letterSpacing: '0.3em', color: ringColor, marginBottom: 10, transition: 'color 0.3s',
+      }}>{isDone ? 'READY' : 'RECOVERING'}</div>
+      <div style={{
+        position: 'relative', fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 900,
+        color: '#fff', marginBottom: 6, textAlign: 'center', letterSpacing: '0.04em', textTransform: 'uppercase',
       }}>
         {exName}
       </div>
-      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 28 }}>{setInfo}</div>
+      <div style={{ position: 'relative', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 28 }}>{setInfo}</div>
 
-      <div style={{ width: 220, height: 220, position: 'relative', marginBottom: 28 }}>
-        <svg width="220" height="220" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)' }}>
+      <div style={{ width: 240, height: 240, position: 'relative', marginBottom: 32 }}>
+        <svg width="240" height="240" viewBox="0 0 240 240" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+          {/* tick ring */}
+          <circle cx="120" cy="120" r="118" fill="none" stroke="rgba(0,229,255,0.25)" strokeWidth="1" strokeDasharray="2 8" />
           <circle cx="120" cy="120" r="108"
-            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
           <circle cx="120" cy="120" r="108"
-            fill="none" stroke={ringColor} strokeWidth="6"
-            strokeLinecap="round"
+            fill="none" stroke={ringColor} strokeWidth="8"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={offset}
-            style={{ transition: 'stroke-dashoffset 0.5s linear, stroke 0.3s' }}
+            style={{
+              transition: 'stroke-dashoffset 0.5s linear, stroke 0.3s',
+              filter: `drop-shadow(0 0 8px ${ringColor})`,
+            }}
           />
         </svg>
         <div style={{
@@ -109,54 +136,34 @@ export default function RestTimer({ visible, exName, setInfo, seconds, onSkip, o
           alignItems: 'center', justifyContent: 'center'
         }}>
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900,
-            color: ringColor, transition: 'color 0.3s', lineHeight: 1,
-            animation: !isDone ? 'timerGlow 2s ease-in-out infinite' : 'none',
+            fontFamily: 'var(--font-display)', fontSize: 46, fontWeight: 900,
+            color: '#fff', textShadow: `0 0 18px ${ringColor}`,
+            transition: 'text-shadow 0.3s', lineHeight: 1, fontVariantNumeric: 'tabular-nums',
           }}>
-            {isDone ? '✓' : timeStr}
+            {isDone ? 'GO!' : timeStr}
           </div>
           <div style={{
-            fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)', fontWeight: 500,
-            color: 'var(--color-text-secondary)', letterSpacing: '0.04em', marginTop: 4
+            fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+            color: 'var(--color-text-secondary)', letterSpacing: '0.24em', marginTop: 8
           }}>
-            {isDone ? 'GO!' : 'REST'}
+            {isDone ? 'NEXT SET' : 'REST'}
           </div>
-          {!isDone && (
-            <div style={{
-              fontFamily: 'var(--font-primary)', fontSize: 'var(--text-xs)',
-              color: 'var(--color-text-tertiary)', marginTop: 8
-            }}>Tap to skip</div>
-          )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={onSkip} style={{
-          padding: '12px 28px', minHeight: 'var(--tap-target)', borderRadius: 'var(--radius-lg)',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: 'var(--text2)', fontFamily: 'var(--font-display)',
-          fontSize: 12, fontWeight: 700, letterSpacing: 0.5
-        }}>SKIP</button>
+      <div style={{ position: 'relative', display: 'flex', gap: 12 }}>
+        <button onClick={onSkip} className="fq-press fq-skew" style={ghostBtn}>SKIP</button>
 
         {!isDone && (
-          <button onClick={add30} style={{
-            padding: '12px 28px', minHeight: 'var(--tap-target)', borderRadius: 'var(--radius-lg)',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: 'var(--text2)', fontFamily: 'var(--font-display)',
-            fontSize: 12, fontWeight: 700, letterSpacing: 0.5
-          }}>+30s</button>
+          <button onClick={add30} className="fq-press fq-skew" style={ghostBtn}>+30s</button>
         )}
 
         {isDone && (
-          <button onClick={onDone} style={{
-            padding: '12px 28px', minHeight: 'var(--tap-target)', borderRadius: 'var(--radius-lg)',
-            background: 'linear-gradient(135deg, var(--cyan2), var(--cyan))',
-            border: 'none', color: 'var(--bg)',
-            fontFamily: 'var(--font-display)',
-            fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
-            boxShadow: '0 4px 18px var(--cyan-glow)'
+          <button onClick={onDone} className="fq-press fq-skew" style={{
+            ...ghostBtn,
+            background: 'linear-gradient(90deg, var(--color-success), #00c853)',
+            border: 'none', color: '#05070f', fontWeight: 900,
+            boxShadow: '0 0 24px rgba(0,230,118,0.45)',
           }}>NEXT SET →</button>
         )}
       </div>

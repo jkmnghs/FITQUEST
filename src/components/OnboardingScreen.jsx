@@ -42,9 +42,10 @@ const SEVERITY_OPTIONS = ['none', 'mild', 'moderate', 'severe'];
 
 function Card({ children, style }) {
   return (
-    <div style={{
-      background: 'var(--card)', border: '1px solid rgba(0,229,255,0.1)',
-      borderRadius: 20, padding: '24px 20px',
+    <div className="fq-cut" style={{
+      background: 'linear-gradient(160deg, rgba(20,27,54,0.95), rgba(12,18,38,0.95))',
+      border: '1px solid rgba(0,229,255,0.22)', '--fq-cut-border': 'rgba(0,229,255,0.22)',
+      padding: '24px 20px',
       backdropFilter: 'blur(20px)', ...style
     }}>{children}</div>
   );
@@ -55,11 +56,11 @@ function OptionBtn({ selected, onClick, children }) {
     <button
       onClick={onClick}
       style={{
-        width: '100%', padding: '14px 16px', marginBottom: 10,
-        borderRadius: 12,
-        border: selected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
-        background: selected ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
-        color: selected ? 'var(--cyan)' : 'var(--text)',
+        width: '100%', padding: '14px 16px', marginBottom: 10, minHeight: 52,
+        border: selected ? '1px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
+        background: selected ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.03)',
+        boxShadow: selected ? '0 0 16px rgba(0,229,255,0.2), inset 0 0 0 1px var(--cyan)' : 'none',
+        color: selected ? '#fff' : 'var(--text)',
         fontSize: 15, fontFamily: 'var(--font-primary)', fontWeight: 600,
         textAlign: 'left', cursor: 'pointer',
         display: 'flex', alignItems: 'center', gap: 12,
@@ -67,9 +68,11 @@ function OptionBtn({ selected, onClick, children }) {
       }}
     >
       <span style={{
-        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-        border: selected ? '5px solid var(--cyan)' : '2px solid rgba(255,255,255,0.3)',
-        background: 'transparent', display: 'inline-block',
+        width: 16, height: 18, flexShrink: 0,
+        clipPath: 'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
+        background: selected ? 'var(--cyan)' : 'rgba(255,255,255,0.25)',
+        boxShadow: selected ? '0 0 8px var(--cyan)' : 'none',
+        display: 'inline-block',
       }} />
       {children}
     </button>
@@ -81,9 +84,9 @@ function CheckBtn({ selected, onClick, children }) {
     <button
       onClick={onClick}
       style={{
-        padding: '10px 14px', marginBottom: 6, marginRight: 6,
-        borderRadius: 10,
-        border: selected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
+        padding: '10px 14px', marginBottom: 6, marginRight: 6, minHeight: 44,
+        border: selected ? '1px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
+        boxShadow: selected ? 'inset 0 0 0 1px var(--cyan)' : 'none',
         background: selected ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.03)',
         color: selected ? 'var(--cyan)' : 'var(--text)',
         fontSize: 14, fontFamily: 'var(--font-primary)', fontWeight: 600,
@@ -92,7 +95,7 @@ function CheckBtn({ selected, onClick, children }) {
       }}
     >
       <span style={{
-        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+        width: 16, height: 16, flexShrink: 0,
         border: selected ? '2px solid var(--cyan)' : '2px solid rgba(255,255,255,0.3)',
         background: selected ? 'var(--cyan)' : 'transparent',
         display: 'inline-block',
@@ -111,26 +114,26 @@ function StepHeader({ step, total, title }) {
         marginBottom: 8,
       }}>
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-          color: 'var(--text3)', letterSpacing: 1.5,
-        }}>STEP {step} OF {total}</div>
+          fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800,
+          color: 'var(--color-action)', letterSpacing: '0.24em',
+        }}>QUEST SETUP · {step}/{total}</div>
         <div style={{
           fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--cyan)',
         }}>{Math.round(pct)}%</div>
       </div>
-      <div style={{
-        height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)',
-        marginBottom: 20, overflow: 'hidden',
-      }}>
-        <div style={{
-          height: '100%', borderRadius: 2,
-          background: 'linear-gradient(90deg, var(--cyan), var(--purple))',
-          width: `${pct}%`, transition: 'width 0.4s',
-        }} />
+      <div aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))`, gap: 3, marginBottom: 20 }}>
+        {Array.from({ length: total }, (_, i) => (
+          <div key={i} style={{
+            height: 4,
+            background: i < step ? (i === step - 1 ? 'var(--cyan)' : 'rgba(0,229,255,0.55)') : 'rgba(255,255,255,0.08)',
+            boxShadow: i === step - 1 ? '0 0 8px var(--cyan)' : 'none',
+            transition: 'background 0.3s',
+          }} />
+        ))}
       </div>
       <div style={{
-        fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700,
-        color: 'var(--text)', lineHeight: 1.3,
+        fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 900,
+        color: '#fff', lineHeight: 1.3, letterSpacing: '0.02em',
       }}>{title}</div>
     </div>
   );
@@ -149,9 +152,9 @@ function NumInput({ label, value, onChange, placeholder, unit, isText, error }) 
         placeholder={placeholder}
         maxLength={isText ? 50 : undefined}
         style={{
-          width: '100%', padding: '11px 14px', borderRadius: 10,
-          border: error ? '1.5px solid var(--fire2)' : '1px solid rgba(255,255,255,0.1)',
-          background: error ? 'rgba(255,80,80,0.06)' : 'rgba(255,255,255,0.05)',
+          width: '100%', padding: '11px 14px', minHeight: 48,
+          border: error ? '1.5px solid var(--fire2)' : '1px solid rgba(0,229,255,0.25)',
+          background: error ? 'rgba(255,80,80,0.06)' : '#05070f',
           color: 'var(--text)', fontSize: 15, fontFamily: 'var(--font-primary)',
           outline: 'none', boxSizing: 'border-box',
           transition: 'border-color 0.2s',
@@ -200,22 +203,22 @@ function NavButtons({ onBack, onNext, nextLabel = 'NEXT', nextDisabled = false, 
   return (
     <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
       {step > 1 && (
-        <button onClick={onBack} style={{
-          flex: 1, padding: '13px', borderRadius: 12,
-          border: '1px solid rgba(255,255,255,0.1)',
+        <button onClick={onBack} className="fq-press" style={{
+          flex: 1, padding: '13px', minHeight: 52,
+          border: '1px solid rgba(255,255,255,0.14)',
           background: 'transparent', color: 'var(--text2)',
-          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+          fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, letterSpacing: '0.14em',
           cursor: 'pointer',
         }}>← BACK</button>
       )}
-      <button onClick={onNext} disabled={nextDisabled} style={{
-        flex: 2, padding: '13px', borderRadius: 12,
+      <button onClick={onNext} disabled={nextDisabled} className="fq-press fq-skew" style={{
+        flex: 2, padding: '13px', minHeight: 52,
         border: 'none',
-        background: nextDisabled ? 'rgba(0,229,255,0.2)' : 'var(--cyan)',
-        color: nextDisabled ? 'rgba(0,229,255,0.5)' : 'var(--bg)',
-        fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
+        background: nextDisabled ? 'rgba(0,229,255,0.15)' : 'linear-gradient(90deg, var(--cyan), #00b8d4)',
+        color: nextDisabled ? 'rgba(0,229,255,0.6)' : '#05070f',
+        fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 900, letterSpacing: '0.16em',
         cursor: nextDisabled ? 'not-allowed' : 'pointer',
-        boxShadow: nextDisabled ? 'none' : '0 0 20px rgba(0,229,255,0.2)',
+        boxShadow: nextDisabled ? 'none' : '0 0 22px rgba(0,229,255,0.4)',
         transition: 'all 0.2s',
       }}>{nextLabel} {!nextDisabled && step < TOTAL_STEPS ? '→' : ''}</button>
     </div>
@@ -227,10 +230,11 @@ function RadioRow({ options, value, onChange }) {
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
       {options.map(opt => (
         <button key={opt} onClick={() => onChange(opt)} style={{
-          padding: '6px 10px', borderRadius: 8, fontSize: 11,
+          padding: '6px 10px', minHeight: 36, fontSize: 11,
           fontFamily: 'var(--font-primary)', fontWeight: 600, cursor: 'pointer',
-          border: value === opt ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
-          background: value === opt ? 'rgba(0,229,255,0.1)' : 'transparent',
+          border: value === opt ? '1px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
+          boxShadow: value === opt ? 'inset 0 0 0 1px var(--cyan)' : 'none',
+          background: value === opt ? 'rgba(0,229,255,0.12)' : 'transparent',
           color: value === opt ? 'var(--cyan)' : 'var(--text3)',
           textTransform: 'capitalize',
         }}>{opt}</button>

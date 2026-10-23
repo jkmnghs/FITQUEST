@@ -34,11 +34,16 @@ function ProgressRing({ done, total, size = 62, restDay = false }) {
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
         <circle
+          className="fq-ring"
           cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - pct)}
-          style={{ transition: 'stroke-dashoffset 0.5s var(--transition-slow), stroke 0.3s' }}
+          style={{
+            '--fq-ring-from': circumference,
+            transition: 'stroke-dashoffset 0.5s var(--transition-slow), stroke 0.3s',
+            filter: pct > 0 ? `drop-shadow(0 0 5px ${color})` : 'none',
+          }}
         />
       </svg>
       <div style={{
@@ -117,7 +122,7 @@ function SessionHero({
   }
 
   const toneStyles = {
-    action: { background: 'linear-gradient(135deg, var(--color-action-hover), var(--color-action))', color: 'var(--color-bg-primary)', border: 'none', boxShadow: '0 4px 18px rgba(0,229,255,0.22)' },
+    action: { background: 'linear-gradient(90deg, var(--color-action), #00b8d4)', color: '#05070f', border: 'none', boxShadow: '0 0 24px rgba(0,229,255,0.45)' },
     fire:   { background: 'linear-gradient(135deg, var(--color-fire), var(--color-warning))', color: 'var(--color-bg-primary)', border: 'none', boxShadow: '0 4px 18px rgba(255,109,0,0.22)' },
     purple: { background: 'linear-gradient(135deg, rgba(179,136,255,0.22), rgba(0,229,255,0.16))', color: 'var(--color-accent-purple)', border: '1px solid rgba(179,136,255,0.3)', boxShadow: 'none' },
     done:   { background: 'rgba(0,230,118,0.1)', color: 'var(--color-success)', border: '1px solid rgba(0,230,118,0.3)', boxShadow: 'none' },
@@ -127,14 +132,21 @@ function SessionHero({
   return (
     <section
       aria-label="Today's session"
+      className="fq-cut"
       style={{
-        background: 'linear-gradient(160deg, var(--color-surface-1), rgba(15,21,40,0.75))',
-        border: '1px solid var(--color-border-medium)',
-        borderRadius: 'var(--radius-xl)',
+        position: 'relative',
+        background: 'linear-gradient(160deg, #131c38 0%, #0c1226 100%)',
+        border: '1px solid rgba(0,229,255,0.35)',
+        boxShadow: 'inset 0 0 40px rgba(0,229,255,0.06)',
         padding: 'var(--space-4)',
         marginBottom: 'var(--space-4)',
       }}
     >
+      <div style={{
+        fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.28em',
+        color: isRestDay ? 'var(--color-accent-purple)' : 'var(--color-action)',
+        marginBottom: 'var(--space-3)',
+      }}>{isRestDay ? 'RECOVERY' : 'DAILY QUEST'}</div>
       {/* Week stepper */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -272,10 +284,12 @@ function SessionHero({
           width: '100%', minHeight: 50, padding: '14px 16px',
           borderRadius: 'var(--radius-lg)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-          fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 700,
-          letterSpacing: '0.05em', cursor: cta.onClick ? 'pointer' : 'default',
+          fontFamily: 'var(--font-display)', fontSize: 'var(--text-sm)', fontWeight: 900,
+          letterSpacing: '0.14em', cursor: cta.onClick ? 'pointer' : 'default',
+          clipPath: 'polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%)',
           ...toneStyles,
         }}
+        className="fq-press"
       >
         <cta.Icon size={17} />
         {cta.label}
@@ -621,9 +635,9 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                 setActiveExId(ex.id);
               }}
               style={{
-                background: isDone ? 'rgba(0,230,118,0.05)' : 'var(--color-surface-1)',
-                border: `1px solid ${isDone ? 'rgba(0,230,118,0.18)' : isSwiped ? 'rgba(0,229,255,0.25)' : 'var(--color-border-subtle)'}`,
-                borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)',
+                background: isDone ? 'linear-gradient(90deg, rgba(0,230,118,0.10), rgba(0,230,118,0.03))' : 'linear-gradient(160deg, #121a34, #0d1328)',
+                border: `1px solid ${isDone ? 'rgba(0,230,118,0.3)' : isSwiped ? 'rgba(0,229,255,0.45)' : 'rgba(0,229,255,0.12)'}`,
+                borderRadius: 4, padding: 'var(--space-4)',
                 cursor: tappable ? 'pointer' : 'default',
                 opacity: isDone ? 0.75 : 1,
                 position: 'relative', zIndex: 3,
@@ -634,8 +648,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)', marginBottom: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 600,
-                    color: 'var(--color-text-primary)',
+                    fontFamily: 'var(--font-primary)', fontSize: 'var(--text-base)', fontWeight: 700,
+                    color: '#fff',
                     display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
                   }}>
                     {isDone && <Check size={15} color="var(--color-success)" strokeWidth={3} />}
@@ -653,15 +667,15 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                   {isDone ? (
                     <span style={{
                       fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-                      color: 'var(--color-success)', background: 'var(--green-glow)',
-                      padding: '4px 9px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
-                      border: '1px solid rgba(0,230,118,0.25)',
+                      color: '#05070f', background: 'var(--color-success)',
+                      padding: '4px 9px', whiteSpace: 'nowrap', letterSpacing: '0.12em',
+                      boxShadow: '0 0 10px rgba(0,230,118,0.45)',
                     }}>DONE</span>
                   ) : (
                     <span style={{
                       fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700,
-                      color: 'var(--color-warning)', background: 'var(--fire-glow)',
-                      padding: '4px 9px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
+                      color: 'var(--color-success)', background: 'rgba(0,230,118,0.10)',
+                      padding: '4px 9px', whiteSpace: 'nowrap',
                     }}>+{isDeload ? 10 : MAX_EXERCISE_XP} XP</span>
                   )}
 
@@ -675,7 +689,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
                       aria-expanded={menuOpen}
                       aria-haspopup="menu"
                       style={{
-                        width: 32, height: 32, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                        width: 44, height: 44, flexShrink: 0, margin: '-6px -6px -6px 0',
                         border: '1px solid var(--color-border-medium)',
                         background: menuOpen ? 'var(--color-action-muted)' : 'rgba(255,255,255,0.04)',
                         color: menuOpen ? 'var(--color-action)' : 'var(--color-text-tertiary)',

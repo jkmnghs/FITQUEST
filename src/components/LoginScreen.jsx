@@ -78,12 +78,21 @@ export default function LoginScreen({ authError, onSignIn, onSignUp, onResetPass
       fontFamily: 'var(--font-primary)',
     }}>
       {/* Logo / title */}
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+      <div style={{ textAlign: 'center', marginBottom: 28, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <img
+          src="/fq-emblem.png" alt="" width="120" height="120"
+          style={{
+            width: 120, height: 120, objectFit: 'contain', mixBlendMode: 'screen', marginBottom: 10,
+            animation: 'fqFloat 4s ease-in-out infinite',
+            WebkitMaskImage: 'radial-gradient(circle closest-side, #000 86%, transparent 100%)',
+            maskImage: 'radial-gradient(circle closest-side, #000 86%, transparent 100%)',
+          }}
+        />
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900,
-          color: 'var(--cyan)', letterSpacing: 2,
-          textShadow: '0 0 20px rgba(0,229,255,0.4)',
-          marginBottom: 4,
+          fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 900,
+          color: '#fff', letterSpacing: '0.14em',
+          textShadow: '0 0 20px rgba(0,229,255,0.5)',
+          marginBottom: 6,
         }}>FITQUEST</div>
         <div style={{
           fontSize: 12, color: 'var(--text3)', fontFamily: 'var(--font-display)',

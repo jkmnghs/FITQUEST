@@ -2,6 +2,8 @@ import React from 'react';
 import { EXERCISES } from '../data/gameData';
 import { EX_CATALOG, lookupExName } from '../data/exerciseCatalog';
 import { convertWeight } from '../utils/gameLogic';
+import { Zap, Dumbbell, Weight, Flame } from 'lucide-react';
+import CountUp from './CountUp';
 
 // Combined lookup: program defaults + full catalog, keyed by id
 const ALL_EXERCISES = (() => {
@@ -39,10 +41,10 @@ export default function StatsTab({ state }) {
     <div>
       <SectionTitle>Power Stats</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-        <StatCard icon="⚡" value={state.totalXp} label="Total XP" color="var(--cyan)" />
-        <StatCard icon="🏋️" value={state.totalSessions} label="Sessions" color="var(--fire2)" />
-        <StatCard icon="💪" value={`${(state.totalVolume / 1000).toFixed(1)}k`} label={`Volume (${unit})`} color="var(--purple)" />
-        <StatCard icon="🔥" value={state.bestStreak} label="Best Streak" color="var(--green)" />
+        <StatCard Icon={Zap} value={state.totalXp || 0} label="Total XP" color="var(--cyan)" />
+        <StatCard Icon={Dumbbell} value={state.totalSessions || 0} label="Sessions" color="var(--fire2)" />
+        <StatCard Icon={Weight} value={(state.totalVolume || 0) / 1000} decimals={1} suffix="k" label={`Volume (${unit})`} color="var(--purple)" />
+        <StatCard Icon={Flame} value={state.bestStreak || 0} label="Best Streak" color="var(--green)" />
       </div>
 
       <SectionTitle>Weight Trend</SectionTitle>
@@ -93,8 +95,10 @@ export default function StatsTab({ state }) {
               </div>
             </div>
             <div style={{ height: 5, background: 'rgba(0,229,255,0.08)', borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', borderRadius: 6, background: 'var(--cyan)',
+              <div className="fq-grow-x" style={{
+                height: '100%', borderRadius: 6,
+                background: 'linear-gradient(90deg, #00b8d4, var(--cyan))',
+                boxShadow: '0 0 8px rgba(0,229,255,0.6)',
                 width: `${progressPct}%`,
                 transition: 'width 0.6s'
               }} />
@@ -106,14 +110,18 @@ export default function StatsTab({ state }) {
   );
 }
 
-function StatCard({ icon, value, label, color }) {
+function StatCard({ Icon, value, decimals = 0, suffix = '', label, color }) {
   return (
-    <div style={{
-      background: 'var(--card)', border: '1px solid var(--card-border)',
-      borderRadius: 14, padding: 14, textAlign: 'center', backdropFilter: 'blur(20px)'
+    <div className="fq-cut" style={{
+      background: 'linear-gradient(160deg, #141b36, #0c1226)', border: '1px solid rgba(179,136,255,0.18)', '--fq-cut-border': 'rgba(179,136,255,0.18)',
+      padding: 14, textAlign: 'center',
     }}>
-      <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 2, color }}>{value}</div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+        <Icon size={20} color={color} style={{ filter: `drop-shadow(0 0 6px ${color})` }} aria-hidden="true" />
+      </div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 2, color, fontVariantNumeric: 'tabular-nums' }}>
+        <CountUp value={value} from={0} duration={1200} decimals={decimals} format={decimals ? undefined : n => n.toLocaleString()} />{suffix}
+      </div>
       <div style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500, letterSpacing: 0.4 }}>{label}</div>
     </div>
   );
@@ -173,10 +181,10 @@ function WeightChart({ checkins, unit }) {
               <stop offset="100%" stopColor="var(--cyan)" stopOpacity="0" />
             </linearGradient>
           </defs>
-          <path d={areaPath} fill="url(#cg)" />
-          <path d={path} fill="none" stroke="var(--cyan)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={areaPath} className="fq-fade-late" fill="url(#cg)" />
+          <path d={path} pathLength="1" className="fq-line" fill="none" stroke="var(--cyan)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           {dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r="4" fill="var(--cyan)" stroke="var(--bg)" strokeWidth="2" />
+            <circle key={i} className="fq-fade-late" cx={d.x} cy={d.y} r="4" fill="var(--cyan)" stroke="var(--bg)" strokeWidth="2" />
           ))}
         </svg>
       </div>
@@ -250,10 +258,10 @@ function WaistChart({ checkins }) {
               <stop offset="100%" stopColor="var(--purple)" stopOpacity="0" />
             </linearGradient>
           </defs>
-          <path d={areaPath} fill="url(#wg)" />
-          <path d={path} fill="none" stroke="var(--purple)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={areaPath} className="fq-fade-late" fill="url(#wg)" />
+          <path d={path} pathLength="1" className="fq-line" fill="none" stroke="var(--purple)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           {dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r="4" fill="var(--purple)" stroke="var(--bg)" strokeWidth="2" />
+            <circle key={i} className="fq-fade-late" cx={d.x} cy={d.y} r="4" fill="var(--purple)" stroke="var(--bg)" strokeWidth="2" />
           ))}
         </svg>
       </div>
@@ -370,13 +378,13 @@ function SleepChart({ checkins }) {
               stroke="rgba(0,230,118,0.3)" strokeWidth="1" strokeDasharray="4,4" />
           )}
           {sleeps.length > 1 && (
-            <path d={path + `L${W},${H} L0,${H} Z`} fill="url(#slg)" />
+            <path d={path + `L${W},${H} L0,${H} Z`} className="fq-fade-late" fill="url(#slg)" />
           )}
           {sleeps.length > 1 && (
-            <path d={path} fill="none" stroke="var(--purple)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={path} pathLength="1" className="fq-line" fill="none" stroke="var(--purple)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           )}
           {dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r="4" fill="var(--purple)" stroke="var(--bg)" strokeWidth="2" />
+            <circle key={i} className="fq-fade-late" cx={d.x} cy={d.y} r="4" fill="var(--purple)" stroke="var(--bg)" strokeWidth="2" />
           ))}
         </svg>
       </div>

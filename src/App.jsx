@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Component, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Component, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { Dumbbell, Utensils, TrendingUp, User, X, Zap } from 'lucide-react';
 import BgFx from './components/BgFx';
@@ -11,6 +11,7 @@ import CloudLoadFailedScreen from './components/CloudLoadFailedScreen';
 import Onboarding from './components/Onboarding';
 import { TrainTabSkeleton, FuelTabSkeleton, ProgressTabSkeleton, ProfileTabSkeleton } from './components/Skeleton';
 import ProgramCompleteModal from './components/ProgramCompleteModal';
+import LevelUpOverlay from './components/LevelUpOverlay';
 import { useAuth } from './hooks/useAuth';
 import { useGameState } from './hooks/useGameState';
 import { useAgentMessages } from './hooks/useAgentMessages';
@@ -27,10 +28,10 @@ const ProgressTab = lazy(() => import('./components/ProgressTab'));
 const ProfileTab  = lazy(() => import('./components/ProfileTab'));
 
 const NAV_TABS = [
-  { id: 'train',    Icon: Dumbbell,   label: 'Train',    hint: "Today's session" },
-  { id: 'fuel',     Icon: Utensils,   label: 'Fuel',     hint: 'Meals & macros'  },
-  { id: 'progress', Icon: TrendingUp, label: 'Progress', hint: 'Stats & check-in'},
-  { id: 'profile',  Icon: User,       label: 'Profile',  hint: 'Rank & settings' },
+  { id: 'train',    Icon: Dumbbell,   label: 'Train',    hint: "Today's session",  accent: '#00e5ff' },
+  { id: 'fuel',     Icon: Utensils,   label: 'Fuel',     hint: 'Meals & macros',   accent: '#ff9100' },
+  { id: 'progress', Icon: TrendingUp, label: 'Progress', hint: 'Stats & check-in', accent: '#b388ff' },
+  { id: 'profile',  Icon: User,       label: 'Profile',  hint: 'Rank & settings',  accent: '#00e5ff' },
 ];
 
 /** Deep-link target from the PWA manifest shortcuts (/?tab=fuel). */
@@ -206,6 +207,23 @@ export default function App() {
       setShowTour(true);
     }
   }, []);
+
+  // Level-up celebration. The first level we see after loading is the
+  // baseline, so opening the app never "levels you up" to where you already were.
+  const [levelUp, setLevelUp] = useState(null);
+  const seenLevelRef = useRef(null);
+  const seenAchRef = useRef([]);
+  useEffect(() => {
+    if (!user || cloudLoading) { seenLevelRef.current = null; return; }
+    const ach = state.achDone || [];
+    if (seenLevelRef.current != null && state.level > seenLevelRef.current) {
+      const prevAch = seenAchRef.current;
+      setLevelUp({ level: state.level, newAchievementIds: ach.filter(id => !prevAch.includes(id)) });
+    }
+    seenLevelRef.current = state.level;
+    seenAchRef.current = ach;
+  }, [state.level, state.achDone, user, cloudLoading]);
+  const closeLevelUp = useCallback(() => setLevelUp(null), []);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -486,6 +504,17 @@ export default function App() {
             </div>
           </div>
 
+          {/* Held back while a workout is open so it never lands mid-set; it
+              shows as soon as the session screen closes. */}
+          {levelUp && !modalOpen && createPortal(
+            <LevelUpOverlay
+              level={levelUp.level}
+              newAchievementIds={levelUp.newAchievementIds}
+              onClose={closeLevelUp}
+            />,
+            document.body
+          )}
+
           {/* Cycle complete modal — triggered from Settings when user is at week 12 of a cycle */}
           {showCycleComplete && createPortal(
             <ProgramCompleteModal
@@ -511,7 +540,7 @@ export default function App() {
               bar and the fourth tab was unreachable. */}
           {!modalOpen && (
             <nav role="tablist" aria-label="Primary" className="fq-tabbar">
-              {NAV_TABS.map(({ id, Icon, label }) => {
+              {NAV_TABS.map(({ id, Icon, label, accent }) => {
                 const isActive = activeTab === id;
                 const showBadge = id === 'train' && unreadAgentCount > 0;
                 return (
@@ -528,19 +557,21 @@ export default function App() {
                       <span style={{
                         position: 'absolute', top: 0, left: '50%',
                         transform: 'translateX(-50%)',
-                        width: 24, height: 3, borderRadius: 2,
-                        background: 'var(--color-action)',
+                        width: 28, height: 3,
+                        background: accent,
+                        boxShadow: `0 0 12px ${accent}`,
                       }} />
                     )}
                     {/* Icon with optional unread badge */}
                     <span style={{ position: 'relative', display: 'flex' }}>
                       <Icon
                         size={23}
-                        strokeWidth={isActive ? 2.5 : 1.5}
-                        color={isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)'}
+                        strokeWidth={isActive ? 2.4 : 1.6}
+                        color={isActive ? accent : 'var(--color-text-tertiary)'}
                         style={{
-                          transition: 'color var(--transition-normal)',
-                          transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                          transition: 'color var(--transition-normal), transform var(--transition-spring)',
+                          transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                          filter: isActive ? `drop-shadow(0 0 6px ${accent}99)` : 'none',
                           display: 'block',
                         }}
                       />
@@ -548,10 +579,10 @@ export default function App() {
                     </span>
                     {/* Label */}
                     <span style={{
-                      fontFamily: 'var(--font-primary)',
-                      fontSize: 11, fontWeight: isActive ? 600 : 400,
-                      color: isActive ? 'var(--color-action)' : 'var(--color-text-tertiary)',
-                      letterSpacing: '0.02em',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 9, fontWeight: 800, textTransform: 'uppercase',
+                      color: isActive ? accent : 'var(--color-text-tertiary)',
+                      letterSpacing: '0.14em',
                       transition: 'color var(--transition-normal)',
                     }}>{label}</span>
                   </button>
