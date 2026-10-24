@@ -6,7 +6,7 @@
 | Source | `src/components/NutritionTab.jsx` (`addFoodByText`, lines 274–356; input/ADD at 554–591 and 940–977), `src/lib/authFetch.js`, `src/utils/nutritionUtils.js` (`searchUSDA`, `validateUSDAMacros`, `validateUSDAAgainstClaude`) |
 | Flow | Manual add input validation, 3-tier enrichment, and API failure paths: 401/429/500 surface as `API error <status>` (source-derived) |
 | Requires auth | yes |
-| Required role | user |
+| Required role | `test-user` |
 | Destructive | no. Nothing is logged; every card is discarded with `RE-SCAN` |
 | Estimated steps | 34 |
 

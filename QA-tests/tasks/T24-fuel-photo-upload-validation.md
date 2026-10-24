@@ -6,7 +6,7 @@
 | Source | `src/components/NutritionTab.jsx` (`handleImageSelect` lines 88–123, `analyzeMeal` lines 125–272, error banner lines 662–672) |
 | Flow | Upload HEIC photo → rejected with the HEIC error and no API call; API failure paths for ANALYZE MEAL (source-derived) |
 | Requires auth | yes |
-| Required role | user |
+| Required role | `test-user` |
 | Destructive | no. Nothing is logged |
 | Estimated steps | 30 |
 

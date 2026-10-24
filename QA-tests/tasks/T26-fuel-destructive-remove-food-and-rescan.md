@@ -6,7 +6,7 @@
 | Source | `src/components/NutritionTab.jsx` (dot menu lines 828–863 plus the outside-click effect 31–36, swipe helpers 41–86, trash button 699–724, `reset()` 404–411, `RE-SCAN` 1022–1034, `✕` 620–629, `handleImageSelect` 102–104) |
 | Flow | Remove a detected food via ⋯ > Delete (desktop) or swipe-left trash (mobile); RE-SCAN / ✕ discard the current analysis with no confirm (source-derived) |
 | Requires auth | yes |
-| Required role | user |
+| Required role | `test-user` |
 | Destructive | yes. Only **unsaved, in-memory** food cards are destroyed. No logged meal or cloud data is touched |
 | Estimated steps | 34 |
 

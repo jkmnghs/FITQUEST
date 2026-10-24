@@ -6,13 +6,13 @@
 | Source | `src/components/ProgramEditorTab.jsx` (catalog: `src/data/exerciseCatalog.js`; dialog: `src/components/ui/ConfirmDialog.jsx`) |
 | Flow | Program editor: switch day, add catalog/custom exercise, edit fields, reorder, delete, clear day (confirm), save program (source-derived) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | yes (`✕` delete and `CLEAR DAY` change the draft; SAVE writes `dayTemplates`) |
 | Estimated steps | 40 |
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
 - Onboarding completed, and `localStorage.fitquest_onboarding_complete = "true"`.
 - Seed: at least 2 training days. `testDay` = the first day tab, which has at least 2 exercises (`exA`, `exB`) for the reorder steps.
 - Before starting, record `testDay`'s original title, minutes and exercise list (screenshot plus the text of each row). TC-06 restores it.
@@ -33,7 +33,7 @@
 ## Steps
 
 ### TC-01: Happy path — add, edit, reorder and save
-1. Sign in as `qa-throwaway`. Navigate to `/?tab=profile` and scroll to `My Program`.
+1. Sign in as `test-user`. Navigate to `/?tab=profile` and scroll to `My Program`.
 2. Assert: one day tab per training day (`MON` … `SUN`, sorted). The active tab is cyan, and tabs with exercises show a small dot. The title input has the placeholder `<Full day> session — e.g. PUSH + SHOULDERS + ABS`. The minutes input defaults to `75` with the suffix `min`.
 3. Click the `testDay` tab. Fill the title = `dayTitle` and the minutes = `sessionMinutes`.
 4. Click **`+ ADD EXERCISE`**. Assert: `SEARCH EXERCISE LIBRARY` shows, the input (placeholder `Search or type custom name…`) is focused, and 10 catalog suggestions are listed, each with `<n>kg` or `BW`.

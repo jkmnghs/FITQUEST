@@ -1,0 +1,211 @@
+{
+  "version": 3,
+  "generatedAt": "2026-10-24T03:17:40.262Z",
+  "framework": "vite-react",
+  "devUrl": "http://localhost:5173",
+  "stack": {
+    "languages": [
+      "javascript"
+    ],
+    "runtime": "node",
+    "packageManager": "npm",
+    "buildTool": "vite",
+    "repoType": "single",
+    "uiLibraries": [],
+    "stateManagement": [],
+    "forms": [],
+    "validation": [
+      "zod"
+    ],
+    "httpClient": [],
+    "styling": [],
+    "testFrameworks": [
+      "vitest"
+    ],
+    "e2eFrameworks": [],
+    "nodeVersion": null
+  },
+  "integrations": {
+    "github": {
+      "enabled": true,
+      "mcpServer": "github",
+      "repo": "jkmnghs/fitquest"
+    },
+    "jira": {
+      "enabled": false,
+      "mcpServer": null
+    },
+    "azureDevOps": {
+      "enabled": false,
+      "mcpServer": null
+    }
+  },
+  "settingsSnapshot": {
+    "browserEngine": "playwright",
+    "browserChannel": "chromium",
+    "headless": true,
+    "settleMs": 1000,
+    "authMode": "none",
+    "defaultRole": "anonymous",
+    "taskDepth": "deep",
+    "maxTasksPerRoute": 8,
+    "parallelAgents": 5,
+    "parallelTestAuthors": 5,
+    "excludeGlobs": [
+      "src/**/__tests__/**"
+    ],
+    "notes": "Analyzed with no Supabase env vars: login wall browser-verified; authenticated tab bodies source-derived (Progress partly via isolated-mount harness)."
+  },
+  "auth": {
+    "mode": "none",
+    "defaultRole": "anonymous",
+    "credentialSource": "QA-tests/.qa-catalog/auth.local.json",
+    "rolesUsed": [
+      "anonymous",
+      "test-user"
+    ],
+    "rolesConfigured": [
+      "anonymous"
+    ]
+  },
+  "routes": [
+    {
+      "path": "/",
+      "sourceFile": "src/App.jsx",
+      "requiresAuth": false,
+      "rolesAllowed": [
+        "anonymous"
+      ],
+      "guards": [
+        "useAuth → LoginScreen when signed out; SetPasswordScreen on password recovery"
+      ],
+      "analysis": "routes/root.md",
+      "fingerprint": "bf2523b5408b56e91ba12fea1ff054bbb5de2ea1aac5db11b1c9e68f89e1c5bb",
+      "httpMethods": [
+        "GET"
+      ],
+      "tasks": [
+        "T01-login-signin",
+        "T02-login-signin-validation",
+        "T03-login-signup",
+        "T04-login-signup-validation",
+        "T05-login-forgot-password",
+        "T06-login-signup-resend",
+        "T07-login-mode-navigation",
+        "T08-login-set-password"
+      ]
+    },
+    {
+      "path": "/?tab=train",
+      "sourceFile": "src/components/TrainTab.jsx",
+      "requiresAuth": true,
+      "rolesAllowed": [
+        "test-user"
+      ],
+      "guards": [
+        "useAuth",
+        "initialTabFromUrl",
+        "LazyTab"
+      ],
+      "analysis": "routes/tab-train.md",
+      "fingerprint": "e6abbab35226916c822a786e16b6d787139e9b351d57b40807387a20054c5cf1",
+      "httpMethods": [
+        "GET"
+      ],
+      "tasks": [
+        "T10-train-auth-wall-anonymous",
+        "T11-train-log-weighted-exercise-as-test-user",
+        "T12-train-exercise-log-validation",
+        "T13-train-add-swap-exercise-as-test-user",
+        "T14-train-destructive-remove-exercise",
+        "T15-train-destructive-finish-session",
+        "T16-train-week-nav-missed-day-rest-day",
+        "T17-train-ai-coach-modal-as-test-user"
+      ]
+    },
+    {
+      "path": "/?tab=fuel",
+      "sourceFile": "src/components/NutritionTab.jsx",
+      "requiresAuth": true,
+      "rolesAllowed": [
+        "test-user"
+      ],
+      "guards": [
+        "useAuth",
+        "initialTabFromUrl",
+        "LazyTab"
+      ],
+      "analysis": "routes/tab-fuel.md",
+      "fingerprint": "4604381eea0f8a182b70bcda23b36362674b250ead9927552ec73b16c5b4b0fb",
+      "httpMethods": [
+        "GET"
+      ],
+      "tasks": [
+        "T20-fuel-auth-wall-anonymous",
+        "T21-fuel-manual-add-and-log-as-user",
+        "T22-fuel-manual-add-validation",
+        "T23-fuel-photo-scan-and-log-as-user",
+        "T24-fuel-photo-upload-validation",
+        "T25-fuel-food-card-editing",
+        "T26-fuel-destructive-remove-food-and-rescan",
+        "T27-fuel-destructive-delete-meal-and-daily-summary"
+      ]
+    },
+    {
+      "path": "/?tab=progress",
+      "sourceFile": "src/components/ProgressTab.jsx",
+      "requiresAuth": true,
+      "rolesAllowed": [
+        "test-user"
+      ],
+      "guards": [
+        "useAuth",
+        "initialTabFromUrl",
+        "LazyTab"
+      ],
+      "analysis": "routes/tab-progress.md",
+      "fingerprint": "5df6a8f7d7bec3399a0a482019c20c0191009511962abac9ee25c545dc0a4c6b",
+      "httpMethods": [
+        "GET"
+      ],
+      "tasks": [
+        "T30-progress-auth-wall-anonymous",
+        "T31-progress-checkin-weight-only-as-test-user",
+        "T32-progress-checkin-validation",
+        "T33-progress-checkin-waist-defect",
+        "T34-progress-checkin-overwrite",
+        "T35-progress-weekly-summary-navigation",
+        "T36-progress-weekly-success-checklist",
+        "T37-progress-body-metrics-stats-trends"
+      ]
+    },
+    {
+      "path": "/?tab=profile",
+      "sourceFile": "src/components/ProfileTab.jsx",
+      "requiresAuth": true,
+      "rolesAllowed": [
+        "test-user"
+      ],
+      "guards": [
+        "useAuth",
+        "initialTabFromUrl",
+        "LazyTab"
+      ],
+      "analysis": "routes/tab-profile.md",
+      "fingerprint": "1c70c496902dbf3f611a8acd2104bc3fcd8973724cd87487d88a101b259ba341",
+      "httpMethods": [
+        "GET"
+      ],
+      "tasks": [
+        "T40-profile-auth-wall-anonymous",
+        "T41-profile-render-deeplink",
+        "T42-profile-change-password",
+        "T43-profile-preferences-nutrition",
+        "T44-profile-backfill-past-weeks",
+        "T45-profile-program-editor",
+        "T46-profile-backup-export-import",
+        "T47-profile-danger-zone"
+      ]
+    }
+  ]
+}

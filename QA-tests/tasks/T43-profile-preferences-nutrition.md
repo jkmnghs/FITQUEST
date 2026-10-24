@@ -6,13 +6,13 @@
 | Source | `src/components/OtherTabs.jsx` (`SettingsTab`: Preferences group + Nutrition goals accordion); persistence through `onUpdate` → `useGameState.updateSetting` |
 | Flow | Edit Name/Week/Unit preferences; changes persist immediately. Edit nutrition goals in the accordion; the header kcal value updates (source-derived) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | no (changes settings on a throwaway account, restored in TC-05) |
 | Estimated steps | 30 |
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
 - Onboarding completed, and `localStorage.fitquest_onboarding_complete = "true"`.
 - Before starting, record the original values of `Name`, `Current Week`, `Unit` and the four nutrition goals (`origName`, `origWeek`, `origUnit`, `origGoals`). TC-05 restores them.
 - **If no Supabase env or throwaway credentials are available, mark every TC BLOCKED (needs Supabase backend + throwaway user), not FAILED.**
@@ -31,7 +31,7 @@
 ## Steps
 
 ### TC-01: Happy path — edit Preferences and confirm they persist
-1. Sign in as `qa-throwaway`. Navigate to `/?tab=profile`. Scroll to `Settings` › `Preferences`.
+1. Sign in as `test-user`. Navigate to `/?tab=profile`. Scroll to `Settings` › `Preferences`.
 2. Assert: three rows: `Name` (text input, `maxlength=20`), `Current Week` (select with `Week 1` … `Week N`, where N = max(currentWeek + 4, 12)) and `Unit` (select with options `kg`, `lbs`).
 3. Clear `Name` and type `name`. Select `Current Week` = `week`. Select `Unit` = `unit`.
 4. Assert: the Name input shows `QA Tester`. The desktop rail header (if visible) shows `Week 2 · Lvl <n>`. The Backfill grid header (open `Backfill Past Weeks` and pick any day) shows `LBS` as its unit column.

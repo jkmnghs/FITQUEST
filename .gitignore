@@ -4,3 +4,7 @@ dist/
 .env.local
 .env*.local
 .vercel/
+
+# QA catalog secrets
+QA-tests/.qa-catalog/auth.local.json
+QA-tests/.qa-catalog/state/

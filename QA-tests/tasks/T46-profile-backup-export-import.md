@@ -6,7 +6,7 @@
 | Source | `src/components/OtherTabs.jsx` (`SettingsTab.handleExport`, IMPORT file handler, RESYNC FROM CLOUD); `src/components/BackupCard.jsx` (`ExportNudge`, `BackupCard`); `src/components/ui/ConfirmDialog.jsx` |
 | Flow | Export downloads fitquest-backup-YYYY-MM-DD.json and dismisses the ExportNudge. Import valid backup → confirm (CANCEL only here); invalid shape and unparseable file each show their own dialog. Restore server snapshot via BackupCard (cancel only) (source-derived) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | yes (gated: IMPORT → `RESTORE` and snapshot restore are exercised on their **cancel paths only**) |
 | Estimated steps | 34 |
 
@@ -18,7 +18,7 @@
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
 - Onboarding completed, and `localStorage.fitquest_onboarding_complete = "true"`.
 - Seed for the ExportNudge (TC-01): `state.totalSessions > 0`, and `state.lastExportAt` missing or more than 14 days old. If it cannot be arranged, record the nudge sub-steps as N/A.
 - Seed for the BackupCard (TC-05): a row in `user_profiles.state_backup` that differs from the current state. If none exists, the card does not render; record TC-05 as N/A.
@@ -39,7 +39,7 @@
 ## Steps
 
 ### TC-01: Happy path — EXPORT downloads a valid backup and clears the nudge
-1. Sign in as `qa-throwaway`. Navigate to `/?tab=profile`. Scroll to `Training data`.
+1. Sign in as `test-user`. Navigate to `/?tab=profile`. Scroll to `Training data`.
 2. Assert: the helper `Export your progress as a JSON file, or restore from a previous backup.` shows, with the buttons `EXPORT` and `IMPORT`.
 3. If seeded: assert that the yellow ExportNudge button shows `You have never backed up` (when `lastExportAt` is missing) or `Last backup was <N> days ago`, with the subtext `<totalSessions> sessions of progress. Tap to save a copy.`
 4. Click **`EXPORT`** (or the ExportNudge, which does the same). Assert: exactly one download starts, and its filename equals `expectedFilename`.

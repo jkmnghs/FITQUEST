@@ -6,7 +6,7 @@
 | Source | `src/components/OtherTabs.jsx` (`SettingsTab` › `Danger zone`, `submitAccountDelete`); `src/components/ui/ConfirmDialog.jsx`; endpoint `POST /api/account-delete` |
 | Flow | Reset today's session (cancel path); Reset all progress (cancel path); Delete account: open panel, button stays disabled until 'DELETE' is typed, cancel path (source-derived; destructive, never submit) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | yes (irreversible actions are exercised on their **gating and cancel paths only**) |
 | Estimated steps | 32 |
 
@@ -21,7 +21,7 @@
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account.
 - Onboarding completed, and `localStorage.fitquest_onboarding_complete = "true"`.
 - Seed: the account has at least 1 logged session and at least 1 achievement, so "no state change" is observable. Before starting, record the baseline: Name, `Current Week`, the `<n>/<total> UNLOCKED` count and today's logged sets on `Train`.
 - **If no Supabase env or throwaway credentials are available, mark every TC BLOCKED (needs Supabase backend + throwaway user), not FAILED.**
@@ -39,7 +39,7 @@
 ## Steps
 
 ### TC-01: Happy path — Danger zone renders and every gate holds
-1. Sign in as `qa-throwaway`. Navigate to `/?tab=profile`. Scroll to `Settings` › `Danger zone`.
+1. Sign in as `test-user`. Navigate to `/?tab=profile`. Scroll to `Settings` › `Danger zone`.
 2. Assert: the group header `Danger zone` is pink (`#ff8a9b`) and holds three rows in this order, all pink: `Reset today's session`, `Reset all progress`, `Delete account`.
 3. Run TC-02, TC-03 and TC-04 below (cancel paths only).
 4. Reload the page. Assert: every baseline value recorded in the Preconditions is unchanged, the user is still signed in, and no `POST /api/account-delete` was ever attempted.

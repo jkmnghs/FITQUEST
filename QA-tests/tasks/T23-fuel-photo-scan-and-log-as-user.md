@@ -6,7 +6,7 @@
 | Source | `src/components/NutritionTab.jsx` (`handleImageSelect`, `analyzeMeal`, `setPortion`, `addFoodByText`, `handleLogMeal`), `src/utils/nutritionUtils.js` (`getAdjusted`, `sumTotals`, `PORTION_MULT`) |
 | Flow | Scan meal via camera input / upload from gallery → ANALYZE MEAL → adjust portion S/M/L → add a missing item → LOG MEAL (source-derived) |
 | Requires auth | yes |
-| Required role | user |
+| Required role | `test-user` |
 | Destructive | no. It creates one throwaway meal and deletes that same meal during cleanup |
 | Estimated steps | 32 |
 

@@ -6,13 +6,13 @@
 | Source | `src/components/OtherTabs.jsx` (`SettingsTab` › `Training data` › `Backfill Past Weeks`); mutation `onBackfillWeek` → `useGameState.backfillWeek` |
 | Flow | Backfill a past week: pick week, then day, then duration/weights/sets, then LOG WEEK n — DAY; recorded days are disabled (source-derived) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | no (adds a backfilled session to a throwaway account; there is no undo in the UI) |
 | Estimated steps | 30 |
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. **Never run this against a real person's account**, because logging a backfilled session adds permanent history that the UI cannot remove.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account resolved through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. **Never run this against a real person's account**, because logging a backfilled session adds permanent history that the UI cannot remove.
 - Onboarding completed, and `localStorage.fitquest_onboarding_complete = "true"`.
 - Seed: `state.currentWeek >= 3`. Use `Settings` › `Current Week` to raise it if needed (see T43), and restore it afterwards. Week `currentWeek - 1` has at least two training days **not** yet recorded, and `My Program` has at least 2 non-plank exercises on those days.
 - Seed for TC-03: the analysis records `trainingDays` defaulting to `mon` / `wed` / `fri`. Pick `dayA` and `dayB` = two unrecorded training days whose programs contain **different** exercises.
@@ -33,7 +33,7 @@
 ## Steps
 
 ### TC-01: Happy path — log a past week's day
-1. Sign in as `qa-throwaway`. Navigate to `/?tab=profile`. Scroll to `Training data`.
+1. Sign in as `test-user`. Navigate to `/?tab=profile`. Scroll to `Training data`.
 2. Click **`Backfill Past Weeks ▾`**. Assert: the chevron rotates 180°, and the helper `Select the week and the specific training day you want to log.` shows.
 3. Assert: the `Week` select defaults to `Week <currentWeek - 1>`, with options `Week 1` … `Week <currentWeek>`.
 4. Assert: `Training day to log` shows one button per training day, sorted Mon→Sun. Already-recorded days are `disabled`, green, and suffixed ` ✓`. If any day is recorded, the cyan line `Week <n>: <Days> already recorded` shows.

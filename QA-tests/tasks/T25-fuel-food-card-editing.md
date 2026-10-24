@@ -6,7 +6,7 @@
 | Source | `src/components/NutritionTab.jsx` (gram editor lines 770–798, `setGrams` 362–368, macro tiles 868–918, `saveMacroEdit` 370–386, `setPortion` 358–360), `src/utils/nutritionUtils.js` (`getAdjusted`, `PORTION_MULT`) |
 | Flow | Edit grams inline (tap `<N>g`) and check that macros scale; edit a macro tile and check that calories are recomputed as 4/4/9 (source-derived) |
 | Requires auth | yes |
-| Required role | user |
+| Required role | `test-user` |
 | Destructive | no. It logs throwaway meals and deletes those same meals during cleanup |
 | Estimated steps | 36 |
 

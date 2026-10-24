@@ -6,13 +6,13 @@
 | Source | `src/components/ProfileTab.jsx` (tab routing: `src/App.jsx` `initialTabFromUrl` / `NAV_TABS`; sections: `RankTab.jsx`, `ProgramEditorTab.jsx`, `OtherTabs.jsx` `AchievementsTab` + `SettingsTab`) |
 | Flow | After sign-in, deep link ?tab=profile opens the Profile tab; notifications; sign out (source-derived) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | no |
 | Estimated steps | 24 |
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set. Restart the dev server after setting them.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account whose data may be changed. The runner resolves the role through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account. No credentials appear in this file.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account whose data may be changed. The runner resolves the role through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never use a real person's account. No credentials appear in this file.
 - The throwaway account has completed onboarding (`state.assessment.completed === true`), so `OnboardingScreen` does not render.
 - Set `localStorage.fitquest_onboarding_complete = "true"` before load so the tour overlay does not cover the page. Otherwise, complete the tour first.
 - The boot screen (`READY`) stays up for at least 5000 ms (`BOOT_MIN_MS`). Wait it out, or tap it to skip once loading is done.
@@ -28,7 +28,7 @@
 ## Steps
 
 ### TC-01: Happy path — deep link lands on Profile with all four sections
-1. Sign in as `qa-throwaway`.
+1. Sign in as `test-user`.
 2. Navigate to `http://localhost:5173/?tab=profile`. Wait for the boot screen to pass.
 3. Assert: the Profile nav tab (`role="tab"`, label `Profile`, hint `Rank & settings`) has `aria-selected="true"`, and `Train` has `aria-selected="false"`.
 4. Assert: while the lazy chunk loads, `ProfileTabSkeleton` may flash. Then `<h2>` section headings render in this order: `Warrior Rank`, `My Program`, `Achievements`, `Settings` (CSS upper-cases them).

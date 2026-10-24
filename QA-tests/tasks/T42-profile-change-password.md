@@ -6,13 +6,13 @@
 | Source | `src/components/OtherTabs.jsx` (`SettingsTab.submitPasswordChange`); auth: `src/hooks/useAuth.js` (`changePassword`) |
 | Flow | Change password: validation errors for <6 chars and mismatch; wrong current password shows 'Current password is incorrect.'; success shows 'Password updated.' and the panel closes (source-derived) |
 | Requires auth | yes |
-| Required role | qa-throwaway |
+| Required role | test-user |
 | Destructive | no (credential change on a throwaway account, reverted in TC-01) |
 | Estimated steps | 26 |
 
 ## Preconditions
 - App running at `http://localhost:5173/` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- Sign in as `qa-throwaway`: a **dedicated, disposable** Supabase test account. The runner resolves it through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never run this task against a real person's account, because TC-01 changes its password.
+- Sign in as `test-user`: a **dedicated, disposable** Supabase test account. The runner resolves it through `scripts/auth-resolve.mjs` from `QA-tests/.qa-catalog/auth.local.json`. Never run this task against a real person's account, because TC-01 changes its password.
 - The account has completed onboarding, and `localStorage.fitquest_onboarding_complete = "true"`.
 - The runner knows the throwaway account's current password (`origPassword`, resolved at run time and never written here).
 - **If no Supabase env or throwaway credentials are available, mark every TC BLOCKED (needs Supabase backend + throwaway user), not FAILED.**
@@ -32,7 +32,7 @@
 ## Steps
 
 ### TC-01: Happy path — change the password, then change it back
-1. Sign in as `qa-throwaway`. Navigate to `/?tab=profile`. Scroll to `Settings` › `Account`.
+1. Sign in as `test-user`. Navigate to `/?tab=profile`. Scroll to `Settings` › `Account`.
 2. Click **`CHANGE PASSWORD`**. Assert: a panel opens with three `type=password` inputs labelled `Current password` (`autocomplete=current-password`), `New password` (`autocomplete=new-password`) and `Confirm new password` (`autocomplete=new-password`), plus the button `UPDATE PASSWORD`. The toggle button now reads `CANCEL`.
 3. Fill `Current password` = `origPassword`, `New password` = `newPassword`, `Confirm new password` = `newPassword`.
 4. Click **`UPDATE PASSWORD`**. Assert: the button reads `UPDATING...` and is `disabled` while in flight.

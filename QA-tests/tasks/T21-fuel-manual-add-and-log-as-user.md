@@ -6,7 +6,7 @@
 | Source | `src/components/NutritionTab.jsx` (`addFoodByText`, `handleLogMeal`), `src/components/nutrition/DailySummaryBar.jsx`, `src/components/nutrition/TodaysMealHistory.jsx`, `src/hooks/useGameState.js` (`logMeal`, `deleteMeal`) |
 | Flow | Manually add food by text (Enter or ADD) with no image, then LOG MEAL (source-derived) |
 | Requires auth | yes |
-| Required role | user |
+| Required role | `test-user` |
 | Destructive | no. It creates one throwaway meal and deletes that same meal during cleanup |
 | Estimated steps | 30 |
 
