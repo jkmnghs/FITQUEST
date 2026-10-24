@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TriangleAlert } from 'lucide-react';
+import { getHeightCm } from '../utils/bodyMetrics';
 
 const CHECKLIST_ITEMS = [
   { id: 'ck1', text: '3/3 workouts completed' },
