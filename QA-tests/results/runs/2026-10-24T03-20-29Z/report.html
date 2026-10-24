@@ -102,27 +102,27 @@
 <h1>QA run <code>2026-10-24T03-20-29Z</code></h1>
 
 <div class="status-line">
-  <span><span class="live-dot "></span>running — 7 in flight, 13 pending</span>
+  <span><span class="live-dot "></span>running — 4 in flight, 0 pending</span>
   <span>started <code>2026-10-24T03:20:29.151Z</code></span>
-  <span>updated <code>2026-10-24T03:24:11.195Z</code></span>
+  <span>updated <code>2026-10-24T03:26:07.795Z</code></span>
   <span>filter <code>interactive</code></span>
 </div>
 
 <div class="grid">
   <div class="stat"><div class="label">Tasks</div><div class="value">32</div></div>
-  <div class="stat pass"><div class="label">Pass</div><div class="value">0</div></div>
+  <div class="stat pass"><div class="label">Pass</div><div class="value">4</div></div>
   <div class="stat fail"><div class="label">Fail</div><div class="value">0</div></div>
-  <div class="stat blocked"><div class="label">Blocked</div><div class="value">12</div></div>
-  <div class="stat running"><div class="label">In flight</div><div class="value">7</div></div>
-  <div class="stat"><div class="label">Pending</div><div class="value">13</div></div>
+  <div class="stat blocked"><div class="label">Blocked</div><div class="value">24</div></div>
+  <div class="stat running"><div class="label">In flight</div><div class="value">4</div></div>
+  <div class="stat"><div class="label">Pending</div><div class="value">0</div></div>
 </div>
 
 <div class="progress" title="progress">
-  <span class="p" style="width: 0.00%"></span>
+  <span class="p" style="width: 12.50%"></span>
   <span class="f" style="width: 0.00%"></span>
-  <span class="b" style="width: 37.50%"></span>
+  <span class="b" style="width: 75.00%"></span>
   <span class="v" style="width: 0.00%"></span>
-  <span class="r" style="width: 21.88%"></span>
+  <span class="r" style="width: 12.50%"></span>
 </div>
 
 <table>
@@ -137,14 +137,14 @@
     <tr>
       <td><code>T10-train-auth-wall-anonymous</code></td>
       <td><code>/?tab=train</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="badge blocked">BLOCKED</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge pass">PASS</span></td>
       <td>2</td>
-      <td>0 / 0 / 5</td>
-      <td>0 / 0</td>
-      <td>—</td>
-      <td><code>DEF-runner-no-browser-tooling</code></td>
-      <td><span class="dash">—</span></td>
+      <td>5 / 0 / 0</td>
+      <td>3 / 3</td>
+      <td>3m 56s</td>
+      <td><code>DEF-stale-error-native-validation</code><br/><code>DEF-signin-silent-noop-no-supabase</code><br/><code>DEF-auth-loading-boot-flash</code></td>
+      <td><a href="T10-train-auth-wall-anonymous/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T11-train-log-weighted-exercise-as-test-user</code></td>
@@ -185,62 +185,62 @@
     <tr>
       <td><code>T14-train-destructive-remove-exercise</code></td>
       <td><code>/?tab=train</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>50s</td>
+      <td><code>DEF-missing-credential-test-user</code><br/><code>DEF-missing-supabase-env</code></td>
+      <td><a href="T14-train-destructive-remove-exercise/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T15-train-destructive-finish-session</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>1m 20s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T15-train-destructive-finish-session/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T16-train-week-nav-missed-day-rest-day</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>1m 10s</td>
+      <td><code>DEF-missing-credential-test-user</code><br/><code>DEF-env-missing-supabase</code></td>
+      <td><a href="T16-train-week-nav-missed-day-rest-day/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T17-train-ai-coach-modal-as-test-user</code></td>
+      <td><code>/?tab=train</code></td>
       <td><span class="badge dispatched">dispatched</span></td>
       <td><span class="dash">—</span></td>
       <td>1</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
-      <td>9s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T15-train-destructive-finish-session</code></td>
-      <td><code>/?tab=train</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T16-train-week-nav-missed-day-rest-day</code></td>
-      <td><code>/?tab=train</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T17-train-ai-coach-modal-as-test-user</code></td>
-      <td><code>/?tab=train</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
+      <td>5s</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
     </tr>
     <tr>
       <td><code>T20-fuel-auth-wall-anonymous</code></td>
       <td><code>/?tab=fuel</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="badge blocked">BLOCKED</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge pass">PASS</span></td>
       <td>2</td>
-      <td>0 / 0 / 5</td>
-      <td>0 / 0</td>
-      <td>—</td>
-      <td><code>DEF-runner-no-browser-tooling</code></td>
-      <td><span class="dash">—</span></td>
+      <td>5 / 0 / 0</td>
+      <td>3 / 3</td>
+      <td>3m 12s</td>
+      <td><code>DEF-signin-silent-failure-no-supabase</code></td>
+      <td><a href="T20-fuel-auth-wall-anonymous/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T21-fuel-manual-add-and-log-as-user</code></td>
@@ -281,62 +281,62 @@
     <tr>
       <td><code>T24-fuel-photo-upload-validation</code></td>
       <td><code>/?tab=fuel</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>49s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T24-fuel-photo-upload-validation/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T25-fuel-food-card-editing</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>1m 15s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T25-fuel-food-card-editing/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T26-fuel-destructive-remove-food-and-rescan</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>1m 10s</td>
+      <td><code>DEF-missing-credential-test-user</code><br/><code>DEF-env-no-supabase</code><br/><code>DEF-env-no-browser-tools</code></td>
+      <td><a href="T26-fuel-destructive-remove-food-and-rescan/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T27-fuel-destructive-delete-meal-and-daily-summary</code></td>
+      <td><code>/?tab=fuel</code></td>
       <td><span class="badge dispatched">dispatched</span></td>
       <td><span class="dash">—</span></td>
       <td>1</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
-      <td>4s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T25-fuel-food-card-editing</code></td>
-      <td><code>/?tab=fuel</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T26-fuel-destructive-remove-food-and-rescan</code></td>
-      <td><code>/?tab=fuel</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T27-fuel-destructive-delete-meal-and-daily-summary</code></td>
-      <td><code>/?tab=fuel</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
+      <td>5s</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
     </tr>
     <tr>
       <td><code>T30-progress-auth-wall-anonymous</code></td>
       <td><code>/?tab=progress</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="badge blocked">BLOCKED</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge pass">PASS</span></td>
       <td>2</td>
-      <td>0 / 0 / 5</td>
+      <td>5 / 0 / 0</td>
       <td>0 / 0</td>
-      <td>—</td>
-      <td><code>DEF-runner-no-browser-tooling</code></td>
+      <td>2m 36s</td>
       <td><span class="dash">—</span></td>
+      <td><a href="T30-progress-auth-wall-anonymous/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T31-progress-checkin-weight-only-as-test-user</code></td>
@@ -377,62 +377,62 @@
     <tr>
       <td><code>T34-progress-checkin-overwrite</code></td>
       <td><code>/?tab=progress</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 4</td>
+      <td>0 / 0</td>
+      <td>45s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T34-progress-checkin-overwrite/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T35-progress-weekly-summary-navigation</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>1m 14s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T35-progress-weekly-summary-navigation/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T36-progress-weekly-success-checklist</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>36s</td>
+      <td><code>DEF-missing-credential-test-user</code><br/><code>DEF-env-supabase-unconfigured</code></td>
+      <td><a href="T36-progress-weekly-success-checklist/result.md">result.md</a></td>
+    </tr>
+    <tr>
+      <td><code>T37-progress-body-metrics-stats-trends</code></td>
+      <td><code>/?tab=progress</code></td>
       <td><span class="badge dispatched">dispatched</span></td>
       <td><span class="dash">—</span></td>
       <td>1</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
-      <td>4s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T35-progress-weekly-summary-navigation</code></td>
-      <td><code>/?tab=progress</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T36-progress-weekly-success-checklist</code></td>
-      <td><code>/?tab=progress</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-    </tr>
-    <tr>
-      <td><code>T37-progress-body-metrics-stats-trends</code></td>
-      <td><code>/?tab=progress</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
+      <td>5s</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
     </tr>
     <tr>
       <td><code>T40-profile-auth-wall-anonymous</code></td>
       <td><code>/?tab=profile</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="badge blocked">BLOCKED</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge pass">PASS</span></td>
       <td>2</td>
-      <td>0 / 0 / 4</td>
+      <td>4 / 0 / 0</td>
       <td>0 / 0</td>
-      <td>—</td>
-      <td><code>DEF-runner-no-browser-tooling</code></td>
-      <td><span class="dash">—</span></td>
+      <td>2m 31s</td>
+      <td><code>DEF-stale-login-error-native-validation</code></td>
+      <td><a href="T40-profile-auth-wall-anonymous/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T41-profile-render-deeplink</code></td>
@@ -473,61 +473,61 @@
     <tr>
       <td><code>T44-profile-backfill-past-weeks</code></td>
       <td><code>/?tab=profile</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>37s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T44-profile-backfill-past-weeks/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T45-profile-program-editor</code></td>
       <td><code>/?tab=profile</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 6</td>
+      <td>0 / 0</td>
+      <td>55s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T45-profile-program-editor/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T46-profile-backup-export-import</code></td>
       <td><code>/?tab=profile</code></td>
-      <td><span class="badge pending">pending</span></td>
-      <td><span class="dash">—</span></td>
-      <td>0</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>—</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
+      <td>1</td>
+      <td>0 / 0 / 6</td>
+      <td>0 / 0</td>
+      <td>24s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T46-profile-backup-export-import/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T47-profile-danger-zone</code></td>
       <td><code>/?tab=profile</code></td>
-      <td><span class="badge pending">pending</span></td>
+      <td><span class="badge dispatched">dispatched</span></td>
       <td><span class="dash">—</span></td>
-      <td>0</td>
+      <td>1</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
-      <td>—</td>
+      <td>5s</td>
       <td><span class="dash">—</span></td>
       <td><span class="dash">—</span></td>
     </tr>
   </tbody>
 </table>
 
-<div class="defects"><h2 style="font-size:1.1rem;margin:1.75rem 0 .25rem">Defects Found</h2><ul><li><code>DEF-runner-no-browser-tooling</code> — <code>T10-train-auth-wall-anonymous</code></li><li><code>DEF-missing-credential-test-user</code> — <code>T11-train-log-weighted-exercise-as-test-user</code></li><li><code>DEF-env-supabase-not-configured</code> — <code>T11-train-log-weighted-exercise-as-test-user</code></li><li><code>DEF-env-missing-supabase</code> — <code>T12-train-exercise-log-validation</code></li><li><code>DEF-missing-supabase-env</code> — <code>T13-train-add-swap-exercise-as-test-user</code></li><li><code>DEF-env-supabase-unconfigured</code> — <code>T22-fuel-manual-add-validation</code></li><li><code>DEF-env-no-supabase</code> — <code>T23-fuel-photo-scan-and-log-as-user</code></li></ul></div>
+<div class="defects"><h2 style="font-size:1.1rem;margin:1.75rem 0 .25rem">Defects Found</h2><ul><li><code>DEF-stale-error-native-validation</code> — <code>T10-train-auth-wall-anonymous</code></li><li><code>DEF-signin-silent-noop-no-supabase</code> — <code>T10-train-auth-wall-anonymous</code></li><li><code>DEF-auth-loading-boot-flash</code> — <code>T10-train-auth-wall-anonymous</code></li><li><code>DEF-missing-credential-test-user</code> — <code>T11-train-log-weighted-exercise-as-test-user</code></li><li><code>DEF-env-supabase-not-configured</code> — <code>T11-train-log-weighted-exercise-as-test-user</code></li><li><code>DEF-env-missing-supabase</code> — <code>T12-train-exercise-log-validation</code></li><li><code>DEF-missing-supabase-env</code> — <code>T13-train-add-swap-exercise-as-test-user</code></li><li><code>DEF-signin-silent-failure-no-supabase</code> — <code>T20-fuel-auth-wall-anonymous</code></li><li><code>DEF-env-supabase-unconfigured</code> — <code>T22-fuel-manual-add-validation</code></li><li><code>DEF-env-no-supabase</code> — <code>T23-fuel-photo-scan-and-log-as-user</code></li><li><code>DEF-env-no-browser-tools</code> — <code>T26-fuel-destructive-remove-food-and-rescan</code></li><li><code>DEF-stale-login-error-native-validation</code> — <code>T40-profile-auth-wall-anonymous</code></li></ul></div>
 
 <div class="verif"><h2 style="font-size:1.1rem;margin:1.5rem 0 .5rem">Verification failures</h2><details><summary><code>T10-train-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details><details><summary><code>T20-fuel-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details><details><summary><code>T30-progress-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details><details><summary><code>T40-profile-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details></div>
 
 <footer>
   <span>auto-refresh: <strong>every 3s</strong></span>
-  <span>generated <code>2026-10-24T03:24:11Z</code></span>
+  <span>generated <code>2026-10-24T03:26:07Z</code></span>
   <span>qa-my-app plugin</span>
 </footer>
 
