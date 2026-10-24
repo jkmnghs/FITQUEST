@@ -88,7 +88,7 @@ Steps:
 | `LOG MEAL` | at E10 | toast `Meal logged — 314 kcal ✓`. Then **cleanup**: `Delete meal` on that row, toast `Meal deleted` |
 
 ### TC-05: Negative & edge cases
-- **Mobile, swiped-open card blocks editing:** at viewport `390×844` (`isDesktop` false), add a fresh card, then drag the card 60 px left with the mouse (mousedown → mousemove −60 px → mouseup). Assert: the card shifts to `translateX(-68px)` and `Remove food` is visible. Click `150g` and assert that no gram editor opens. Click the Protein tile and assert that no macro editor opens. Click the card body and assert that it closes (`translateX(0)`). Click `150g` and assert that the editor now opens.
+- **Mobile, swiped-open card blocks editing:** at viewport `390×844` with `hasTouch: true` (`isDesktop` false), add a fresh card, then swipe the card 60 px left with **touch events** (touchstart → touchmove −60 px → touchend; see T26 for why a mouse drag may not stay open). Assert: the card shifts to `translateX(-68px)` and `Remove food` is visible. Click `150g` and assert that no gram editor opens. Click the Protein tile and assert that no macro editor opens. Click the card body and assert that it closes (`translateX(0)`). Click `150g` and assert that the editor now opens.
 - **Desktop has no swipe:** at `1280×800`, dragging the card 60 px left leaves it at `translateX(0)`, and no `Remove food` button exists in the DOM.
 - **Short swipe does not open:** on mobile, a 20 px left drag springs back (threshold is −30 px).
 - **Custom grams then macro edit:** at E1 (180 g, scale 1.2), set Protein to `60`. Stored base = round(60/1.2 × 10)/10 = 50, so base kcal = round(200 + 48.6) = 249 and the display is `180g · 299 kcal` (249 × 1.2 = 298.8 → 299), with Protein `60g`.
