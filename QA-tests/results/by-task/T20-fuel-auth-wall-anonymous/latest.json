@@ -1,0 +1,11 @@
+{
+  "taskId": "T20-fuel-auth-wall-anonymous",
+  "runId": "2026-10-24T03-20-29Z",
+  "result": "PASS",
+  "resultMd": "QA-tests/results/runs/2026-10-24T03-20-29Z/T20-fuel-auth-wall-anonymous/result.md",
+  "screenshots": 18,
+  "consoleErrors": 3,
+  "networkFailures": 3,
+  "duration": 32,
+  "route": "/?tab=fuel"
+}

@@ -1,0 +1,11 @@
+{
+  "taskId": "T14-train-destructive-remove-exercise",
+  "runId": "2026-10-24T03-20-29Z",
+  "result": "BLOCKED",
+  "resultMd": "QA-tests/results/runs/2026-10-24T03-20-29Z/T14-train-destructive-remove-exercise/result.md",
+  "screenshots": 0,
+  "consoleErrors": 0,
+  "networkFailures": 0,
+  "duration": 0,
+  "route": "/?tab=train"
+}

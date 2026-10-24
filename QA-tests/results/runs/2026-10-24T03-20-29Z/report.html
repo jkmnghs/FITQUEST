@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <title>QA run 2026-10-24T03-20-29Z</title>
 <meta name="color-scheme" content="light dark" />
-<meta http-equiv="refresh" content="3" />
+
 <style>
   :root {
     color-scheme: light dark;
@@ -95,16 +95,16 @@
 <body>
 
 <div class="controls">
-  <label><input type="checkbox" id="auto" checked> auto-refresh</label>
+  <label><input type="checkbox" id="auto" > auto-refresh</label>
   <a href="javascript:location.reload()">refresh now</a>
 </div>
 
 <h1>QA run <code>2026-10-24T03-20-29Z</code></h1>
 
 <div class="status-line">
-  <span><span class="live-dot "></span>running — 4 in flight, 0 pending</span>
+  <span><span class="live-dot done"></span>complete — 6m 7s</span>
   <span>started <code>2026-10-24T03:20:29.151Z</code></span>
-  <span>updated <code>2026-10-24T03:26:07.795Z</code></span>
+  <span>finished <code>2026-10-24T03:26:36.579Z</code></span>
   <span>filter <code>interactive</code></span>
 </div>
 
@@ -112,17 +112,17 @@
   <div class="stat"><div class="label">Tasks</div><div class="value">32</div></div>
   <div class="stat pass"><div class="label">Pass</div><div class="value">4</div></div>
   <div class="stat fail"><div class="label">Fail</div><div class="value">0</div></div>
-  <div class="stat blocked"><div class="label">Blocked</div><div class="value">24</div></div>
-  <div class="stat running"><div class="label">In flight</div><div class="value">4</div></div>
+  <div class="stat blocked"><div class="label">Blocked</div><div class="value">28</div></div>
+  <div class="stat running"><div class="label">In flight</div><div class="value">0</div></div>
   <div class="stat"><div class="label">Pending</div><div class="value">0</div></div>
 </div>
 
 <div class="progress" title="progress">
   <span class="p" style="width: 12.50%"></span>
   <span class="f" style="width: 0.00%"></span>
-  <span class="b" style="width: 75.00%"></span>
+  <span class="b" style="width: 87.50%"></span>
   <span class="v" style="width: 0.00%"></span>
-  <span class="r" style="width: 12.50%"></span>
+  <span class="r" style="width: 0.00%"></span>
 </div>
 
 <table>
@@ -221,14 +221,14 @@
     <tr>
       <td><code>T17-train-ai-coach-modal-as-test-user</code></td>
       <td><code>/?tab=train</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
       <td>1</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>5s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>34s</td>
+      <td><code>DEF-missing-credential-test-user</code><br/><code>DEF-env-missing-supabase</code></td>
+      <td><a href="T17-train-ai-coach-modal-as-test-user/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T20-fuel-auth-wall-anonymous</code></td>
@@ -317,14 +317,14 @@
     <tr>
       <td><code>T27-fuel-destructive-delete-meal-and-daily-summary</code></td>
       <td><code>/?tab=fuel</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
       <td>1</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>5s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>26s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T27-fuel-destructive-delete-meal-and-daily-summary/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T30-progress-auth-wall-anonymous</code></td>
@@ -413,14 +413,14 @@
     <tr>
       <td><code>T37-progress-body-metrics-stats-trends</code></td>
       <td><code>/?tab=progress</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
       <td>1</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>5s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td>0 / 0 / 5</td>
+      <td>0 / 0</td>
+      <td>22s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T37-progress-body-metrics-stats-trends/result.md">result.md</a></td>
     </tr>
     <tr>
       <td><code>T40-profile-auth-wall-anonymous</code></td>
@@ -509,14 +509,14 @@
     <tr>
       <td><code>T47-profile-danger-zone</code></td>
       <td><code>/?tab=profile</code></td>
-      <td><span class="badge dispatched">dispatched</span></td>
-      <td><span class="dash">—</span></td>
+      <td><span class="badge complete">complete</span></td>
+      <td><span class="badge blocked">BLOCKED</span></td>
       <td>1</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
-      <td>5s</td>
-      <td><span class="dash">—</span></td>
-      <td><span class="dash">—</span></td>
+      <td>0 / 0 / 6</td>
+      <td>0 / 0</td>
+      <td>34s</td>
+      <td><code>DEF-missing-credential-test-user</code></td>
+      <td><a href="T47-profile-danger-zone/result.md">result.md</a></td>
     </tr>
   </tbody>
 </table>
@@ -526,14 +526,14 @@
 <div class="verif"><h2 style="font-size:1.1rem;margin:1.5rem 0 .5rem">Verification failures</h2><details><summary><code>T10-train-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details><details><summary><code>T20-fuel-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details><details><summary><code>T30-progress-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details><details><summary><code>T40-profile-auth-wall-anonymous</code> — attempt 2</summary><ul><li>attempt 1: runner spawn had no browser tooling (Playwright MCP not attached, no Bash) — re-dispatched with Node playwright</li></ul></details></div>
 
 <footer>
-  <span>auto-refresh: <strong>every 3s</strong></span>
-  <span>generated <code>2026-10-24T03:26:07Z</code></span>
+  <span>auto-refresh: <strong>off (run complete)</strong></span>
+  <span>generated <code>2026-10-24T03:26:54Z</code></span>
   <span>qa-my-app plugin</span>
 </footer>
 
 <script>
   (function () {
-    var done = false;
+    var done = true;
     var refreshMs = 3000;
     var key = "qa-my-app-autorefresh";
     var box = document.getElementById("auto");

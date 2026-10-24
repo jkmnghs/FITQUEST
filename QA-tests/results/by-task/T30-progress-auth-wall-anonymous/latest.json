@@ -1,0 +1,11 @@
+{
+  "taskId": "T30-progress-auth-wall-anonymous",
+  "runId": "2026-10-24T03-20-29Z",
+  "result": "PASS",
+  "resultMd": "QA-tests/results/runs/2026-10-24T03-20-29Z/T30-progress-auth-wall-anonymous/result.md",
+  "screenshots": 13,
+  "consoleErrors": 0,
+  "networkFailures": 0,
+  "duration": 25,
+  "route": "/?tab=progress"
+}

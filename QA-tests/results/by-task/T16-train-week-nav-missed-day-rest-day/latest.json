@@ -1,0 +1,11 @@
+{
+  "taskId": "T16-train-week-nav-missed-day-rest-day",
+  "runId": "2026-10-24T03-20-29Z",
+  "result": "BLOCKED",
+  "resultMd": "QA-tests/results/runs/2026-10-24T03-20-29Z/T16-train-week-nav-missed-day-rest-day/result.md",
+  "screenshots": 0,
+  "consoleErrors": 0,
+  "networkFailures": 0,
+  "duration": 5,
+  "route": "/?tab=train"
+}

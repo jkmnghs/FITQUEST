@@ -1,0 +1,11 @@
+{
+  "taskId": "T10-train-auth-wall-anonymous",
+  "runId": "2026-10-24T03-20-29Z",
+  "result": "PASS",
+  "resultMd": "QA-tests/results/runs/2026-10-24T03-20-29Z/T10-train-auth-wall-anonymous/result.md",
+  "screenshots": 15,
+  "consoleErrors": 3,
+  "networkFailures": 3,
+  "duration": 27,
+  "route": "/?tab=train"
+}

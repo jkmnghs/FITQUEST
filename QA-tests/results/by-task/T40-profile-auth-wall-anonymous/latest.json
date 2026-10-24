@@ -1,0 +1,11 @@
+{
+  "taskId": "T40-profile-auth-wall-anonymous",
+  "runId": "2026-10-24T03-20-29Z",
+  "result": "PASS",
+  "resultMd": "QA-tests/results/runs/2026-10-24T03-20-29Z/T40-profile-auth-wall-anonymous/result.md",
+  "screenshots": 14,
+  "consoleErrors": 0,
+  "networkFailures": 0,
+  "duration": 16,
+  "route": "/?tab=profile"
+}
