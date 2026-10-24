@@ -12,6 +12,7 @@ import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
 import { todayDayKey, exercisesForDay, sortedTrainingDays } from '../utils/session';
 import { closeElapsedWeek, repairWeekAnchor } from '../utils/week';
 import { mergeCloudAndLocal, sameProgress } from '../utils/stateMerge';
+import { applyCheckin } from '../utils/checkin';
 
 /**
  * Build a personalized exercise list from a program base by applying
@@ -998,34 +999,18 @@ export function useGameState(user) {
 
   const submitCheckin = useCallback((weight, waist, sleep) => {
     let nextState;
+    let awardedXP = 0;
     setState(prev => {
-      const entry = { week: prev.currentWeek, weight, waist: waist || 0, sleep: sleep || 0, date: today() };
-      const isUpdate = prev.weeklyCheckins.some(c => c.week === prev.currentWeek);
-      const logEntry = {
-        name: `Week ${prev.currentWeek} Check-in: ${weight} ${prev.unit}`,
-        xp: isUpdate ? 0 : 25, date: today(), type: 'checkin',
-        dateStr: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-      };
-      // Recalculate BMI from the new weight (height stays fixed from assessment)
-      const weightKg = prev.unit === 'lbs' ? weight / 2.205 : weight;
-      const { bmi } = calcBMI(weightKg, prev.assessment?.heightCm);
-      nextState = {
-        ...prev,
-        bmi: bmi || prev.bmi,
-        checkins: isUpdate ? prev.checkins : prev.checkins + 1,
-        // Replace any existing entry for this week rather than appending
-        weeklyCheckins: [
-          ...prev.weeklyCheckins.filter(c => c.week !== prev.currentWeek),
-          entry,
-        ],
-        log: pruneOldEntries([...prev.log, logEntry])
-      };
+      const { state, xp } = applyCheckin(prev, weight, waist, sleep);
+      awardedXP = xp;
+      nextState = { ...state, log: pruneOldEntries(state.log) };
       return nextState;
     });
     // Force-save immediately — don't wait for the debounced auto-save
     setTimeout(() => {
       if (userId && nextState) { cancelCloudDebounce(); cloudSet(userId, nextState); }
-      addXP(25);
+      // Overwriting this week's check-in earns nothing
+      if (awardedXP > 0) addXP(awardedXP);
     }, 50);
   }, [setState, addXP, userId]);
 
