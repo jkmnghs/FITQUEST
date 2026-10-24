@@ -1,0 +1,21 @@
+{
+  "runId": "2026-10-24T03-20-29Z",
+  "startedAt": "2026-10-24T03:20:29.151Z",
+  "filter": "interactive",
+  "selectedRoutes": [
+    "/?tab=train",
+    "/?tab=fuel",
+    "/?tab=progress",
+    "/?tab=profile"
+  ],
+  "settingsSnapshot": {
+    "devUrl": "http://localhost:5173",
+    "parallelTestRunners": 8,
+    "browserChannel": "chromium",
+    "headless": true,
+    "settleMs": 1000,
+    "authMode": "per-role (auth.local.json)",
+    "defaultRole": "anonymous"
+  },
+  "taskCount": 32
+}

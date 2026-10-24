@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>QA run 2026-10-24T03-20-29Z</title>
+<meta name="color-scheme" content="light dark" />
+<meta http-equiv="refresh" content="3" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --card: #161b22;
+    --border: #30363d;
+    --pass: #3fb950;
+    --fail: #f85149;
+    --blocked: #d29922;
+    --pending: #58a6ff;
+    --running: #a371f7;
+    --neutral: #6e7681;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f8fa; --fg:#1f2328; --muted:#656d76; --card:#fff; --border:#d0d7de; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1.75rem 2rem 3rem; background: var(--bg); color: var(--fg);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  h1 { margin: 0 0 .5rem; font-size: 1.5rem; }
+  h1 code { font-size: 1rem; vertical-align: middle; }
+  .status-line { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;
+                 color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+              background: var(--pass); margin-right: .35rem; vertical-align: middle;
+              animation: pulse 1.2s ease-in-out infinite; }
+  .live-dot.done { background: var(--muted); animation: none; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+          gap: .75rem; margin-bottom: 1.25rem; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+          padding: .65rem .9rem; }
+  .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .stat .value { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+  .stat.pass .value { color: var(--pass); }
+  .stat.fail .value { color: var(--fail); }
+  .stat.blocked .value { color: var(--blocked); }
+  .stat.running .value { color: var(--running); }
+  .progress { background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+              height: 14px; overflow: hidden; margin-bottom: 1.5rem; display: flex; }
+  .progress span { display: block; height: 100%; transition: width .25s ease; }
+  .progress .p { background: var(--pass); }
+  .progress .f { background: var(--fail); }
+  .progress .b { background: var(--blocked); }
+  .progress .v { background: var(--neutral); }
+  .progress .r { background: var(--running); animation: shimmer 1.5s linear infinite;
+                 background-image: linear-gradient(90deg, var(--running) 0%, #c89dff 50%, var(--running) 100%);
+                 background-size: 200% 100%; }
+  @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+          border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  th, td { padding: .55rem .8rem; text-align: left; border-bottom: 1px solid var(--border);
+           vertical-align: top; font-size: 13px; }
+  th { background: rgba(110,118,129,.1); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+  tr:last-child td { border-bottom: 0; }
+  tr:hover td { background: rgba(110,118,129,.06); }
+  code { background: rgba(110,118,129,.18); padding: 0 .35em; border-radius: 3px;
+         font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .badge { display: inline-block; padding: .12rem .55rem; border-radius: 999px;
+           font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+           white-space: nowrap; }
+  .badge.pass, .badge.complete { background: rgba(63,185,80,.16); color: var(--pass); }
+  .badge.fail { background: rgba(248,81,73,.16); color: var(--fail); }
+  .badge.blocked { background: rgba(210,153,34,.16); color: var(--blocked); }
+  .badge.pending { background: rgba(88,166,255,.16); color: var(--pending); }
+  .badge.dispatched, .badge.verifying { background: rgba(163,113,247,.16); color: var(--running); }
+  .badge.failed-verification { background: rgba(248,81,73,.16); color: var(--fail); }
+  .dash { color: var(--muted); }
+  a { color: var(--pending); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .defects { margin-top: 1.75rem; }
+  .defects ul { margin: .25rem 0 0; padding-left: 1.25rem; }
+  .defects li { font-size: 13px; padding: .15rem 0; }
+  .verif { margin-top: 1.5rem; }
+  .verif details { background: var(--card); border: 1px solid var(--border);
+                   border-radius: 6px; padding: .5rem .85rem; }
+  .verif details + details { margin-top: .35rem; }
+  footer { color: var(--muted); margin-top: 2.5rem; font-size: 12px;
+           display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+  .controls { float: right; font-size: 12px; }
+  .controls label { color: var(--muted); margin-right: .5rem; cursor: pointer; user-select: none; }
+  .controls input { vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <label><input type="checkbox" id="auto" checked> auto-refresh</label>
+  <a href="javascript:location.reload()">refresh now</a>
+</div>
+
+<h1>QA run <code>2026-10-24T03-20-29Z</code></h1>
+
+<div class="status-line">
+  <span><span class="live-dot "></span>running — 8 in flight, 24 pending</span>
+  <span>started <code>2026-10-24T03:20:29.151Z</code></span>
+  <span>updated <code>2026-10-24T03:20:42.681Z</code></span>
+  <span>filter <code>interactive</code></span>
+</div>
+
+<div class="grid">
+  <div class="stat"><div class="label">Tasks</div><div class="value">32</div></div>
+  <div class="stat pass"><div class="label">Pass</div><div class="value">0</div></div>
+  <div class="stat fail"><div class="label">Fail</div><div class="value">0</div></div>
+  <div class="stat blocked"><div class="label">Blocked</div><div class="value">0</div></div>
+  <div class="stat running"><div class="label">In flight</div><div class="value">8</div></div>
+  <div class="stat"><div class="label">Pending</div><div class="value">24</div></div>
+</div>
+
+<div class="progress" title="progress">
+  <span class="p" style="width: 0.00%"></span>
+  <span class="f" style="width: 0.00%"></span>
+  <span class="b" style="width: 0.00%"></span>
+  <span class="v" style="width: 0.00%"></span>
+  <span class="r" style="width: 25.00%"></span>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Task</th><th>Route</th><th>Status</th><th>Verdict</th>
+      <th>Try</th><th>TCs (P / F / B)</th><th>Console / Net</th>
+      <th>Duration</th><th>Defects</th><th>Detail</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>T10-train-auth-wall-anonymous</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T11-train-log-weighted-exercise-as-test-user</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T12-train-exercise-log-validation</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T13-train-add-swap-exercise-as-test-user</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T14-train-destructive-remove-exercise</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T15-train-destructive-finish-session</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T16-train-week-nav-missed-day-rest-day</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T17-train-ai-coach-modal-as-test-user</code></td>
+      <td><code>/?tab=train</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T20-fuel-auth-wall-anonymous</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T21-fuel-manual-add-and-log-as-user</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T22-fuel-manual-add-validation</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T23-fuel-photo-scan-and-log-as-user</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T24-fuel-photo-upload-validation</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T25-fuel-food-card-editing</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T26-fuel-destructive-remove-food-and-rescan</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T27-fuel-destructive-delete-meal-and-daily-summary</code></td>
+      <td><code>/?tab=fuel</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T30-progress-auth-wall-anonymous</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T31-progress-checkin-weight-only-as-test-user</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T32-progress-checkin-validation</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T33-progress-checkin-waist-defect</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T34-progress-checkin-overwrite</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T35-progress-weekly-summary-navigation</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T36-progress-weekly-success-checklist</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T37-progress-body-metrics-stats-trends</code></td>
+      <td><code>/?tab=progress</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T40-profile-auth-wall-anonymous</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T41-profile-render-deeplink</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge dispatched">dispatched</span></td>
+      <td><span class="dash">—</span></td>
+      <td>1</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0s</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T42-profile-change-password</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T43-profile-preferences-nutrition</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T44-profile-backfill-past-weeks</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T45-profile-program-editor</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T46-profile-backup-export-import</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+    <tr>
+      <td><code>T47-profile-danger-zone</code></td>
+      <td><code>/?tab=profile</code></td>
+      <td><span class="badge pending">pending</span></td>
+      <td><span class="dash">—</span></td>
+      <td>0</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+      <td>—</td>
+      <td><span class="dash">—</span></td>
+      <td><span class="dash">—</span></td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+
+
+<footer>
+  <span>auto-refresh: <strong>every 3s</strong></span>
+  <span>generated <code>2026-10-24T03:20:42Z</code></span>
+  <span>qa-my-app plugin</span>
+</footer>
+
+<script>
+  (function () {
+    var done = false;
+    var refreshMs = 3000;
+    var key = "qa-my-app-autorefresh";
+    var box = document.getElementById("auto");
+    if (!box) return;
+    var stored = localStorage.getItem(key);
+    if (stored === "off") box.checked = false;
+    if (done) {
+      box.checked = false;
+      box.disabled = true;
+      return;
+    }
+    function arm() {
+      if (!box.checked) return;
+      setTimeout(function () { if (box.checked) location.reload(); }, refreshMs);
+    }
+    box.addEventListener("change", function () {
+      localStorage.setItem(key, box.checked ? "on" : "off");
+      var meta = document.querySelector('meta[http-equiv="refresh"]');
+      if (meta) meta.remove();
+      if (box.checked) arm();
+    });
+    if (!box.checked) {
+      var meta = document.querySelector('meta[http-equiv="refresh"]');
+      if (meta) meta.remove();
+    } else {
+      arm();
+    }
+  })();
+</script>
+
+</body>
+</html>
