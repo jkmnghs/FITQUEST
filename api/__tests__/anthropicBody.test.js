@@ -52,6 +52,11 @@ describe('sanitizeAnthropicBody — thinking', () => {
     expect(out.thinking).toEqual({ type: 'disabled' });
   });
 
+  it('turns thinking off on Sonnet 5.5 with between_tools (disabled is a 400 there)', () => {
+    const out = sanitizeAnthropicBody({ model: 'claude-sonnet-5-5', messages });
+    expect(out.thinking).toEqual({ type: 'between_tools' });
+  });
+
   it('leaves Haiku requests alone', () => {
     const out = sanitizeAnthropicBody({ model: 'claude-haiku-4-5', messages });
     expect(out.thinking).toBeUndefined();
@@ -91,5 +96,24 @@ describe('sanitizeAnthropicBody — payload shape', () => {
   it('rejects a body with no messages', () => {
     expect(sanitizeAnthropicBody({ messages: [] })).toBeNull();
     expect(sanitizeAnthropicBody(null)).toBeNull();
+  });
+});
+
+describe('sanitizeAnthropicBody — output_config', () => {
+  const schema = { type: 'object', properties: {}, additionalProperties: false };
+
+  it('passes a JSON-schema format through for structured output', () => {
+    const out = sanitizeAnthropicBody({
+      model: 'claude-sonnet-5-5', messages,
+      output_config: { format: { type: 'json_schema', schema, extra: 1 } },
+    });
+    expect(out.output_config).toEqual({ format: { type: 'json_schema', schema } });
+  });
+
+  it('allows effort up to high and drops anything else', () => {
+    const ok = sanitizeAnthropicBody({ messages, output_config: { effort: 'low' } });
+    expect(ok.output_config).toEqual({ effort: 'low' });
+    const capped = sanitizeAnthropicBody({ messages, output_config: { effort: 'max', task_budget: {} } });
+    expect(capped).not.toHaveProperty('output_config');
   });
 });
