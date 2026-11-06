@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Sparkles } from 'lucide-react';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 import { useConfirm } from './ui/ConfirmDialog';
+import { generateProgram } from '../utils/programGenerator';
+import { convertWeight } from '../utils/gameLogic';
 
 const DAY_ORDER  = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -227,6 +230,46 @@ export default function ProgramEditorTab({ state, updateSetting }) {
     setTimeout(() => setSaved(false), 2500);
   }
 
+  // ── Regenerate with AI ──
+  // Generates a fresh week from the assessment and shows it as a preview;
+  // nothing is written until the user accepts it.
+  const [regen, setRegen] = useState({ status: 'idle' });
+
+  async function startRegenerate() {
+    if (dirty) {
+      const ok = await confirm({
+        title: 'Discard unsaved edits?',
+        message: 'You have changes that are not saved. A new program will replace them if you use it.',
+        confirmLabel: 'CONTINUE',
+      });
+      if (!ok) return;
+    }
+    setRegen({ status: 'loading' });
+    const result = await generateProgram(state.assessment || {}, { trainingDays });
+    setRegen(result.ok
+      ? { status: 'preview', templates: result.templates, notes: result.notes }
+      : { status: 'error', message: result.message });
+  }
+
+  async function acceptRegenerated() {
+    const ok = await confirm({
+      title: 'Replace your program?',
+      message: 'Every session is replaced with the new one. Your lift history and progress weights are kept.',
+      confirmLabel: 'USE THIS PROGRAM',
+    });
+    if (!ok) return;
+    const merged = { ...(state.dayTemplates || {}), ...regen.templates };
+    updateSetting('dayTemplates', merged);
+    lastSyncedKey.current = `${JSON.stringify(merged)}|${daysKey}`;
+    setDrafts(buildDrafts(merged, trainingDays));
+    setDirty(false);
+    setEditingIdx(null);
+    setAddForm(null);
+    setRegen({ status: 'idle' });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
   async function clearDay() {
     const ok = await confirm({
       title: `Clear ${DAY_FULL[activeDay]}?`,
@@ -248,6 +291,15 @@ export default function ProgramEditorTab({ state, updateSetting }) {
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.5 }}>
         Set custom exercises for each session of the week. Train any day you like — the Train tab loads the next session you haven't done yet.
       </div>
+
+      <RegeneratePanel
+        regen={regen}
+        unit={state.unit}
+        trainingDays={trainingDays}
+        onStart={startRegenerate}
+        onAccept={acceptRegenerated}
+        onDiscard={() => setRegen({ status: 'idle' })}
+      />
 
       {/* Day tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -483,8 +535,85 @@ export default function ProgramEditorTab({ state, updateSetting }) {
         background: 'rgba(179,136,255,0.05)', border: '1px solid rgba(179,136,255,0.15)',
         borderRadius: 12, fontSize: 11, color: 'var(--text3)', lineHeight: 1.6,
       }}>
-        <strong style={{ color: 'var(--purple)' }}>How it works:</strong> Once saved, the Workout tab auto-loads today's exercises from this program. Prescribed weights here are your starting weights — the app tracks progress separately as you advance.
+        <strong style={{ color: 'var(--purple)' }}>How it works:</strong> Once saved, the Workout tab loads the next session you haven't done this week. Prescribed weights here are your starting weights — the app tracks progress separately as you advance.
       </div>
+    </div>
+  );
+}
+
+/**
+ * The "Regenerate with AI" control: a button, then a loading line, an error,
+ * or a read-only preview of the new week with use / discard.
+ */
+function RegeneratePanel({ regen, unit, trainingDays, onStart, onAccept, onDiscard }) {
+  const box = {
+    marginBottom: 16, padding: '12px 14px',
+    background: 'rgba(179,136,255,0.06)', border: '1px solid rgba(179,136,255,0.2)',
+    borderRadius: 12,
+  };
+  const btn = (primary) => ({
+    flex: primary ? 2 : 1, minHeight: 44, padding: '10px 12px', borderRadius: 10,
+    border: primary ? 'none' : '1px solid rgba(255,255,255,0.12)',
+    background: primary ? 'linear-gradient(135deg, var(--purple), var(--cyan))' : 'transparent',
+    color: primary ? '#05070f' : 'var(--text2)',
+    fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em',
+    cursor: 'pointer',
+  });
+  const kg = (v) => `${convertWeight(Number(v) || 0, unit)} ${unit === 'lbs' ? 'lbs' : 'kg'}`;
+
+  if (regen.status === 'preview') {
+    return (
+      <div style={box} aria-live="polite">
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, letterSpacing: '0.14em', color: 'var(--purple)', marginBottom: 8 }}>
+          NEW PROGRAM PREVIEW
+        </div>
+        {trainingDays.filter(d => regen.templates[d]).map((d, i) => {
+          const t = regen.templates[d];
+          return (
+            <div key={d} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                Session {i + 1}{t.title ? ` — ${t.title}` : ''}
+              </div>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                {t.exercises.map(ex => (
+                  <li key={ex.id}>
+                    {ex.name} — {ex.sets} × {ex.isPlank ? (ex.duration ?? '30s') : ex.reps}
+                    {!ex.isBodyweight && !ex.isPlank && ex.startKg > 0 ? ` @ ${kg(ex.startKg)}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+        {regen.notes?.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>
+            Balanced weekly volume: {regen.notes.length} exercise{regen.notes.length === 1 ? '' : 's'} added.
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onAccept} style={btn(true)}>USE THIS PROGRAM</button>
+          <button onClick={onDiscard} style={btn(false)}>DISCARD</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={box}>
+      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 10 }}>
+        Build a fresh week from your goals, equipment, session length, injuries and lifts. You'll see it before anything changes.
+      </div>
+      {regen.status === 'error' && (
+        <div role="alert" style={{ fontSize: 12, color: '#ff8a9b', marginBottom: 10 }}>{regen.message}</div>
+      )}
+      <button
+        onClick={onStart}
+        disabled={regen.status === 'loading'}
+        style={{ ...btn(true), width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: regen.status === 'loading' ? 0.6 : 1 }}
+      >
+        <Sparkles size={15} aria-hidden="true" />
+        {regen.status === 'loading' ? 'BUILDING YOUR PROGRAM…' : 'REGENERATE WITH AI'}
+      </button>
     </div>
   );
 }

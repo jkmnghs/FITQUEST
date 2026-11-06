@@ -66,6 +66,7 @@ export async function requireUser(req, res) {
 export const ALLOWED_MODELS = new Set([
   'claude-haiku-4-5',
   'claude-sonnet-5',
+  'claude-sonnet-5-5',
 ]);
 
 // Model IDs that earlier bundles sent. An installed PWA can keep running a
@@ -79,7 +80,26 @@ export const LEGACY_MODEL_ALIASES = {
 };
 
 export const DEFAULT_MODEL = 'claude-haiku-4-5';
-export const MAX_OUTPUT_TOKENS = 4096;
+// Program generation returns a full week of sessions as JSON; 4096 could cut
+// a five-session program off mid-object.
+export const MAX_OUTPUT_TOKENS = 8192;
+
+const EFFORT_LEVELS = new Set(['low', 'medium', 'high']);
+
+/**
+ * Only the parts of output_config the app uses: a JSON-schema response format
+ * (structured output) and an effort level up to `high`.
+ */
+function sanitizeOutputConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return null;
+  const out = {};
+  const f = cfg.format;
+  if (f && f.type === 'json_schema' && f.schema && typeof f.schema === 'object') {
+    out.format = { type: 'json_schema', schema: f.schema };
+  }
+  if (EFFORT_LEVELS.has(cfg.effort)) out.effort = cfg.effort;
+  return Object.keys(out).length ? out : null;
+}
 
 /**
  * Returns a sanitized Anthropic Messages payload, or null when the body is
@@ -108,6 +128,8 @@ export function sanitizeAnthropicBody(body) {
   if (body.tool_choice && typeof body.tool_choice === 'object') {
     payload.tool_choice = body.tool_choice;
   }
+  const outputConfig = sanitizeOutputConfig(body.output_config);
+  if (outputConfig) payload.output_config = outputConfig;
 
   // Sonnet 5 runs adaptive thinking whenever `thinking` is omitted, and
   // thinking tokens are charged against max_tokens. Every call we make here is
@@ -116,6 +138,12 @@ export function sanitizeAnthropicBody(body) {
   // Ask for it off explicitly instead of relying on the old default.
   if (payload.model === 'claude-sonnet-5') {
     payload.thinking = { type: 'disabled' };
+  }
+  // Sonnet 5.5 rejects `disabled` (400); `between_tools` is its no-thinking
+  // setting, and is only valid at effort `high` or below — which is all
+  // sanitizeOutputConfig lets through.
+  if (payload.model === 'claude-sonnet-5-5') {
+    payload.thinking = { type: 'between_tools' };
   }
   return payload;
 }

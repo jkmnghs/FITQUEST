@@ -171,3 +171,31 @@ export function applyCompetencySubstitutions(exercises, movementCompetency) {
 
   return result;
 }
+
+/**
+ * Exercise ids the user should not be given at all, from the same rules the
+ * substitutions apply: anything a pain rule replaces at the user's severity,
+ * and any movement they have never tried (squat → no barbell squat, etc.).
+ *
+ * The program generator removes these from the pool it offers the model, so
+ * the model plans around them instead of having its picks swapped afterwards.
+ */
+export function blockedExerciseIds(painRegions, movementCompetency) {
+  const blocked = new Set();
+  for (const rule of SUBSTITUTION_RULES) {
+    const severity = painRegions?.[rule.region] || 'none';
+    if (SEVERITY_RANK[severity] >= (SEVERITY_RANK[rule.minSeverity] || 2)) {
+      blocked.add(rule.exerciseId);
+    }
+  }
+  for (const [movement, level] of Object.entries(movementCompetency || {})) {
+    const swap = COMPETENCY_SWAPS[movement]?.[level];
+    if (!swap) continue;
+    // 'unsure' on deadlift swaps rdl for rdl with a "start light" note —
+    // that is a caution, not a reason to leave the lift out.
+    for (const id of COMPETENCY_TARGETS[movement] || []) if (id !== swap) blocked.add(id);
+    // Never having deadlifted rules out the conventional pull as well.
+    if (movement === 'deadlift' && level === 'never') blocked.add('deadlift');
+  }
+  return blocked;
+}
