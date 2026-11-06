@@ -640,6 +640,11 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       if (isBuildMode) {
         requestBody.tools = [SAVE_PROGRAM_TOOL];
         requestBody.tool_choice = { type: 'auto' };
+        // Building a program is program generation, not conversation: it
+        // draws on the weekly program budget (15) like onboarding and
+        // Regenerate do, so a few build attempts don't use up the five
+        // weekly coach messages.
+        requestBody.purpose = 'program_generation';
       }
 
       const response = await authPostJSON('/api/coach', requestBody);
@@ -658,7 +663,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       // The server increments the weekly quest quota on its own copy of the
       // state; mirror it locally so the client's next auto-save agrees instead
       // of writing a stale count back.
-      onQuestMessageSent?.();
+      if (!isBuildMode) onQuestMessageSent?.();
 
       // ── Handle tool_use (Program Builder) — supports multiple days in one response ──
       const toolCalls = (data.content || []).filter(b => b.type === 'tool_use' && b.name === 'save_day_program');
