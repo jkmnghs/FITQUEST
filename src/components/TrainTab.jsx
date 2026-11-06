@@ -61,17 +61,17 @@ function SessionHistory({ log }) {
   );
 }
 
-const DAY_LABEL = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
 
-function NextWorkoutCard({ state }) {
+function NextWorkoutCard({ state, sessionDayKey }) {
   const [open, setOpen] = useState(false);
 
+  // The session after the one on screen this week, in slot order (training
+  // days are flexible, so "next" means next in the week, not next weekday).
   const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const dayKey = DAY_ORDER[new Date().getDay()];
   const tdays = state.trainingDays || ['mon', 'wed', 'fri'];
   const sortedTdays = [...tdays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
-  const todayOrdinal = DAY_ORDER.indexOf(dayKey);
-  const nextDayKey = sortedTdays.find(d => DAY_ORDER.indexOf(d) > todayOrdinal) || sortedTdays[0];
+  const fromIdx = sortedTdays.indexOf(sessionDayKey);
+  const nextDayKey = sortedTdays[(fromIdx + 1) % sortedTdays.length] || sortedTdays[0];
 
   // Prefer dayTemplates; fall back to activeTemplates keyed by original tdays index
   const nextFromDayTemplates = state.dayTemplates?.[nextDayKey];
@@ -100,7 +100,7 @@ function NextWorkoutCard({ state }) {
           flex: 1, fontFamily: 'var(--font-primary)', fontSize: 'var(--text-sm)',
           fontWeight: 600, color: 'var(--color-text-secondary)',
         }}>
-          Next workout: <span style={{ color: 'var(--color-text-primary)' }}>{next.title || next.name || DAY_LABEL[nextDayKey] || 'Upcoming'}</span>
+          Next workout: <span style={{ color: 'var(--color-text-primary)' }}>{next.title || next.name || `Session ${sortedTdays.indexOf(nextDayKey) + 1}`}</span>
         </span>
         {open
           ? <ChevronUp size={15} color="var(--color-text-tertiary)" />
@@ -229,7 +229,7 @@ export default function TrainTab({
       />
 
       {/* Next workout preview */}
-      <NextWorkoutCard state={state} />
+      <NextWorkoutCard state={state} sessionDayKey={sessionDayKey} />
 
       {/* Session history */}
       <div style={{ marginTop: 'var(--space-8)' }}>

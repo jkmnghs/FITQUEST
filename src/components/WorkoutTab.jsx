@@ -14,6 +14,7 @@ import { useConfirm } from './ui/ConfirmDialog';
 import { haptic } from '../utils/haptics';
 import { getLastPerformance } from '../utils/exerciseHistory';
 import { resolveWeekDays, defaultViewingWeek } from '../utils/week';
+import { slotLabel } from '../utils/session';
 
 // Ceiling from calculateAdherenceXP: 10 (training day) + 8 (RPE) + 20 (overload).
 const MAX_EXERCISE_XP = 38;
@@ -160,7 +161,7 @@ function SessionHero({
         fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 800, letterSpacing: '0.28em',
         color: isRestDay ? 'var(--color-accent-purple)' : 'var(--color-action)',
         marginBottom: 'var(--space-3)',
-      }}>{isRestDay ? 'RECOVERY' : 'DAILY QUEST'}</div>
+      }}>{isRestDay ? 'RECOVERY' : 'WEEKLY QUEST · ANY DAY'}</div>
       {/* Week stepper */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -223,14 +224,14 @@ function SessionHero({
             fontFamily: 'var(--font-display)', fontSize: 'var(--text-base)', fontWeight: 700,
             color: 'var(--color-text-primary)', lineHeight: 1.25, letterSpacing: '0.02em',
           }}>
-            {isRestDay ? 'REST DAY' : (sessionTitle || "TODAY'S SESSION")}
+            {isRestDay ? 'WEEK CLEARED' : (sessionTitle || "TODAY'S SESSION")}
           </h2>
           <div style={{
             fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
             marginTop: 3, lineHeight: 1.4,
           }}>
             {isRestDay
-              ? <>Recovery — next up {FULL_DAY[nextTrainingDayKey] || 'soon'}</>
+              ? <>All {state.sessionsPerWeek || weekDays.length} sessions in — recover. Next week's quest opens Monday.</>
               : <>{totalExercises} exercise{totalExercises === 1 ? '' : 's'} · session {Math.min(sessionsThisWeek + (sessionFinished ? 0 : 1), state.sessionsPerWeek || weekDays.length)} of {state.sessionsPerWeek || weekDays.length}</>}
           </div>
           {sessionRunning && !isRestDay && (
@@ -254,7 +255,7 @@ function SessionHero({
         display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
         marginBottom: 'var(--space-4)', flexWrap: 'wrap',
       }}>
-        {weekDays.map(({ dayKey, label, done, skipped, markedSkipped, current }) => {
+        {weekDays.map(({ dayKey, label, trainedOn, done, skipped, markedSkipped, current }) => {
           const interactive = (skipped || done) && !!onMakeUpDay;
           let borderColor = 'var(--color-border-medium)';
           let bg = 'transparent';
@@ -266,10 +267,13 @@ function SessionHero({
           else if (skipped)    { borderColor = 'rgba(255,23,68,0.6)';  bg = 'rgba(255,23,68,0.1)'; fg = 'var(--color-destructive)'; }
           else if (current)    { borderColor = 'var(--color-action)';  fg = 'var(--color-action)'; }
 
-          const label_ = done ? `${FULL_DAY[dayKey]} complete — tap to clear`
-            : markedSkipped ? `${FULL_DAY[dayKey]} marked as skipped`
-            : skipped ? `${FULL_DAY[dayKey]} missed — resolve it`
-            : `${FULL_DAY[dayKey]} upcoming`;
+          const name = slotLabel(state, dayKey);
+          const on = trainedOn ? ` on ${FULL_DAY[DAY_KEYS[new Date(trainedOn).getDay()]]}` : '';
+          const label_ = done ? `${name} done${on} — tap to clear`
+            : markedSkipped ? `${name} marked as skipped`
+            : skipped ? `${name} missed — resolve it`
+            : current ? `${name} — up next, any day this week`
+            : `${name} still to do this week`;
 
           return (
             <button
@@ -435,8 +439,8 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           marginBottom: 'var(--space-4)',
         }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-3)' }}>
-            <TriangleAlert size={14} color="var(--color-premium)" aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} /><strong style={{ color: 'var(--color-premium)' }}>Rest days are when muscle is built.</strong>{' '}
-            Training through one usually costs more than it earns, and raises injury risk.
+            <TriangleAlert size={14} color="var(--color-premium)" aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} /><strong style={{ color: 'var(--color-premium)' }}>This week's sessions are already in.</strong>{' '}
+            Recovery is when muscle is built — an extra session usually costs more than it earns, and raises injury risk.
             Your coach can tell you whether today is an exception.
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -902,6 +906,7 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
           // was current, silently crediting the wrong one.
           week={w}
           dayId={makeUpDay}
+          dayName={slotLabel(state, makeUpDay)}
           isCurrentWeek={isCurrentWeek}
           isDone={weekDays.find(d => d.dayKey === makeUpDay)?.done ?? false}
           isMarkedSkipped={weekDays.find(d => d.dayKey === makeUpDay)?.markedSkipped ?? false}
@@ -1150,8 +1155,8 @@ const FULL_DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: '
  * even when you simply missed it. Marking it skipped closes the slot honestly:
  * the week can complete, and no session, XP or volume is invented.
  */
-function MissedDayModal({ week, dayId, isDone, isMarkedSkipped, isCurrentWeek, onCancel, onMakeUp, onSkip, onUnskip, onClear }) {
-  const dayName = FULL_DAY_NAMES[dayId] || dayId;
+function MissedDayModal({ week, dayId, dayName: dayNameProp, isDone, isMarkedSkipped, isCurrentWeek, onCancel, onMakeUp, onSkip, onUnskip, onClear }) {
+  const dayName = dayNameProp || FULL_DAY_NAMES[dayId] || dayId;
   const btn = (extra) => ({
     width: '100%', minHeight: 'var(--tap-target)', padding: '12px 14px',
     borderRadius: 'var(--radius-lg)', border: 'none',
@@ -1196,7 +1201,7 @@ function MissedDayModal({ week, dayId, isDone, isMarkedSkipped, isCurrentWeek, o
             ? 'This day is recorded as trained. Clearing it removes the session from the week and returns the day to missed. XP already banked is kept.'
             : isMarkedSkipped
             ? 'This day is marked as skipped. It counts toward closing the week but earns nothing.'
-            : `You didn't train ${dayName}. Log it now, or mark it skipped so the week can close without crediting a session.`}
+            : `${dayName} wasn't trained that week. Log it now, or mark it skipped so the week can close without crediting a session.`}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

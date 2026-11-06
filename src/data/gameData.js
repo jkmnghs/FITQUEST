@@ -180,7 +180,7 @@ export const DEFAULT_STATE = {
   agentMessages: [],           // proactive messages from the AI agent
   agentDeloadSuggested: false, // agent has recommended a deload
   // ── v2 State Fields ──
-  stateVersion: 2,
+  stateVersion: 3,
   dailyXPEarned: 0,
   dailySessionCount: 0,
   lastDayReset: null,

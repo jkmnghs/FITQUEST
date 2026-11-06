@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { DEFAULT_STATE, ACHIEVEMENTS } from '../data/gameData';
 import { storageGet, storageSet, storageClear, migrateLegacyStorage, cloudGet, cloudGetResult, cloudSet, cloudClear, cloudSetDebounced, cancelCloudDebounce, flushCloudDebounce, markCloudLoadSettled, resetCloudLoadGate, isCloudLoadSettled, isEmptyState, getSyncStatus, subscribeSyncStatus } from '../utils/storage';
-import { today, applyXP, updateStreak, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, startOfThisWeek, midnightOf } from '../utils/gameLogic';
+import { today, applyXP, updateStreak, isStreakBroken, checkAchievements, calculateSessionXP, calculateAdherenceXP, overtrainingCheck, isDeloadWeek, DAILY_XP_CAP, xpToLevel, removeXP, nextMonday, startOfThisWeek, midnightOf } from '../utils/gameLogic';
 import { maybeFireOpenNotification } from '../utils/notifications';
 import { selectProgram, getProgramById, buildInitialWeights } from '../data/programs';
 import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutrition';
@@ -91,13 +91,9 @@ function checkDayReset(state) {
     next.dailySessionCount = 0;
     next.lastDayReset = new Date().toISOString().slice(0, 10);
   }
-  // Decay streak if gap since last session exceeds the 3-day rest-day window
-  if (next.lastDate && next.lastDate !== t && next.streak > 0) {
-    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
-    const lastMidnight = new Date(next.lastDate); lastMidnight.setHours(0, 0, 0, 0);
-    const daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
-    if (daysSinceLast > 3) next.streak = 0;
-  }
+  // The streak is weekly: it only lapses once a week ends short of its
+  // sessions (or a whole week passes with none), never over a rest gap.
+  if (isStreakBroken(next)) next.streak = 0;
   // Auto-advance currentWeek if it's already marked complete (e.g. via backfill)
   let advanced = false;
   while (next.weekProgress?.[next.currentWeek]?.completed && next.currentWeek < 999) {
@@ -517,17 +513,11 @@ export function useGameState(user) {
     const waistToHeightRatio = calcWaistToHeight(assessment.waistCm, assessment.heightCm);
 
     setStateRaw(prev => {
-      const _dayOrder2 = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-      const _todayKey2 = _dayOrder2[new Date().getDay()];
-      const _tdays2 = assessment.trainingDays || [];
       const _builtTemplates = program.templates
         ? program.templates.map(t => ({ ...t, exercises: buildPersonalizedExercises(t.exercises, assessment) }))
         : null;
-      // Start from today's slot so the first workout shown is today's, not always slot 0 (Monday)
-      const _todayOrigIdx2 = _tdays2.indexOf(_todayKey2);
-      const _initDayIndex = (_todayOrigIdx2 >= 0 && _builtTemplates?.length > 0)
-        ? _todayOrigIdx2 % _builtTemplates.length
-        : 0;
+      // Training days are flexible, so the first workout is always session 1.
+      const _initDayIndex = 0;
       const _initExercises = _builtTemplates?.[_initDayIndex]?.exercises
         ?? buildPersonalizedExercises(program.exercises, assessment);
 
@@ -563,7 +553,7 @@ export function useGameState(user) {
           primaryMotivation: assessment.primaryMotivation || null,
           previousQuitReason: assessment.previousQuitReason || null,
         },
-        stateVersion: 2,
+        stateVersion: 3,
       };
       pendingAssessmentSave.current = newState;
       return newState;
@@ -737,9 +727,8 @@ export function useGameState(user) {
 
       // ── Adherence-based XP calculation ──
       const avgRPE = rpeCount > 0 ? totalRPE / rpeCount : 0;
-      const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase().slice(0, 3);
-      const matchesPrescribedDay = (prev.trainingDays || [])
-        .some(d => d.toLowerCase().startsWith(todayStr));
+      // Any day is a training day while the week still has sessions to do.
+      const matchesPrescribedDay = (prev.weekProgress?.[prev.currentWeek]?.count || 0) < (prev.sessionsPerWeek || 3);
       const previousWeight = prev.liftWeights?.[exId] || 0;
       const overloadAchieved = maxWeightUsed > previousWeight && previousWeight > 0;
 
@@ -868,8 +857,8 @@ export function useGameState(user) {
       const missedCount = Math.max(0, totalEx - doneCount);
 
       // Session-level adherence bonuses (prescribed day + overall RPE quality)
-      const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase().slice(0, 3);
-      const matchesPrescribedDay = (prev.trainingDays || []).some(d => d.toLowerCase().startsWith(todayStr));
+      // Any day counts as on schedule while the week still has sessions to do.
+      const matchesPrescribedDay = (prev.weekProgress?.[w]?.count || 0) < (prev.sessionsPerWeek || 3);
       const details = Object.values(prev.todayExDetails || {});
       const rpeValues = details.map(d => d.maxRPE).filter(r => r > 0);
       const avgSessionRPE = rpeValues.length > 0 ? rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length : 0;

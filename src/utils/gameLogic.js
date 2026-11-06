@@ -247,21 +247,125 @@ export function applyXP(state, amount) {
   return { xp, totalXp, level, leveledUp };
 }
 
+/** Midnight timestamp of the Monday of the calendar week containing `value`. */
+function mondayMs(value) {
+  const d = new Date(midnightOf(value));
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+
+/** Every distinct calendar day with a logged session, as sorted midnight timestamps. */
+function trainingDayList(state) {
+  const days = new Set();
+  for (const wp of Object.values(state?.weekProgress || {})) {
+    for (const d of [...(wp?.dates || []), ...(wp?.sessions || []).map(s => s?.date)]) {
+      const t = midnightOf(d);
+      if (!isNaN(t)) days.add(t);
+    }
+  }
+  for (const e of state?.log || []) {
+    if (e?.type !== 'session') continue;
+    const t = midnightOf(e.date);
+    if (!isNaN(t)) days.add(t);
+  }
+  const last = state?.lastDate ? midnightOf(state.lastDate) : NaN;
+  if (!isNaN(last)) days.add(last);
+  return [...days].sort((a, b) => a - b);
+}
+
+/** Distinct calendar days with a logged session in [fromMs, toMs). */
+export function trainingDaysBetween(state, fromMs, toMs) {
+  return trainingDayList(state).filter(t => t >= fromMs && t < toMs).length;
+}
+
+/**
+ * Pure weekly rule: is a streak of `streak` training days, last trained on
+ * `lastMs`, broken by `nowMs`? See isStreakBroken.
+ */
+function weeklyBreak(dayList, target, streak, lastMs, nowMs) {
+  const lastMon = mondayMs(lastMs);
+  const weeksSince = Math.round((mondayMs(nowMs) - lastMon) / (7 * 864e5));
+  if (weeksSince <= 0) return false;
+  if (weeksSince >= 2) return true;
+  const weekEnd = new Date(lastMon);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const trained = dayList.filter(t => t >= lastMon && t < weekEnd.getTime()).length;
+  const streakStartedThatWeek = streak <= trained;
+  return trained < target && !streakStartedThatWeek;
+}
+
+/**
+ * Whether the streak has lapsed, judged by the week rather than the day.
+ *
+ * Training days are flexible: any day counts, as long as the week's sessions
+ * (sessionsPerWeek) are in by Sunday. So the streak survives any gap between
+ * sessions inside a week, and only breaks when
+ * - a whole calendar week (Mon–Sun) went by with no session at all, or
+ * - the week of the last session ended short of the weekly target.
+ *
+ * The week a streak starts in gets a pass: someone who starts on a Saturday
+ * can't fit three sessions before Sunday. That is the case when every session
+ * in the streak falls inside that week.
+ *
+ * `streakGraceFrom` marks the day an account switched to weekly streaks. The
+ * week before it and the switch week itself were planned under fixed weekdays,
+ * so they are not held to the weekly target: a streak alive then stays alive
+ * until a full week after the switch week goes by without a session.
+ */
+export function isStreakBroken(state, now = new Date()) {
+  if (!(state?.streak > 0) || !state.lastDate) return false;
+  const lastMs = midnightOf(state.lastDate);
+  if (isNaN(lastMs)) return false;
+
+  const graceMon = state.streakGraceFrom ? mondayMs(state.streakGraceFrom) : NaN;
+  if (!isNaN(graceMon)) {
+    const lastMon = mondayMs(lastMs);
+    const weekBeforeGrace = graceMon - 7 * 864e5;
+    if (Math.round((lastMon - weekBeforeGrace) / 864e5) >= 0 && lastMon <= graceMon) {
+      return Math.round((mondayMs(now) - graceMon) / (7 * 864e5)) >= 2;
+    }
+  }
+
+  return weeklyBreak(trainingDayList(state), state.sessionsPerWeek || 3, state.streak, lastMs, midnightOf(now));
+}
+
+/**
+ * Rebuild the streak from session history under the weekly rule.
+ *
+ * Used once when an account moves to flexible training days, so streaks lost
+ * to the old "more than 3 days between sessions" rule come back.
+ * Returns { streak, bestStreak } — never lower than what the state holds.
+ */
+export function recomputeStreak(state, now = new Date()) {
+  const days = trainingDayList(state);
+  const target = state?.sessionsPerWeek || 3;
+  let streak = 0;
+  let best = 0;
+  let prev = NaN;
+  for (const t of days) {
+    streak = (!isNaN(prev) && !weeklyBreak(days, target, streak, prev, t)) ? streak + 1 : 1;
+    best = Math.max(best, streak);
+    prev = t;
+  }
+  if (days.length && isStreakBroken({ ...state, streak, lastDate: new Date(prev).toDateString() }, now)) {
+    streak = 0;
+  }
+  return {
+    streak: Math.max(streak, state?.streak || 0),
+    bestStreak: Math.max(best, streak, state?.bestStreak || 0),
+  };
+}
+
+/**
+ * Count a session toward the streak (once per calendar day). The streak counts
+ * training days; it keeps going as long as every week hits its sessions.
+ */
 export function updateStreak(state) {
   const t = today();
   if (state.lastDate === t) return state; // already updated today
 
-  // Calculate calendar-day gap between last session and today.
-  // Allow up to 3 days so normal rest days (e.g. Mon→Wed, Fri→Mon) don't
-  // break the streak. Gap > 3 means a session was genuinely skipped.
-  let daysSinceLast = Infinity;
-  if (state.lastDate) {
-    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
-    const lastMidnight = new Date(state.lastDate); lastMidnight.setHours(0, 0, 0, 0);
-    daysSinceLast = Math.round((todayMidnight - lastMidnight) / 864e5);
-  }
-  const streak = daysSinceLast <= 3 ? state.streak + 1 : 1;
-  const bestStreak = Math.max(streak, state.bestStreak);
+  const streak = isStreakBroken(state) ? 1 : (state.streak || 0) + 1;
+  const bestStreak = Math.max(streak, state.bestStreak || 0);
   return { ...state, streak, bestStreak, lastDate: t };
 }
 
