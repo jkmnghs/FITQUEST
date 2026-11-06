@@ -635,8 +635,12 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
 
     try {
       const requestBody = {
-        model: 'claude-haiku-4-5',
-        max_tokens: isBuildMode ? 4000 : 500,
+        // Build mode designs programs, where Haiku is weakest; it runs on the
+        // program budget (15/week), so the stronger model is affordable there.
+        // Chat stays on Haiku. tool_choice stays 'auto' — Sonnet 5.5 rejects
+        // forced tool use.
+        model: isBuildMode ? 'claude-sonnet-5-5' : 'claude-haiku-4-5',
+        max_tokens: isBuildMode ? 8192 : 500,
         system: systemPrompt,
         messages: modeHistory,
       };
