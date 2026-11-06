@@ -1,13 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, ImagePlus, ChevronRight, Info, Search, Utensils, Trash2 } from 'lucide-react';
-import { searchUSDA, validateUSDAMacros, validateUSDAAgainstClaude, getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
-import { findFoodReference } from '../utils/foodReference';
+import { getAdjusted, sumTotals, PORTION_MULT } from '../utils/nutritionUtils';
+import { analyzeMealPhoto, analyzeFoodText } from '../utils/foodEnrichment';
 import DailySummaryBar from './nutrition/DailySummaryBar';
 import TodaysMealHistory from './nutrition/TodaysMealHistory';
 import { useIsDesktop } from '../hooks/useIsDesktop';
-import { authPostJSON } from '../lib/authFetch';
-
-const API_URL = '/api/nutrition';
 
 export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs = [] }) {
   const [image, setImage] = useState(null); // { base64, preview, type }
@@ -89,22 +86,24 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     const file = e.target.files[0];
     if (!file) return;
 
-    // Reject HEIC/HEIF — Anthropic vision API doesn't support them
-    const lowerName = file.name.toLowerCase();
-    if (
-      file.type === 'image/heic' || file.type === 'image/heif' ||
-      lowerName.endsWith('.heic') || lowerName.endsWith('.heif')
-    ) {
-      setError('HEIC photos are not supported. In iPhone Settings → Camera → Formats, choose "Most Compatible" to shoot in JPEG, or pick an existing JPEG from your gallery.');
-      return;
-    }
-
     setFoods([]);
     setError(null);
     setLogged(false);
+    const lowerName = file.name.toLowerCase();
+    const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
+      || lowerName.endsWith('.heic') || lowerName.endsWith('.heif');
+
+    // Every photo is redrawn to a ≤1024px JPEG before upload, so a HEIC the
+    // browser can decode (Safari can) works fine. Only fail when it can't —
+    // previously HEIC was rejected outright, and any other undecodable image
+    // left the screen silently unchanged because nothing handled the error.
     const reader = new FileReader();
+    reader.onerror = () => setError('Could not read that photo. Try another one.');
     reader.onload = (ev) => {
       const img = new Image();
+      img.onerror = () => setError(isHeic
+        ? 'This HEIC photo could not be opened here. In iPhone Settings → Camera → Formats, choose "Most Compatible", or pick a JPEG from your gallery.'
+        : 'Could not open that photo. Try a JPEG or PNG.');
       img.onload = () => {
         const MAX = 1024;
         const scale = Math.min(1, MAX / Math.max(img.width, img.height));
@@ -128,142 +127,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     setError(null);
     setFoods([]);
     try {
-      const res = await authPostJSON(API_URL, {
-        model: 'claude-sonnet-5-5',
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: image.type, data: image.base64 },
-              },
-              {
-                type: 'text',
-                text: `Analyze this meal photo. Identify each food item and estimate portions.
-
-Return ONLY a valid JSON array — no markdown, no explanation, nothing else:
-[
-  {
-    "name": "Food Name",
-    "cookingMethod": "grilled",
-    "grams": 150,
-    "calories": 250,
-    "protein": 30,
-    "carbs": 10,
-    "fat": 8
-  }
-]
-
-Guidelines:
-- SCALE PRIORITY: If a kitchen scale is visible, read its exact digital display value and use that as the grams for the food on the scale. This overrides any visual estimate.
-- If no scale is visible, estimate grams from visual portion size (standard dinner plate ~26cm as reference)
-- Calories/macros must accurately match the gram amount (e.g. raw rolled oats: ~389 kcal/100g, ~13g protein, ~66g carbs, ~7g fat)
-- Look carefully at texture, color, and context to distinguish similar foods (e.g. oats vs flour vs rice)
-- Separate mixed dishes into visible components
-- cookingMethod: how it was prepared — grilled, fried, deep-fried, breaded, boiled, steamed, raw, roasted, stewed, braised, or the dish name if it is a named preparation (adobo, sinigang, teriyaki, carbonara). Use "unknown" only if it genuinely cannot be told. This decides whether reference nutrition values can be applied, so a fried or sauce-heavy item must say so.
-- Use "Unknown food" if unidentifiable`,
-              },
-            ],
-        }],
-      });
-
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data = await res.json();
-      // Pick the text block by type: a response can lead with a non-text block
-      // (a thinking block, say), and content[0] would then have no .text.
-      const text = (data.content?.find(b => b.type === 'text')?.text || '').trim();
-
-      let parsed;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        const match = text.match(/\[[\s\S]*\]/);
-        if (match) parsed = JSON.parse(match[0]);
-        else throw new Error('Could not parse response. Try again.');
-      }
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('No food items detected. Try a clearer photo.');
-      }
-
-      // Sanitize parsed fields — guard against non-numeric values from Claude
-      parsed = parsed.map(f => ({
-        name:     typeof f.name === 'string' && f.name.trim() ? f.name.trim() : 'Unknown food',
-        // Carried through to findFoodReference below: its complex-cooking guard
-        // is what stops a fried or sauce-heavy dish being overwritten with
-        // plain-ingredient reference values. Dropping this field here left that
-        // guard reading the food name alone.
-        cookingMethod: typeof f.cookingMethod === 'string' ? f.cookingMethod.trim() : '',
-        grams:    Number(f.grams)    > 0  ? Number(f.grams)    : 100,
-        calories: Number(f.calories) >= 0 ? Number(f.calories) : 0,
-        protein:  Number(f.protein)  >= 0 ? Number(f.protein)  : 0,
-        carbs:    Number(f.carbs)    >= 0 ? Number(f.carbs)    : 0,
-        fat:      Number(f.fat)      >= 0 ? Number(f.fat)      : 0,
-      }));
-
-      // 3-tier enrichment: Reference DB → USDA (cross-validated) → Claude estimate
-      const enriched = await Promise.all(parsed.map(async (f) => {
-        if (f.grams <= 0) return { ...f, source: 'ai' };
-
-        // Tier 1: Curated reference database
-        const ref = findFoodReference(f.name, f.cookingMethod || '');
-        if (ref) {
-          const m = f.grams / 100;
-          return {
-            ...f,
-            calories: Math.round(ref.calories * m),
-            protein:  Math.round(ref.protein  * m * 10) / 10,
-            carbs:    Math.round(ref.carbs     * m * 10) / 10,
-            fat:      Math.round(ref.fat       * m * 10) / 10,
-            source: 'reference',
-          };
-        }
-
-        // Tier 2: USDA with dual validation
-        const claudeCalsPer100g = (f.calories / f.grams) * 100;
-        const claudePer100g = {
-          calories: claudeCalsPer100g,
-          protein:  (f.protein / f.grams) * 100,
-          carbs:    (f.carbs   / f.grams) * 100,
-          fat:      (f.fat     / f.grams) * 100,
-        };
-        const usda = await searchUSDA(f.name, claudeCalsPer100g);
-        if (usda) {
-          const m = f.grams / 100;
-          const usdaResult = {
-            calories: Math.round(usda.calories * m),
-            protein: Math.round(usda.protein * m * 10) / 10,
-            carbs: Math.round(usda.carbs * m * 10) / 10,
-            fat: Math.round(usda.fat * m * 10) / 10,
-          };
-          const physicallyValid  = validateUSDAMacros(usdaResult, f.grams);
-          const consistentClaude = validateUSDAAgainstClaude(usda, claudePer100g);
-          const noMacroWipeout   =
-            !(f.protein > 2 && usdaResult.protein === 0) &&
-            !(f.carbs   > 2 && usdaResult.carbs   === 0) &&
-            !(f.fat     > 2 && usdaResult.fat      === 0);
-          if (physicallyValid && consistentClaude && noMacroWipeout) {
-            return { ...f, ...usdaResult, source: 'usda' };
-          }
-        }
-
-        // Tier 3: Claude's estimate
-        return { ...f, source: 'ai' };
-      }));
-
-      setFoods(enriched.map(f => ({
-        name:     f.name || 'Unknown',
-        cookingMethod: f.cookingMethod || '',
-        grams:    Number(f.grams)    || 0,
-        calories: Number(f.calories) || 0,
-        protein:  Number(f.protein)  || 0,
-        carbs:    Number(f.carbs)    || 0,
-        fat:      Number(f.fat)      || 0,
-        source:   f.source || 'ai',
-        portion: 'M',
-        customGrams: null,
-      })));
+      setFoods(await analyzeMealPhoto(image));
     } catch (err) {
       setError(err.message || 'Analysis failed. Try again.');
     } finally {
@@ -277,76 +141,8 @@ Guidelines:
     setAdding(true);
     setAddError(null);
     try {
-      // Ask Claude for gram weight + full nutrition
-      const claudeRes = await authPostJSON(API_URL, {
-        model: 'claude-sonnet-5-5',
-        max_tokens: 256,
-        messages: [{
-          role: 'user',
-          content: `Nutritional info for: "${query}". Return ONLY JSON (no markdown):\n{"name":"Food Name","cookingMethod":"grilled","grams":150,"calories":250,"protein":22,"carbs":5,"fat":8}\nUse cooked-state values. Realistic serving gram weight. cookingMethod is how it is prepared (grilled, fried, deep-fried, breaded, boiled, steamed, raw, stewed) or the named dish if it is one (adobo, sinigang, teriyaki) — "unknown" only if genuinely unclear.`,
-        }],
-      });
-      if (!claudeRes.ok) throw new Error(`API error ${claudeRes.status}`);
-      const claudeData = await claudeRes.json();
-      const text = (claudeData.content?.find(b => b.type === 'text')?.text || '').trim();
-      let c = {};
-      try { c = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) c = JSON.parse(m[0]); }
-
-      const name  = typeof c.name === 'string' && c.name.trim() ? c.name.trim() : query;
-      const grams = Number(c.grams) > 0 ? Number(c.grams) : 100;
-      const claudePer100g = grams > 0 ? {
-        calories: ((Number(c.calories) || 0) / grams) * 100,
-        protein:  ((Number(c.protein)  || 0) / grams) * 100,
-        carbs:    ((Number(c.carbs)    || 0) / grams) * 100,
-        fat:      ((Number(c.fat)      || 0) / grams) * 100,
-      } : null;
-
-      // Tier 1: Reference database
-      // The raw query is included as a cooking hint alongside the method: the
-      // user typing "chicken adobo" carries the signal even when the model
-      // normalizes the name down to "Chicken".
-      const cookingMethod = typeof c.cookingMethod === 'string' ? c.cookingMethod.trim() : '';
-      const ref = findFoodReference(name, `${cookingMethod} ${query}`.trim());
-      if (ref) {
-        const m = grams / 100;
-        setFoods(prev => [...prev, {
-          name, grams,
-          calories: Math.round(ref.calories * m),
-          protein:  Math.round(ref.protein  * m * 10) / 10,
-          carbs:    Math.round(ref.carbs     * m * 10) / 10,
-          fat:      Math.round(ref.fat       * m * 10) / 10,
-          source: 'reference', portion: 'M', customGrams: null,
-        }]);
-        setAddText('');
-        return;
-      }
-
-      // Tier 2: USDA with cross-validation
-      const usdaPer100g = await searchUSDA(name, claudePer100g?.calories ?? 0);
-      if (usdaPer100g && claudePer100g) {
-        const m = grams / 100;
-        const usdaResult = {
-          calories: Math.round(usdaPer100g.calories * m),
-          protein:  Math.round(usdaPer100g.protein  * m * 10) / 10,
-          carbs:    Math.round(usdaPer100g.carbs     * m * 10) / 10,
-          fat:      Math.round(usdaPer100g.fat       * m * 10) / 10,
-        };
-        if (validateUSDAMacros(usdaResult, grams) && validateUSDAAgainstClaude(usdaPer100g, claudePer100g)) {
-          setFoods(prev => [...prev, { name, grams, ...usdaResult, source: 'usda', portion: 'M', customGrams: null }]);
-          setAddText('');
-          return;
-        }
-      }
-
-      // Tier 3: Claude's estimate
-      setFoods(prev => [...prev, {
-        name, grams,
-        calories: Math.max(0, Number(c.calories) || 0),
-        protein:  Math.max(0, Number(c.protein)  || 0),
-        carbs:    Math.max(0, Number(c.carbs)     || 0),
-        fat:      Math.max(0, Number(c.fat)       || 0),
-        source: 'ai', portion: 'M', customGrams: null,
-      }]);
+      const food = await analyzeFoodText(query);
+      setFoods(prev => [...prev, food]);
       setAddText('');
     } catch (err) {
       setAddError(err.message || 'Failed to add item.');
@@ -469,8 +265,10 @@ Guidelines:
         style={{ display: 'none' }}
       />
 
-      {/* Upload area or preview */}
-      {!image ? (
+      {/* Upload area or preview. Once foods are listed (from a photo or typed),
+          the list's own "missing something?" field takes over — showing this
+          block too gave two inputs, and after logging it added to the logged meal. */}
+      {!image && foods.length === 0 ? (
         <>
           {/* Primary action — Camera */}
           <button
@@ -604,7 +402,7 @@ Guidelines:
             </span>
           </div>
         </>
-      ) : (
+      ) : image && (
         <div style={{ position: 'relative', marginBottom: 14 }}>
           <img
             src={image.preview}
@@ -1030,7 +828,7 @@ Guidelines:
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                RE-SCAN
+                {image ? 'RE-SCAN' : 'START OVER'}
               </button>
               <button
                 onClick={handleLogMeal}

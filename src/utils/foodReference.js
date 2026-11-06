@@ -301,25 +301,49 @@ function keywordMatches(normalized, kw) {
   return true;
 }
 
+// Words that mean the food is not the plain item an entry describes: "potato
+// chips" is not boiled potato, "fried rice" is not steamed rice, "banana cue"
+// is not a banana, "milk tea" is not milk. A name containing one of these
+// (outside the matched keyword itself — "fried egg" and "protein shake" are
+// their own entries) gets no reference value and falls through to USDA / AI.
+const DISQUALIFIERS = new Set([
+  'fried', 'fry', 'fries', 'chip', 'chips', 'crisps', 'crispy', 'sinangag', 'garlic',
+  'cake', 'cakes', 'pie', 'cookie', 'cookies', 'muffin', 'bread', 'toast', 'bar',
+  'pudding', 'flour', 'noodle', 'noodles', 'bihon', 'vermicelli',
+  'juice', 'shake', 'smoothie', 'tea', 'latte', 'chocolate', 'ice', 'cream',
+  'dried', 'candied', 'jam', 'jelly', 'syrup', 'sweetened', 'condensed', 'evaporated',
+  'cue', 'turon', 'mayo', 'mayonnaise', 'oil', 'sauce', 'soup', 'nugget', 'nuggets',
+  'burger', 'sandwich', 'pizza', 'chicken', 'pork', 'beef', 'fish',
+]);
+
+const words = (text) => text.split(/[^a-z0-9]+/).filter(Boolean);
+
 /**
  * Returns per-100g macros from the reference database if a reliable match is found.
- * Returns null if no keyword match exists or complex cooking is detected for non-staple entries.
+ * Returns null if no keyword match exists, complex cooking is detected for a
+ * non-staple entry, or the name says it's a different food (see DISQUALIFIERS).
  */
 export function findFoodReference(foodName, cookingMethod = '') {
   if (!foodName) return null;
   const normalized = foodName.toLowerCase();
+  const nameWords = words(normalized);
   const isComplex = hasComplexCooking(foodName, cookingMethod);
+  // A complex name ("garlic fried rice") disqualifies staples too; a complex
+  // cooking method alone ("adobo" for the rice beside it) does not.
+  const nameIsComplex = hasComplexCooking(foodName, '');
 
   let bestMatch = null;
   let bestLen = 0;
 
   for (const entry of FOOD_DB) {
     if (!entry.staple && isComplex) continue;
+    if (entry.staple && nameIsComplex) continue;
     for (const kw of entry.keywords) {
-      if (keywordMatches(normalized, kw) && kw.length > bestLen) {
-        bestMatch = entry;
-        bestLen = kw.length;
-      }
+      if (!keywordMatches(normalized, kw) || kw.length <= bestLen) continue;
+      const kwWords = new Set(words(kw));
+      if (nameWords.some(w => !kwWords.has(w) && DISQUALIFIERS.has(w))) continue;
+      bestMatch = entry;
+      bestLen = kw.length;
     }
   }
 
