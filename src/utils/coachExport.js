@@ -1,5 +1,6 @@
 import { EXERCISES, ACHIEVEMENTS } from '../data/gameData';
 import { getPhase, convertWeight } from './gameLogic';
+import { sortedTrainingDays, templateForDay, exercisesForDay } from './session';
 
 function getExercises(state) {
   return state.activeExercises?.length ? state.activeExercises : EXERCISES;
@@ -232,5 +233,35 @@ export function formatForCoach(state) {
   }
 
   lines.push('END OF REPORT');
+  return lines.join('\n');
+}
+
+/**
+ * The user's current week of sessions, exercise by exercise, for the coach.
+ *
+ * The Build-mode prompt used to send only "Monday: UPPER (9 exercises)", so
+ * the coach could not see a single exercise, set or weight and had to ask the
+ * user to type their own program out. Weights are the user's current working
+ * weights (liftWeights), falling back to the template's starting weight.
+ */
+export function describeProgram(state) {
+  const unit = state.unit || 'kg';
+  const lines = [];
+  sortedTrainingDays(state).forEach((slot, i) => {
+    const template = templateForDay(state, slot);
+    const exercises = exercisesForDay(state, slot);
+    lines.push(`Session ${i + 1} (day key "${slot}") — ${template?.title || 'Untitled'}${template ? '' : ' (default list)'}:`);
+    exercises.forEach((ex, j) => {
+      const reps = ex.isPlank
+        ? (ex.duration ?? '30s')
+        : (ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}-${ex.repMax}` : ex.reps);
+      const kg = state.liftWeights?.[ex.id] ?? ex.startKg;
+      const load = ex.isBodyweight || ex.isPlank || !(Number(kg) > 0)
+        ? 'bodyweight'
+        : `${convertWeight(Number(kg), unit)} ${unit}`;
+      const rest = ex.rest || (ex.restSec ? `${ex.restSec}s` : null);
+      lines.push(`  ${j + 1}. ${ex.name} [${ex.id}] — ${ex.sets ?? 3}×${reps} @ ${load}${rest ? `, rest ${rest}` : ''}${ex.rpe ? `, RPE ${ex.rpe}` : ''}`);
+    });
+  });
   return lines.join('\n');
 }
