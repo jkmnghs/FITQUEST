@@ -7,8 +7,9 @@
 
 import { selectProgram, getProgramById } from '../data/programs';
 import { applySubstitutions, applyCompetencySubstitutions } from './exerciseSubstitutions';
+import { recomputeStreak } from './gameLogic';
 
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 const migrations = {
   1: (state) => {
@@ -78,6 +79,17 @@ const migrations = {
       ...state.dailyHabits,
     },
   });
+  },
+
+  // v2 → v3: training days became flexible and the streak became weekly.
+  // Rebuild the streak from session history under the new rule, so streaks
+  // that the old "more than 3 days between sessions" rule broke come back,
+  // and mark today as the switch so the week planned under fixed weekdays
+  // isn't held to the weekly target.
+  2: (state) => {
+    const graced = { ...state, streakGraceFrom: new Date().toDateString() };
+    const { streak, bestStreak } = recomputeStreak(graced);
+    return { ...graced, streak, bestStreak, stateVersion: 3 };
   },
 };
 

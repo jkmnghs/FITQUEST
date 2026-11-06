@@ -553,7 +553,7 @@ export function useGameState(user) {
           primaryMotivation: assessment.primaryMotivation || null,
           previousQuitReason: assessment.previousQuitReason || null,
         },
-        stateVersion: 2,
+        stateVersion: 3,
       };
       pendingAssessmentSave.current = newState;
       return newState;

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   xpForLevel,
   isStreakBroken,
+  recomputeStreak,
   xpToLevel,
   removeXP,
   today,
@@ -815,5 +816,35 @@ describe('isStreakBroken / weekly streak', () => {
     vi.setSystemTime(day(29));
     const s = withSessions([22], { streak: 6, bestStreak: 6 });
     expect(updateStreak(s)).toMatchObject({ streak: 1, bestStreak: 6 });
+  });
+});
+
+describe('streak grace for the switch to weekly streaks', () => {
+  const day = (m, d) => new Date(2026, m - 1, d, 10);
+  const ds = (m, d) => day(m, d).toDateString();
+  // Switched on Thu 2026-10-22. Last week (Oct 12–18) had only 2 sessions
+  // under the old fixed-day plan.
+  const state = {
+    sessionsPerWeek: 3, streak: 6, streakGraceFrom: ds(10, 22),
+    weekProgress: { 1: { dates: [ds(10, 13), ds(10, 15)] } },
+    lastDate: ds(10, 15),
+  };
+
+  it('does not hold the week before the switch to the weekly target', () => {
+    expect(isStreakBroken(state, day(10, 25))).toBe(false);
+    expect(isStreakBroken(state, day(10, 30))).toBe(false);
+  });
+
+  it('still breaks once a full week after the switch week passes untrained', () => {
+    expect(isStreakBroken(state, day(11, 2))).toBe(true);
+  });
+
+  it('applies normal rules to sessions after the switch week', () => {
+    const later = { ...state, weekProgress: { 1: { dates: [ds(10, 27)] } }, lastDate: ds(10, 27) };
+    expect(isStreakBroken(later, day(11, 3))).toBe(true);
+  });
+
+  it('recomputeStreak returns 0-floor values when there is no history', () => {
+    expect(recomputeStreak({ streak: 0, bestStreak: 0 })).toEqual({ streak: 0, bestStreak: 0 });
   });
 });
