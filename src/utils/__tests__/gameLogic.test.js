@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   xpForLevel,
+  isStreakBroken,
   xpToLevel,
   removeXP,
   today,
@@ -387,22 +388,6 @@ describe('updateStreak', () => {
     expect(result.streak).toBe(3);
   });
 
-  it('gap of 4 days resets streak to 1', () => {
-    const fourDaysAgo = new Date();
-    fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-    const state = { streak: 10, bestStreak: 10, lastDate: fourDaysAgo.toDateString() };
-    const result = updateStreak(state);
-    expect(result.streak).toBe(1);
-  });
-
-  it('gap of 30 days resets streak to 1', () => {
-    const longAgo = new Date();
-    longAgo.setDate(longAgo.getDate() - 30);
-    const state = { streak: 8, bestStreak: 8, lastDate: longAgo.toDateString() };
-    const result = updateStreak(state);
-    expect(result.streak).toBe(1);
-  });
-
   it('bestStreak updates when new streak exceeds it', () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -412,9 +397,9 @@ describe('updateStreak', () => {
   });
 
   it('bestStreak never decreases after a streak reset', () => {
-    const fourDaysAgo = new Date();
-    fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-    const state = { streak: 5, bestStreak: 15, lastDate: fourDaysAgo.toDateString() };
+    const longAgo = new Date();
+    longAgo.setDate(longAgo.getDate() - 30);
+    const state = { streak: 5, bestStreak: 15, lastDate: longAgo.toDateString() };
     const result = updateStreak(state);
     expect(result.streak).toBe(1);
     expect(result.bestStreak).toBe(15); // unchanged
@@ -771,5 +756,64 @@ describe('startOfThisWeek', () => {
       expect(startOfThisWeek(new Date(2026, 8, d, 15))).toBe(new Date(2026, 8, 28).toDateString());
     }
     expect(startOfThisWeek(new Date(2026, 9, 4, 15))).toBe(new Date(2026, 8, 28).toDateString());
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Weekly streak — training days are flexible, the streak is judged per week
+// ---------------------------------------------------------------------------
+describe('isStreakBroken / weekly streak', () => {
+  // Mon 2026-09-21 .. Sun 2026-09-27; next week Mon 2026-09-28.
+  const day = (d) => new Date(2026, 8, d, 10);
+  const ds = (d) => day(d).toDateString();
+  const withSessions = (dates, extra = {}) => ({
+    sessionsPerWeek: 3,
+    weekProgress: { 1: { sessions: dates.map(d => ({ date: ds(d) })), dates: dates.map(ds) } },
+    lastDate: ds(dates[dates.length - 1]),
+    ...extra,
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('survives any gap inside the same week', () => {
+    // Mon then Sat: a 5-day gap used to kill the streak.
+    const s = withSessions([21], { streak: 4 });
+    expect(isStreakBroken(s, day(26))).toBe(false);
+  });
+
+  it('survives into next week when last week hit its sessions on any days', () => {
+    const s = withSessions([23, 26, 27], { streak: 9 }); // Wed, Sat, Sun
+    expect(isStreakBroken(s, day(30))).toBe(false);
+  });
+
+  it('breaks when last week ended short of its sessions', () => {
+    const s = withSessions([22, 24], { streak: 9 });
+    expect(isStreakBroken(s, day(29))).toBe(true);
+  });
+
+  it('breaks after a whole week with no session', () => {
+    const s = withSessions([21, 23, 25], { streak: 9 });
+    expect(isStreakBroken(s, new Date(2026, 9, 6, 10))).toBe(true);
+  });
+
+  it('gives the week a streak started in a pass', () => {
+    // Started Saturday; only two days were left in the week.
+    const s = withSessions([26, 27], { streak: 2 });
+    expect(isStreakBroken(s, day(29))).toBe(false);
+  });
+
+  it('updateStreak keeps counting across a long in-week gap', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(day(27));
+    const s = withSessions([21], { streak: 4, bestStreak: 4 });
+    expect(updateStreak(s).streak).toBe(5);
+  });
+
+  it('updateStreak restarts at 1 after a short week', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(day(29));
+    const s = withSessions([22], { streak: 6, bestStreak: 6 });
+    expect(updateStreak(s)).toMatchObject({ streak: 1, bestStreak: 6 });
   });
 });

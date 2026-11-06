@@ -1,71 +1,46 @@
 import { midnightOf } from './gameLogic';
-import { DAY_ORDER } from './session';
+import { DAY_ORDER, trainedSlots as trainedDays } from './session';
 
-const DAY_SHORT = { mon: 'M', tue: 'Tu', wed: 'W', thu: 'Th', fri: 'F', sat: 'Sa', sun: 'Su' };
 const DAY_MS = 864e5;
 
-/** Calendar days trained in a week, from completedDays and session records. */
-function trainedDays(wp) {
-  const fromSessions = (wp?.sessions || [])
-    .map(s => s.dayKey || (s.date ? DAY_ORDER[new Date(s.date).getDay()] : null))
-    .filter(Boolean);
-  if (fromSessions.length === 0) return wp?.completedDays || null;
-  return [...new Set([...(wp.completedDays || []), ...fromSessions])];
-}
-
 /**
- * Resolves each training day in the viewed week to done / skipped / current.
+ * Resolves each session slot of the viewed week to done / skipped / current.
  *
- * Skipped is calendar-aware: a day only counts as missed once its actual date
- * has passed, anchored to `state.currentWeekStartDate` rather than re-inferred
- * from session data (inferring it pushed earlier skipped days into next week
- * whenever the first training day of a week was missed).
+ * Sessions are not tied to weekdays: the user trains any day they like, as
+ * long as the week's sessions are in by Sunday. So a slot is only "missed"
+ * when the user said so, or once its week is behind us — never because a
+ * particular weekday went by.
+ *
+ * `label` is the slot's position ("1", "2", …); `trainedOn` is the date the
+ * slot was actually trained, when known.
  */
 export function resolveWeekDays(state, viewingWeek, sortedTrainingDays, now = new Date()) {
   const wp = state.weekProgress?.[viewingWeek] || { count: 0, sessions: [] };
   const isCurrentWeek = viewingWeek === state.currentWeek;
   const resolvedDays = trainedDays(wp);
 
-  const todayOrd = now.getDay();
-  const todayMidnight = new Date(now);
-  todayMidnight.setHours(0, 0, 0, 0);
-
-  const weekStartDate = new Date(todayMidnight);
   const startMs = state.currentWeekStartDate ? midnightOf(state.currentWeekStartDate) : NaN;
-  if (!isNaN(startMs)) weekStartDate.setTime(startMs);
-  const weekStartOrd = weekStartDate.getDay();
-
-  // Cursor = first undone training day at or after today, so skipped past days
-  // don't hold it hostage.
-  const currentDayId = (isCurrentWeek && !wp.completed)
-    ? sortedTrainingDays.find(d => {
-        const done = resolvedDays ? resolvedDays.includes(d) : false;
-        return DAY_ORDER.indexOf(d) >= todayOrd && !done;
-      }) ?? null
-    : null;
+  const weekStarted = isNaN(startMs) || startMs <= midnightOf(now);
 
   const explicitlySkipped = new Set(wp.skippedDays || []);
   const weekIsPast = viewingWeek < state.currentWeek;
 
+  const isDone = (dayKey, i) => (resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count);
+
+  // Cursor = the next slot still open this week.
+  const currentDayId = (isCurrentWeek && !wp.completed && weekStarted)
+    ? sortedTrainingDays.find((d, i) => !isDone(d, i) && !explicitlySkipped.has(d)) ?? null
+    : null;
+
   return sortedTrainingDays.map((dayKey, i) => {
-    const done = resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count;
-    const daysFromStart = (DAY_ORDER.indexOf(dayKey) - weekStartOrd + 7) % 7;
-    const trainingDayDate = new Date(weekStartDate);
-    trainingDayDate.setDate(weekStartDate.getDate() + daysFromStart);
+    const done = isDone(dayKey, i);
+    const session = (wp.sessions || []).find(s => s?.dayKey === dayKey && s.date);
     return {
       dayKey,
-      label: DAY_SHORT[dayKey] || dayKey,
+      label: String(i + 1),
+      trainedOn: done && session ? session.date : null,
       done,
-      // A training day counts as missed when the user said so, or when the
-      // week it belongs to is behind us. The old rule was gated on
-      // isCurrentWeek alone, so last week's missed Wednesday rendered as a
-      // plain grey pill — indistinguishable from a day still to come, and
-      // with nothing to tap.
-      skipped: !done && (
-        explicitlySkipped.has(dayKey)
-        || weekIsPast
-        || (isCurrentWeek && trainingDayDate < todayMidnight)
-      ),
+      skipped: !done && (explicitlySkipped.has(dayKey) || weekIsPast),
       markedSkipped: explicitlySkipped.has(dayKey),
       current: dayKey === currentDayId,
     };
@@ -79,15 +54,15 @@ const fromMonday = dayKey => (DAY_ORDER.indexOf(dayKey) + 6) % 7;
  * The Monday on which the week starting at `startMs` is over.
  *
  * Program weeks run Monday to Sunday, so that is normally the Monday after
- * the start's calendar week. A week that started too late to hold any of its
- * training days (e.g. an older state anchored to a Saturday) gets the
- * following calendar week instead, rather than being closed empty.
+ * the start's calendar week. A week that started too late to fit its
+ * sessions (e.g. a 3-session week anchored to a Saturday) gets the following
+ * calendar week as well, rather than being closed short.
  */
 function weekCloseDate(startMs, sortedTrainingDays) {
   const close = new Date(startMs);
   const startOffset = fromMonday(DAY_ORDER[close.getDay()]);
   close.setDate(close.getDate() - startOffset + 7);
-  if (!sortedTrainingDays.some(d => fromMonday(d) >= startOffset)) {
+  if (7 - startOffset < sortedTrainingDays.length) {
     close.setDate(close.getDate() + 7);
   }
   return close;

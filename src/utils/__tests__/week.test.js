@@ -45,8 +45,10 @@ describe('closeElapsedWeek', () => {
     const next = closeElapsedWeek(stuckWeek(), DAYS, at(2026, 10, 14)); // Wed, 3 weeks later
     expect(next.currentWeek).toBe(4);
     expect(next.currentWeekStartDate).toBe(at(2026, 10, 12).toDateString());
+    // Training days are flexible: Monday going by doesn't make session 1 missed.
     const days = resolveWeekDays(next, 4, DAYS, at(2026, 10, 14));
-    expect(days.map(d => d.skipped)).toEqual([true, false, false]);
+    expect(days.map(d => d.skipped)).toEqual([false, false, false]);
+    expect(days.find(d => d.current)?.dayKey).toBe('mon');
   });
 
   it('rolls over on Monday even when the week started mid-week', () => {
@@ -82,11 +84,34 @@ describe('closeElapsedWeek', () => {
 });
 
 describe('resolveWeekDays', () => {
-  it('shows the stuck week (the old bug) as all missed', () => {
-    // Documents what users saw before the rollover: week never advanced, so
-    // Monday of the next calendar week read every day as behind us.
-    const days = resolveWeekDays(stuckWeek(), 3, DAYS, at(2026, 9, 28));
-    expect(days.find(d => d.dayKey === 'wed').skipped).toBe(true);
+  const week = (sessions, extra = {}) => ({
+    currentWeek: 3,
+    sessionsPerWeek: 3,
+    currentWeekStartDate: at(2026, 9, 21).toDateString(),
+    weekProgress: {
+      3: { count: sessions.length, completed: false, completedDays: sessions.map(s => s.dayKey), sessions, ...extra },
+    },
+  });
+
+  it('does not mark a slot missed just because its weekday went by', () => {
+    // Thursday, nothing trained yet: all three sessions are still on.
+    const days = resolveWeekDays(week([]), 3, DAYS, at(2026, 9, 24));
+    expect(days.map(d => d.skipped)).toEqual([false, false, false]);
+    expect(days.find(d => d.current)?.dayKey).toBe('mon');
+    expect(days.map(d => d.label)).toEqual(['1', '2', '3']);
+  });
+
+  it('moves the cursor to the next open slot and records when a slot was trained', () => {
+    const tue = at(2026, 9, 22).toDateString();
+    const days = resolveWeekDays(week([{ dayKey: 'mon', date: tue }]), 3, DAYS, at(2026, 9, 24));
+    expect(days[0]).toMatchObject({ done: true, trainedOn: tue });
+    expect(days.find(d => d.current)?.dayKey).toBe('wed');
+  });
+
+  it('marks untrained slots missed once the week is behind us', () => {
+    const s = { ...week([]), currentWeek: 4 };
+    const days = resolveWeekDays(s, 3, DAYS, at(2026, 9, 30));
+    expect(days.every(d => d.skipped)).toBe(true);
   });
 });
 

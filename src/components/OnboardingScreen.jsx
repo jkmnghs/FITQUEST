@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
+import { defaultSlotsFor } from '../utils/session';
 import { TriangleAlert, Zap, Stethoscope } from 'lucide-react';
-
-const DAYS = [
-  { id: 'mon', label: 'M', full: 'Mon' },
-  { id: 'tue', label: 'T', full: 'Tue' },
-  { id: 'wed', label: 'W', full: 'Wed' },
-  { id: 'thu', label: 'T', full: 'Thu' },
-  { id: 'fri', label: 'F', full: 'Fri' },
-  { id: 'sat', label: 'S', full: 'Sat' },
-  { id: 'sun', label: 'S', full: 'Sun' },
-];
 
 const PARQ_QUESTIONS = [
   'Has your doctor ever said you have a heart condition and recommended only medically supervised activity?',
@@ -244,7 +235,7 @@ function RadioRow({ options, value, onChange }) {
   );
 }
 
-const TOTAL_STEPS = 14;
+const TOTAL_STEPS = 13;
 
 export default function OnboardingScreen({ onComplete }) {
   const [step, setStep] = useState(1);
@@ -337,6 +328,9 @@ export default function OnboardingScreen({ onComplete }) {
     }
     const assessment = {
       ...data,
+      // No fixed weekdays: the user trains any day, N sessions a week. The
+      // slot keys only identify and order the week's sessions.
+      trainingDays: defaultSlotsFor(data.daysPerWeek || 3),
       parqFlagged: data.parqAnswers.some(Boolean),
       age: parseFloat(data.age) || null,
       weightKg: parseFloat(data.weightKg) || null,
@@ -607,6 +601,10 @@ export default function OnboardingScreen({ onComplete }) {
                 cursor: 'pointer',
               }}>{d}</button>
             ))}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5, marginTop: -12, marginBottom: 24 }}>
+            No fixed days — train whichever days suit you. Just get your
+            {' '}<strong style={{ color: 'var(--cyan)' }}>{data.daysPerWeek || 'N'} sessions</strong> in before the week ends to keep your streak.
           </div>
           <div style={{
             fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
@@ -913,58 +911,7 @@ export default function OnboardingScreen({ onComplete }) {
               {m}
             </OptionBtn>
           ))}
-          <NavButtons step={step} onBack={handleBack} onNext={handleNext} />
-        </Card>
-      </div>
-    );
-  }
-
-  // ── Step 14: Training Days ──
-  if (step === 14) {
-    const needed = data.daysPerWeek || 3;
-    const selected = data.trainingDays;
-    const exactly = selected.length === needed;
-
-    function toggleDay(id) {
-      if (selected.includes(id)) {
-        set('trainingDays', selected.filter(d => d !== id));
-      } else if (selected.length < needed) {
-        set('trainingDays', [...selected, id]);
-      }
-    }
-
-    return (
-      <div style={{ minHeight: '100dvh', padding: 'calc(var(--safe-area-top) + 32px) 20px calc(var(--safe-area-bottom) + 32px)', background: 'var(--bg)' }}>
-        <Card>
-          <StepHeader step={14} total={TOTAL_STEPS} title="Pick Your Training Days" />
-          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 16 }}>
-            Select exactly <strong style={{ color: 'var(--cyan)' }}>{needed} days</strong> per week.
-            <span style={{ color: 'var(--text3)', marginLeft: 6 }}>({selected.length}/{needed} selected)</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 24, justifyContent: 'space-between' }}>
-            {DAYS.map(d => {
-              const isSelected = selected.includes(d.id);
-              const disabled = !isSelected && selected.length >= needed;
-              return (
-                <button key={d.id} onClick={() => toggleDay(d.id)} disabled={disabled} style={{
-                  width: 40, height: 48, borderRadius: 10, flexShrink: 0,
-                  border: isSelected ? '2px solid var(--cyan)' : '1px solid rgba(255,255,255,0.1)',
-                  background: isSelected ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: isSelected ? 'var(--cyan)' : (disabled ? 'rgba(255,255,255,0.2)' : 'var(--text2)'),
-                  fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 2,
-                  transition: 'all 0.15s',
-                }}>
-                  <span>{d.label}</span>
-                  <span style={{ fontSize: 11, fontWeight: 400 }}>{d.full}</span>
-                </button>
-              );
-            })}
-          </div>
-          <NavButtons step={step} onBack={handleBack} onNext={handleNext}
-            nextLabel="START MY PROGRAM" nextDisabled={!exactly} />
+          <NavButtons step={step} onBack={handleBack} onNext={handleNext} nextLabel="START MY PROGRAM" />
         </Card>
       </div>
     );

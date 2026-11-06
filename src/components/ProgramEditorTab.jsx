@@ -3,8 +3,6 @@ import { EX_CATALOG } from '../data/exerciseCatalog';
 import { useConfirm } from './ui/ConfirmDialog';
 
 const DAY_ORDER  = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const DAY_FULL   = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-const DAY_SHORT  = { mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT', sun: 'SUN' };
 
 const REST_OPTIONS = [
   { label: '45 sec',  sec: 45  },
@@ -114,6 +112,10 @@ export default function ProgramEditorTab({ state, updateSetting }) {
     const raw = state.trainingDays?.length ? state.trainingDays : (state.assessment?.trainingDays || ['mon', 'wed', 'fri']);
     return raw.filter(d => DAY_ORDER.includes(d)).sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
   }, [state.trainingDays, state.assessment?.trainingDays]);
+
+  // Sessions aren't tied to weekdays, so tabs are named by position.
+  const DAY_FULL = useMemo(() => Object.fromEntries(trainingDays.map((d, i) => [d, `Session ${i + 1}`])), [trainingDays]);
+  const DAY_SHORT = useMemo(() => Object.fromEntries(trainingDays.map((d, i) => [d, `S${i + 1}`])), [trainingDays]);
 
   const [activeDay, setActiveDay] = useState(trainingDays[0] || 'mon');
 
@@ -244,7 +246,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
       {/* The "MY PROGRAM" title that used to sit here is now supplied by
           ProfileTab's SectionHeader — printing it here too showed it twice. */}
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)', lineHeight: 1.5 }}>
-        Set custom exercises for each training day. The Train tab auto-loads today's session.
+        Set custom exercises for each session of the week. Train any day you like — the Train tab loads the next session you haven't done yet.
       </div>
 
       {/* Day tabs */}
@@ -278,7 +280,7 @@ export default function ProgramEditorTab({ state, updateSetting }) {
           type="text"
           value={day.title}
           onChange={e => patchDay('title', e.target.value)}
-          placeholder={`${DAY_FULL[activeDay]} session — e.g. PUSH + SHOULDERS + ABS`}
+          placeholder={`${DAY_FULL[activeDay]} — e.g. PUSH + SHOULDERS + ABS`}
           style={{ ...inputSt, flex: 1 }}
         />
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>

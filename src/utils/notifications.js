@@ -38,23 +38,18 @@ function getWorkoutDayNumbers(trainingDays) {
   return (trainingDays || []).map(d => DAY_MAP[d]).filter(n => n !== undefined);
 }
 
-// Check if today is a workout day — uses user's training schedule from state.
-// Falls back to Mon/Wed/Fri if no training days are configured yet.
-export function isTodayWorkoutDay(trainingDays) {
-  const day = new Date().getDay();
-  const days = trainingDays?.length ? getWorkoutDayNumbers(trainingDays) : [1, 3, 5];
-  return days.includes(day);
+// Training days are flexible: any day is a workout day while the current week
+// still has sessions to do. `trainingDays` is kept for callers' signatures.
+export function isTodayWorkoutDay(_trainingDays, state) {
+  if (!state) return true;
+  const wp = state.weekProgress?.[state.currentWeek];
+  if (wp?.completed) return false;
+  return (wp?.count || 0) < (state.sessionsPerWeek || 3);
 }
 
-// Check-in day = day after the user's last training day, or Sunday by default.
-export function isTodayCheckinDay(trainingDays) {
-  const day = new Date().getDay();
-  if (!trainingDays?.length) return day === 0; // fallback: Sunday
-  const nums = getWorkoutDayNumbers(trainingDays).sort((a, b) => a - b);
-  // The day after the highest training day (wrapping around to Sunday)
-  const lastTrainingDay = nums[nums.length - 1];
-  const checkinDay = (lastTrainingDay + 1) % 7;
-  return day === checkinDay;
+// Check-in day = Sunday, the last day to fit the week's sessions in.
+export function isTodayCheckinDay() {
+  return new Date().getDay() === 0;
 }
 
 export function getDayName() {
@@ -73,15 +68,15 @@ export function maybeFireOpenNotification(state) {
   const userName = state.name || 'Champ';
 
   // Overload nudge: if there are increase suggestions and it's a workout day
-  if (isTodayWorkoutDay(trainingDays) && !state.todaySessionFinished) {
+  if (isTodayWorkoutDay(trainingDays, state) && !state.todaySessionFinished) {
     const increases = Object.entries(state.overloadSuggestions || {})
       .filter(([,v]) => v === 'increase').length;
     const title = increases > 0
       ? `💪 Time to train — ${increases} lift${increases > 1 ? 's' : ''} ready to increase!`
-      : `⚔️ Workout day — let's go, ${userName}!`;
+      : `⚔️ ${Math.max(0, (state.sessionsPerWeek || 3) - (state.weekProgress?.[state.currentWeek]?.count || 0))} session(s) left this week — let's go, ${userName}!`;
     const body = increases > 0
       ? 'Your RPE was ≤8 last session. Progressive overload time!'
-      : 'Your full-body session is waiting. Get after it.';
+      : 'Any day works — just get them in before Sunday to keep your streak.';
     showLocalNotification(title, body);
     localStorage.setItem('fitquest-last-notif', t);
   } else if (isTodayCheckinDay(trainingDays) && (state.weeklyCheckins?.length === 0 || state.weeklyCheckins?.[state.weeklyCheckins.length - 1]?.week !== state.currentWeek)) {

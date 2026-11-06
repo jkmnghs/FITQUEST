@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSession, exercisesForDay, nextTrainingDayAfter, todayDayKey } from '../session';
+import { resolveSession, exercisesForDay, nextTrainingDayAfter, todayDayKey, defaultSlotsFor, slotLabel } from '../session';
 import { EXERCISES } from '../../data/gameData';
 
 // Dates chosen so the weekday is unambiguous regardless of the runner's TZ:
@@ -7,6 +7,7 @@ import { EXERCISES } from '../../data/gameData';
 const MONDAY    = new Date(2026, 7, 10); // 2026-08-10
 const TUESDAY   = new Date(2026, 7, 11);
 const WEDNESDAY = new Date(2026, 7, 12);
+const THURSDAY  = new Date(2026, 7, 13);
 const SATURDAY  = new Date(2026, 7, 15);
 
 function makeState(overrides = {}) {
@@ -41,9 +42,11 @@ describe('resolveSession — training day', () => {
         { name: 'B', exercises: [{ id: 'bench' }] },
       ],
     });
-    // 'mon' sits at index 1 of trainingDays, so it maps to template B.
+    // 'mon' is session 1 and sits at index 1 of trainingDays → template B.
     expect(resolveSession(state, { now: MONDAY }).exercises[0].id).toBe('bench');
-    expect(resolveSession(state, { now: WEDNESDAY }).exercises[0].id).toBe('squat');
+    // With session 1 done, 'wed' (index 0 → template A) is next — on any day.
+    const done = { ...state, currentWeek: 1, weekProgress: { 1: { count: 1, sessions: [{ dayKey: 'mon', date: MONDAY.toDateString() }] } } };
+    expect(resolveSession(done, { now: TUESDAY }).exercises[0].id).toBe('squat');
   });
 
   it('falls back to activeExercises, then to the built-in list', () => {
@@ -53,34 +56,59 @@ describe('resolveSession — training day', () => {
   });
 });
 
-describe('resolveSession — rest day', () => {
-  it('previews the next training day, not today', () => {
+describe('resolveSession — flexible days', () => {
+  const week = (sessions, extra = {}) => ({
+    currentWeek: 2,
+    currentWeekStartDate: MONDAY.toDateString(),
+    weekProgress: { 2: { count: sessions.length, completed: false, sessions, ...extra } },
+  });
+
+  it('any day of the week is a training day', () => {
     const state = makeState({ dayTemplates: { mon: PUSH_DAY, wed: PULL_DAY } });
-    const s = resolveSession(state, { now: TUESDAY });
-    expect(s.isRestDay).toBe(true);
+    for (const now of [TUESDAY, THURSDAY, SATURDAY]) {
+      const s = resolveSession(state, { now });
+      expect(s.isRestDay).toBe(false);
+      expect(s.isTrainable).toBe(true);
+    }
+  });
+
+  it('serves the next session not yet done, whatever the weekday', () => {
+    const state = makeState({
+      dayTemplates: { mon: PUSH_DAY, wed: PULL_DAY },
+      ...week([{ dayKey: 'mon', date: TUESDAY.toDateString() }]),
+    });
+    const s = resolveSession(state, { now: SATURDAY });
     expect(s.dayKey).toBe('wed');
     expect(s.exercises).toEqual(PULL_DAY.exercises);
   });
 
-  it('wraps to the first training day of the week after the last one', () => {
-    const state = makeState({ dayTemplates: { mon: PUSH_DAY } });
-    expect(resolveSession(state, { now: SATURDAY }).dayKey).toBe('mon');
+  it('a missed Monday is still waiting later in the week', () => {
+    const state = makeState({ dayTemplates: { mon: PUSH_DAY }, ...week([]) });
+    expect(resolveSession(state, { now: THURSDAY }).dayKey).toBe('mon');
   });
 
-  it('is not trainable on a rest day unless the user overrides', () => {
-    const state = makeState({ dayTemplates: { wed: PULL_DAY } });
-    expect(resolveSession(state, { now: TUESDAY }).isTrainable).toBe(false);
-    expect(resolveSession(state, { now: TUESDAY, overrideRestDay: true }).isTrainable).toBe(true);
+  it('keeps showing the session logged today after it is finished', () => {
+    const state = makeState({ ...week([{ dayKey: 'mon', date: THURSDAY.toDateString() }]) });
+    expect(resolveSession(state, { now: THURSDAY }).dayKey).toBe('mon');
+    expect(resolveSession(state, { now: SATURDAY }).dayKey).toBe('wed');
   });
 
-  it('reports the same dayKey with and without the override', () => {
-    // This is the regression: the UI showed Wednesday's workout while the
-    // mutations acted on Tuesday's (empty) template, so swap and delete no-op'd.
-    const state = makeState({ dayTemplates: { mon: PUSH_DAY, wed: PULL_DAY } });
-    const preview  = resolveSession(state, { now: TUESDAY });
-    const training = resolveSession(state, { now: TUESDAY, overrideRestDay: true });
-    expect(training.dayKey).toBe(preview.dayKey);
-    expect(training.exercises).toEqual(preview.exercises);
+  it('skips slots marked skipped', () => {
+    const state = makeState({ ...week([], { skippedDays: ['mon'] }) });
+    expect(resolveSession(state, { now: TUESDAY }).dayKey).toBe('wed');
+  });
+
+  it('is a rest day once the week is cleared or has not begun', () => {
+    const all = ['mon', 'wed', 'fri'].map(d => ({ dayKey: d, date: MONDAY.toDateString() }));
+    const cleared = makeState({ ...week(all) });
+    expect(resolveSession(cleared, { now: SATURDAY }).isRestDay).toBe(true);
+
+    const notStarted = makeState({ currentWeek: 3, currentWeekStartDate: new Date(2026, 7, 17).toDateString(), weekProgress: {} });
+    const s = resolveSession(notStarted, { now: SATURDAY });
+    expect(s.isRestDay).toBe(true);
+    expect(s.dayKey).toBe('mon');
+    expect(s.isTrainable).toBe(false);
+    expect(resolveSession(notStarted, { now: SATURDAY, overrideRestDay: true }).isTrainable).toBe(true);
   });
 
   it('the resolved dayKey selects the same list the mutations will edit', () => {
@@ -109,8 +137,21 @@ describe('helpers', () => {
     expect(exercisesForDay(state, 'sat')).toEqual([{ id: 'squat' }]);
   });
 
-  it('defaults to Mon/Wed/Fri when trainingDays is missing', () => {
-    expect(resolveSession({}, { now: MONDAY }).isRestDay).toBe(false);
-    expect(resolveSession({}, { now: TUESDAY }).isRestDay).toBe(true);
+  it('defaults to three sessions when trainingDays is missing', () => {
+    expect(resolveSession({}, { now: TUESDAY }).dayKey).toBe('mon');
+    expect(resolveSession({}, { now: TUESDAY }).isRestDay).toBe(false);
+  });
+
+  it('defaultSlotsFor spreads N sessions as slot keys', () => {
+    expect(defaultSlotsFor(3)).toEqual(['mon', 'wed', 'fri']);
+    expect(defaultSlotsFor(2)).toHaveLength(2);
+    expect(defaultSlotsFor(5)).toHaveLength(5);
+    expect(defaultSlotsFor(null)).toEqual(['mon', 'wed', 'fri']);
+  });
+
+  it('slotLabel names slots by position, not weekday', () => {
+    const state = makeState({ trainingDays: ['fri', 'mon', 'wed'] });
+    expect(slotLabel(state, 'mon')).toBe('Session 1');
+    expect(slotLabel(state, 'fri')).toBe('Session 3');
   });
 });

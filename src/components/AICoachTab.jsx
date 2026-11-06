@@ -115,8 +115,13 @@ EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest th
   if (mode === 'build') {
     const equipment = state.assessment?.equipment || 'full_gym';
     const equipmentDesc = EQUIPMENT_DESC[equipment] || EQUIPMENT_DESC.full_gym;
-    const trainingDays = (state.assessment?.trainingDays || state.trainingDays || ['mon', 'wed', 'fri'])
-      .map(d => DAY_FULL[d] || d).join(', ');
+    const DAY_ORDER = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const slotKeys = [...(state.trainingDays?.length ? state.trainingDays : (state.assessment?.trainingDays || ['mon', 'wed', 'fri']))]
+      .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+    // Training days are flexible: the user does these sessions on any days of
+    // the week. The keys only identify each session slot.
+    const trainingDays = `${slotKeys.length} sessions/week on any days the user chooses (not fixed weekdays). Session slot keys for the "day" field: `
+      + slotKeys.map((d, i) => `${d} = Session ${i + 1}`).join(', ');
     const currentProgram = Object.entries(state.dayTemplates || {})
       .map(([d, t]) => `${DAY_FULL[d] || d}: ${t.title || 'Untitled'} (${(t.exercises || []).length} exercises)`)
       .join('; ') || 'None set yet';

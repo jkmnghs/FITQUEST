@@ -555,8 +555,9 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
         </button>
 
         {backfillOpen && (() => {
-          const DAY_FULL = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
-          const DAY_SHORT = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+          // Sessions aren't tied to weekdays — label each slot by its position.
+          const DAY_FULL = Object.fromEntries(_sortedTdays.map((d, i) => [d, `Session ${i + 1}`]));
+          const DAY_SHORT = Object.fromEntries(_sortedTdays.map((d, i) => [d, `S${i + 1}`]));
           const alreadyDone = backfillDay ? _doneDays.has(backfillDay) : false;
           const canApply = backfillDay && !alreadyDone && programExercises.length > 0;
           const doneCount = Object.values(backfillSets).filter(s => s > 0).length;
@@ -564,7 +565,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
 
           return <>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, marginTop: 4, lineHeight: 1.5 }}>
-            Select the week and the specific training day you want to log.
+            Select the week and the session you want to log.
           </div>
 
           {/* Week selector */}
@@ -580,13 +581,13 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
           {/* Week status */}
           {_doneDays.size > 0 && (
             <div style={{ fontSize: 11, color: 'var(--cyan)', marginBottom: 10 }}>
-              Week {backfillW}: {[..._doneDays].map(d => DAY_SHORT[d] || d).join(', ')} already recorded
+              Week {backfillW}: {[..._doneDays].map(d => DAY_FULL[d] || d).join(', ')} already recorded
             </div>
           )}
 
           {/* Single-day picker */}
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>Training day to log</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>Session to log</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {_sortedTdays.map(dk => {
                 const isDone = _doneDays.has(dk);
@@ -622,7 +623,7 @@ export function SettingsTab({ state, onUpdate, onReset, onResetToday, onBackfill
               fontSize: 12, fontWeight: 600, color: 'var(--cyan)',
               marginBottom: 8, fontFamily: 'var(--font-display)',
             }}>
-              {DAY_FULL[backfillDay]} session
+              {DAY_FULL[backfillDay] || backfillDay}
             </div>
 
             {/* Session duration */}
