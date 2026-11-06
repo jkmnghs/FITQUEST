@@ -25,7 +25,7 @@ export function nextTrainingDayAfter(state, fromKey = todayDayKey()) {
  * Resolves the workout for a given day key from the layered template sources.
  * Returns null when that day has no template of its own.
  */
-function templateForDay(state, dayKey) {
+export function templateForDay(state, dayKey) {
   const fromDayTemplates = state?.dayTemplates?.[dayKey];
   if (fromDayTemplates?.exercises?.length > 0) {
     return {

@@ -129,7 +129,7 @@ export default function NutritionTab({ state, onLogMeal, onDeleteMeal, mealLogs 
     setFoods([]);
     try {
       const res = await authPostJSON(API_URL, {
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -279,7 +279,7 @@ Guidelines:
     try {
       // Ask Claude for gram weight + full nutrition
       const claudeRes = await authPostJSON(API_URL, {
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         max_tokens: 256,
         messages: [{
           role: 'user',

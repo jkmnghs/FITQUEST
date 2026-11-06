@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { X as XIcon, Sparkles, Inbox, ArrowRight, Loader2, CalendarRange, Check, Zap, ChartColumn, TrendingUp, Target, ClipboardCheck, ScanSearch } from 'lucide-react';
 import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
-import { formatForCoach } from '../utils/coachExport';
+import { formatForCoach, describeProgram } from '../utils/coachExport';
+import { sortedTrainingDays, slotLabel } from '../utils/session';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
 import { authPostJSON } from '../lib/authFetch';
@@ -122,9 +123,7 @@ EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest th
     // the week. The keys only identify each session slot.
     const trainingDays = `${slotKeys.length} sessions/week on any days the user chooses (not fixed weekdays). Session slot keys for the "day" field: `
       + slotKeys.map((d, i) => `${d} = Session ${i + 1}`).join(', ');
-    const currentProgram = Object.entries(state.dayTemplates || {})
-      .map(([d, t]) => `${DAY_FULL[d] || d}: ${t.title || 'Untitled'} (${(t.exercises || []).length} exercises)`)
-      .join('; ') || 'None set yet';
+    const currentProgram = describeProgram(state);
     const availableCatalog = filterCatalogForEquipment(equipment);
     const catalog = availableCatalog.map(e =>
       `${e.id}="${e.name}"${e.isBodyweight ? '[BW]' : e.isPlank ? '[Plank]' : `[${e.startKg}kg]`}`
@@ -134,7 +133,8 @@ You are ${name}'s personal program designer. You build and save evidence-based w
 
 TRAINING DAYS: ${trainingDays}
 EQUIPMENT: ${equipmentDesc}
-CURRENT PROGRAM: ${currentProgram}
+CURRENT PROGRAM (exercise ids in brackets; weights are the user's current working weights):
+${currentProgram}
 STATS: Lv ${state.level} | ${weekLabel} | ${state.totalSessions} sessions | ${state.assessment?.level || 'intermediate'} | Goal: ${goal || 'not set'}
 
 EXERCISE CATALOG — ONLY exercises available for this user's equipment (use exact IDs): ${catalog}
@@ -148,7 +148,10 @@ CRITICAL RULES — FOLLOW EXACTLY:
 6. Use ONLY exercise IDs from the catalog — never suggest exercises requiring unavailable equipment.
 7. Set isBodyweight: true and startKg: 0 for bodyweight moves.
 8. Use evidence-based standards: 3-5 sets, 6-15 rep ranges, 90-180s rest for compounds, 60-90s for accessories.
-9. Keep sessions to 6-10 exercises max.`;
+9. Keep sessions to 6-10 exercises max.
+10. Refer to sessions as "Session 1", "Session 2"… — never by weekday. The user trains on any days they like.
+11. save_day_program REPLACES the whole session. When asked to change part of a session, re-send every exercise the user didn't ask to change, unchanged, with its current weight as startKg.
+12. You can see the full current program above — never ask the user to list their exercises.`;
   }
 
   if (mode === 'physique') {
@@ -632,13 +635,28 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
 
     try {
       const requestBody = {
-        model: 'claude-haiku-4-5',
-        max_tokens: isBuildMode ? 4000 : 500,
+        // Build mode designs programs, where Haiku is weakest; it runs on the
+        // program budget (15/week), so the stronger model is affordable there.
+        // Chat stays on Haiku. tool_choice stays 'auto' — Sonnet 5.5 rejects
+        // forced tool use.
+        model: isBuildMode ? 'claude-sonnet-5-5' : 'claude-haiku-4-5',
+        max_tokens: isBuildMode ? 8192 : 500,
         system: systemPrompt,
         messages: modeHistory,
       };
       if (isBuildMode) {
-        requestBody.tools = [SAVE_PROGRAM_TOOL];
+        // Limit the day field to this user's session keys.
+        const slots = sortedTrainingDays(state);
+        requestBody.tools = [{
+          ...SAVE_PROGRAM_TOOL,
+          input_schema: {
+            ...SAVE_PROGRAM_TOOL.input_schema,
+            properties: {
+              ...SAVE_PROGRAM_TOOL.input_schema.properties,
+              day: { type: 'string', enum: slots, description: `Session key: ${slots.map((d, i) => `${d} = Session ${i + 1}`).join(', ')}` },
+            },
+          },
+        }];
         requestBody.tool_choice = { type: 'auto' };
         // Building a program is program generation, not conversation: it
         // draws on the weekly program budget (15) like onboarding and
@@ -676,6 +694,9 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
             role: 'assistant',
             type: 'program_preview',
             toolInputs: toolCalls.map(t => t.input),
+            // Session names for the preview card ("Session 2"), resolved now
+            // so the card doesn't need the whole state.
+            dayLabels: Object.fromEntries(toolCalls.map(t => [t.input?.day, slotLabel(state, t.input?.day)])),
             content: textPart,
             mode: activeMode,
             ts: Date.now(),
@@ -1103,6 +1124,8 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
   const inputs = msg.toolInputs || (msg.toolInput ? [msg.toolInput] : []);
   const totalExercises = inputs.reduce((n, t) => n + (t.exercises?.length || 0), 0);
   const isMultiDay = inputs.length > 1;
+  // Older history entries carry no labels; fall back to the weekday name.
+  const labelFor = (day) => msg.dayLabels?.[day] || DAY_FULL[day] || day;
   const accent = isSaved ? 'var(--green)' : 'var(--cyan)';
   const accentLine = isSaved ? 'rgba(0,230,118,0.45)' : 'rgba(0,229,255,0.4)';
 
@@ -1146,11 +1169,11 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 900, color: accent, letterSpacing: '0.14em' }}>
               {isSaved
                 ? 'PROGRAM SAVED'
-                : `${isMultiDay ? `${inputs.length}-DAY` : (DAY_FULL[inputs[0]?.day] || inputs[0]?.day || '?').toUpperCase()} PROGRAM PROPOSAL`}
+                : `${isMultiDay ? `${inputs.length}-SESSION` : (labelFor(inputs[0]?.day) || '?').toUpperCase()} PROGRAM PROPOSAL`}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
               {isSaved
-                ? inputs.map(t => DAY_FULL[t.day] || t.day || '').join(' · ')
+                ? inputs.map(t => labelFor(t.day) || '').join(' · ')
                 : `${totalExercises} exercise${totalExercises === 1 ? '' : 's'}`}
             </div>
           </div>
@@ -1158,7 +1181,7 @@ function ProgramPreviewBubble({ msg, onConfirm }) {
 
         {/* Day sections */}
         {inputs.map((t, di) => {
-          const dayLabel = DAY_FULL[t.day] || t.day || '?';
+          const dayLabel = labelFor(t.day) || '?';
           return (
             <div key={di}>
               {isMultiDay && (
@@ -1298,7 +1321,7 @@ function getPlaceholder(modeId) {
     case 'overload': return 'Should I add 2.5kg to everything?';
     case 'form':     return 'squat  (or bench, rdl, etc.)';
     case 'checkin':  return 'Am I on track for my goal?';
-    case 'build':    return 'e.g. Build me a Monday push session';
+    case 'build':    return 'e.g. Swap bench for incline in Session 1';
     case 'physique': return 'Should I focus on fat loss or muscle?';
     default:         return 'Ask anything...';
   }
@@ -1311,7 +1334,7 @@ function getQuickPrompts(modeId) {
     case 'overload': return ['What increases next?', 'Explain the logic', 'Am I progressing well?'];
     case 'form':     return ['Squat', 'Bench', 'RDL', 'Lat Pulldown', 'OHP', 'Leg Curl'];
     case 'checkin':  return ['Am I on track?', 'Weight trend ok?', 'Halfway check'];
-    case 'build':    return ['Build my Monday push session', 'Set up Wednesday pull day', 'Add lateral raises to Friday', 'Design a full body day'];
+    case 'build':    return ['Review my program', 'Add lateral raises to Session 3', 'Make Session 1 a push day', 'Design a full body session'];
     case 'physique': return ['Analyze my physique', 'Should I cut or bulk?', 'Am I recomping?', 'What does my BMI say?'];
     default:         return [];
   }
