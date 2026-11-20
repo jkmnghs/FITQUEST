@@ -112,7 +112,7 @@ function SessionHero({
   state, viewingWeek, isCurrentWeek, sessionTitle, isRestDay, nextTrainingDayKey,
   weekDays, doneCount, totalExercises, sessionFinished,
   onPrevWeek, onNextWeek, onJumpToCurrent, onStartSession, onFinish,
-  onMakeUpDay, onOpenCoach, onTrainAnyway,
+  onMakeUpDay, onOpenCoach, onTrainAnyway, onChooseSession, sessionDayKey,
 }) {
   const phase = getPhase(viewingWeek);
   const elapsed = useElapsed(state.sessionStartTime);
@@ -232,7 +232,7 @@ function SessionHero({
           }}>
             {isRestDay
               ? <>All {state.sessionsPerWeek || weekDays.length} sessions in — recover. Next week's quest opens Monday.</>
-              : <>{totalExercises} exercise{totalExercises === 1 ? '' : 's'} · session {Math.min(sessionsThisWeek + (sessionFinished ? 0 : 1), state.sessionsPerWeek || weekDays.length)} of {state.sessionsPerWeek || weekDays.length}</>}
+              : <>{totalExercises} exercise{totalExercises === 1 ? '' : 's'}{sessionDayKey ? ` · ${slotLabel(state, sessionDayKey)}` : ''}</>}
           </div>
           {sessionRunning && !isRestDay && (
             <div style={{
@@ -256,7 +256,9 @@ function SessionHero({
         marginBottom: 'var(--space-4)', flexWrap: 'wrap',
       }}>
         {weekDays.map(({ dayKey, label, trainedOn, done, skipped, markedSkipped, current }) => {
-          const interactive = (skipped || done) && !!onMakeUpDay;
+          // An open session other than the one on screen can be picked for today.
+          const choosable = !!onChooseSession && !done && !skipped && !current;
+          const interactive = ((skipped || done) && !!onMakeUpDay) || choosable;
           let borderColor = 'var(--color-border-medium)';
           let bg = 'transparent';
           let fg = 'var(--color-text-tertiary)';
@@ -272,13 +274,16 @@ function SessionHero({
           const label_ = done ? `${name} done${on} — tap to clear`
             : markedSkipped ? `${name} marked as skipped`
             : skipped ? `${name} missed — resolve it`
-            : current ? `${name} — up next, any day this week`
+            : current ? `${name} — today's session`
+            : choosable ? `${name} — tap to train this one today`
             : `${name} still to do this week`;
 
           return (
             <button
               key={dayKey}
-              onClick={interactive ? () => onMakeUpDay(dayKey) : undefined}
+              onClick={!interactive ? undefined
+                : choosable ? () => { haptic('tap'); onChooseSession(dayKey); }
+                : () => onMakeUpDay(dayKey)}
               disabled={!interactive}
               aria-label={label_}
               title={label_}
@@ -300,6 +305,14 @@ function SessionHero({
           {wp.completed ? 'WEEK DONE' : `${sessionsThisWeek}/${weekDays.length}`}
         </span>
       </div>
+      {onChooseSession && weekDays.some(d => !d.done && !d.skipped && !d.current) && (
+        <div style={{
+          fontSize: 11, color: 'var(--color-text-tertiary)',
+          marginTop: 'calc(-1 * var(--space-3))', marginBottom: 'var(--space-4)',
+        }}>
+          Tap another session to do it today instead.
+        </div>
+      )}
 
       {/* Single primary action */}
       <button
@@ -337,7 +350,7 @@ function SessionHero({
   );
 }
 
-export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped, onClearDayProgress }) {
+export default function WorkoutTab({ state, exercises, currentDayName, isRestDay, nextTrainingDayKey, sessionDayKey, onCompleteExercise, onFinishSession, onStartSession, onModalChange, onChangeProgram, onSwapExercise, onDeleteExercise, onOpenCoach, onBackfillWeek, onMarkDaySkipped, onClearDayProgress, onChooseSession }) {
   const [viewingWeek, setViewingWeek] = useState(() => defaultViewingWeek(state));
   const [activeExId, setActiveExId] = useState(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -427,6 +440,13 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
         onMakeUpDay={(onBackfillWeek || onMarkDaySkipped) ? (dayKey) => setMakeUpDay(dayKey) : null}
         onOpenCoach={onOpenCoach}
         onTrainAnyway={() => setShowRestWarning(true)}
+        sessionDayKey={isCurrentWeek ? sessionDayKey : null}
+        // Switching is only offered on the current week, before today's
+        // session has started — the exercises on screen must not change
+        // under a session in progress.
+        onChooseSession={onChooseSession && isCurrentWeek && !activeRestDay
+          && !state.sessionStartTime && !(todayExDone || []).length && !todaySessionFinished
+          ? onChooseSession : null}
       />
 
       {/* Overtraining warning — only surfaced once the user reaches for
