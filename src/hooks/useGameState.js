@@ -1232,6 +1232,25 @@ export function useGameState(user) {
    * A skipped day closes the slot without crediting anything: no session, no
    * XP, no streak, no volume. It only lets the week finish.
    */
+  /**
+   * Pick which open session to train today — e.g. Session 3 when the user
+   * wants to leave Session 2 for later in the week. Not allowed once today's
+   * session has started or been logged, so the exercises on screen can't
+   * change under a session in progress.
+   */
+  const chooseSession = useCallback((dayKey) => {
+    setState(prev => {
+      const inProgress = !!prev.sessionStartTime
+        || (prev.todayExDone || []).length > 0
+        || prev.todaySessionFinished;
+      if (inProgress) return prev;
+      return {
+        ...prev,
+        chosenSession: { dayKey, week: prev.currentWeek, date: today() },
+      };
+    });
+  }, [setState]);
+
   const markDaySkipped = useCallback((week, dayKey, skipped = true) => {
     setState(prev => {
       const wp = prev.weekProgress?.[week]
@@ -1545,7 +1564,7 @@ export function useGameState(user) {
     toast, showToast,
     addXP,
     resetAll, resetToday,
-    startSession, backfillWeek, markDaySkipped, clearDayProgress,
+    startSession, backfillWeek, markDaySkipped, clearDayProgress, chooseSession,
     completeExercise, finishSession,
     submitCheckin, updateSetting,
     addAIHistory, addAIEpisodic,

@@ -1,5 +1,5 @@
 import { midnightOf } from './gameLogic';
-import { DAY_ORDER, trainedSlots as trainedDays } from './session';
+import { DAY_ORDER, trainedSlots as trainedDays, chosenSessionKey } from './session';
 
 const DAY_MS = 864e5;
 
@@ -27,9 +27,13 @@ export function resolveWeekDays(state, viewingWeek, sortedTrainingDays, now = ne
 
   const isDone = (dayKey, i) => (resolvedDays ? resolvedDays.includes(dayKey) : i < wp.count);
 
-  // Cursor = the next slot still open this week.
+  // Cursor = the session picked for today if it's still open, else the next
+  // slot still open this week. Mirrors resolveSession.
+  const isOpen = (d, i) => !isDone(d, i) && !explicitlySkipped.has(d);
+  const chosen = chosenSessionKey(state, now);
+  const chosenIdx = chosen ? sortedTrainingDays.indexOf(chosen) : -1;
   const currentDayId = (isCurrentWeek && !wp.completed && weekStarted)
-    ? sortedTrainingDays.find((d, i) => !isDone(d, i) && !explicitlySkipped.has(d)) ?? null
+    ? (chosenIdx >= 0 && isOpen(chosen, chosenIdx) ? chosen : sortedTrainingDays.find(isOpen) ?? null)
     : null;
 
   return sortedTrainingDays.map((dayKey, i) => {

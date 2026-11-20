@@ -98,6 +98,29 @@ describe('resolveSession — flexible days', () => {
     expect(resolveSession(state, { now: TUESDAY }).dayKey).toBe('wed');
   });
 
+  it('serves the session the user picked for today', () => {
+    const state = makeState({
+      dayTemplates: { mon: PUSH_DAY, wed: PULL_DAY },
+      ...week([]),
+      chosenSession: { dayKey: 'wed', week: 2, date: TUESDAY.toDateString() },
+    });
+    const s = resolveSession(state, { now: TUESDAY });
+    expect(s.dayKey).toBe('wed');
+    expect(s.exercises).toEqual(PULL_DAY.exercises);
+  });
+
+  it('forgets the pick the next day, or once that session is done', () => {
+    const pick = { dayKey: 'fri', week: 2, date: TUESDAY.toDateString() };
+    expect(resolveSession(makeState({ ...week([]), chosenSession: pick }), { now: THURSDAY }).dayKey).toBe('mon');
+    const done = makeState({ ...week([{ dayKey: 'fri', date: MONDAY.toDateString() }]), chosenSession: pick });
+    expect(resolveSession(done, { now: TUESDAY }).dayKey).toBe('mon');
+  });
+
+  it('ignores a pick from another program week', () => {
+    const state = makeState({ ...week([]), chosenSession: { dayKey: 'fri', week: 1, date: TUESDAY.toDateString() } });
+    expect(resolveSession(state, { now: TUESDAY }).dayKey).toBe('mon');
+  });
+
   it('is a rest day once the week is cleared or has not begun', () => {
     const all = ['mon', 'wed', 'fri'].map(d => ({ dayKey: d, date: MONDAY.toDateString() }));
     const cleared = makeState({ ...week(all) });

@@ -108,6 +108,13 @@ describe('resolveWeekDays', () => {
     expect(days.find(d => d.current)?.dayKey).toBe('wed');
   });
 
+  it('moves the cursor to the session picked for today', () => {
+    const s = { ...week([]), chosenSession: { dayKey: 'fri', week: 3, date: at(2026, 9, 24).toDateString() } };
+    const days = resolveWeekDays(s, 3, DAYS, at(2026, 9, 24));
+    expect(days.find(d => d.current)?.dayKey).toBe('fri');
+    expect(days.find(d => d.dayKey === 'wed')).toMatchObject({ current: false, skipped: false });
+  });
+
   it('marks untrained slots missed once the week is behind us', () => {
     const s = { ...week([]), currentWeek: 4 };
     const days = resolveWeekDays(s, 3, DAYS, at(2026, 9, 30));

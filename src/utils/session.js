@@ -95,6 +95,17 @@ export function trainedSlots(wp) {
   return [...new Set([...(wp.completedDays || []), ...fromSessions])];
 }
 
+/**
+ * The session the user picked to train today, if they picked one: e.g.
+ * skipping Session 2 and doing Session 3 instead. A pick only holds for the
+ * day and week it was made in.
+ */
+export function chosenSessionKey(state, now = new Date()) {
+  const c = state?.chosenSession;
+  if (!c?.dayKey || c.date !== now.toDateString() || c.week !== state?.currentWeek) return null;
+  return c.dayKey;
+}
+
 function midnightMs(value) {
   const d = new Date(value);
   d.setHours(0, 0, 0, 0);
@@ -110,7 +121,8 @@ function midnightMs(value) {
  * Training days are not tied to the calendar: any day of the week is a
  * training day until the week's sessions are done. The session on screen is
  * the next slot of the current week that has not been trained or skipped, so
- * missing a Monday just means Session 1 is still waiting on Tuesday.
+ * missing a Monday just means Session 1 is still waiting on Tuesday — unless
+ * the user picked a different open session for today (chosenSession).
  *
  * It is a "rest day" (week cleared) only when every session of the current
  * week is in, or the next program week has not begun yet. The user can still
@@ -143,7 +155,8 @@ export function resolveSession(state, { overrideRestDay = false, now = new Date(
     dayKey = loggedToday[loggedToday.length - 1].dayKey;
   } else {
     weekCleared = !!wp?.completed || weekNotStarted || open.length === 0;
-    dayKey = open[0] ?? sorted[0];
+    const chosen = chosenSessionKey(state, now);
+    dayKey = (chosen && open.includes(chosen)) ? chosen : (open[0] ?? sorted[0]);
   }
 
   const template = templateForDay(state, dayKey);
