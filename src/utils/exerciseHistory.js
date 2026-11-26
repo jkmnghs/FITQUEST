@@ -33,6 +33,9 @@ export function getLastPerformance(state, exId) {
     return {
       maxWeight: detail.maxWeight || 0,
       repsPerSet: Array.isArray(detail.repsPerSet) ? detail.repsPerSet.filter(r => r > 0) : [],
+      // Distance work (runs, ergs, sleds): metres and seconds per set.
+      metersPerSet: Array.isArray(detail.metersPerSet) ? detail.metersPerSet.filter(m => m > 0) : [],
+      timePerSet: Array.isArray(detail.timePerSet) ? detail.timePerSet : [],
       setsCompleted: detail.setsCompleted || 0,
       setsPrescribed: detail.setsPrescribed || 0,
       maxRPE: detail.maxRPE || 0,
@@ -129,6 +132,9 @@ export function getRecentPerformances(state, exId, limit = 3) {
     out.push({
       maxWeight: detail.maxWeight || 0,
       repsPerSet: Array.isArray(detail.repsPerSet) ? detail.repsPerSet.filter(r => r > 0) : [],
+      // Distance work (runs, ergs, sleds): metres and seconds per set.
+      metersPerSet: Array.isArray(detail.metersPerSet) ? detail.metersPerSet.filter(m => m > 0) : [],
+      timePerSet: Array.isArray(detail.timePerSet) ? detail.timePerSet : [],
       setsCompleted: detail.setsCompleted || 0,
       setsPrescribed: detail.setsPrescribed || 0,
       maxRPE: detail.maxRPE || 0,

@@ -1,4 +1,4 @@
-import { EX_CATALOG_MAP, getExerciseGroup, filterCatalogForEquipment } from '../data/exerciseCatalog';
+import { EX_CATALOG_MAP, getExerciseGroup, filterCatalogForEquipment, isDistanceExercise } from '../data/exerciseCatalog';
 import { authPostJSON } from '../lib/authFetch';
 import { apiErrorMessage } from '../lib/apiError';
 import { blockedExerciseIds, applySubstitutions, applyCompetencySubstitutions } from './exerciseSubstitutions';
@@ -216,10 +216,11 @@ export function buildGenerationPlan(assessment = {}, { trainingDays } = {}) {
 
 // Which groups each split-day type may contain.
 const DAY_TYPE_GROUPS = {
-  full: ['push', 'pull', 'legs', 'core'],
-  push: ['push', 'core'], pull: ['pull', 'core'], legs: ['legs', 'core'],
-  pull_legs: ['pull', 'legs', 'core'],
-  upper: ['push', 'pull', 'core'], lower: ['legs', 'core'],
+  // 'cardio' (runs, ergs, HYROX stations) fits any day, like core work.
+  full: ['push', 'pull', 'legs', 'core', 'cardio'],
+  push: ['push', 'core', 'cardio'], pull: ['pull', 'core', 'cardio'], legs: ['legs', 'core', 'cardio'],
+  pull_legs: ['pull', 'legs', 'core', 'cardio'],
+  upper: ['push', 'pull', 'core', 'cardio'], lower: ['legs', 'core', 'cardio'],
 };
 
 const DAY_TYPE_BRIEF = {
@@ -254,7 +255,7 @@ function buildPrompt(plan, assessment) {
   ].filter(Boolean).join(', ');
 
   const catalog = plan.pool
-    .map(e => `${e.id}="${e.name}"[${e.group}${e.isBodyweight ? ',BW' : ''}]`)
+    .map(e => `${e.id}="${e.name}"[${e.group}${e.isBodyweight ? ',BW' : ''}${e.metric === 'distance' ? ',distance' : ''}]`)
     .join(', ');
 
   const sessions = plan.slots
@@ -281,6 +282,8 @@ Rules:
 - Across the week, give push, pull and legs each at least ${plan.weeklyFloor} hard sets.
 - Don't repeat an exercise within a session.
 - reps is the target; repMin/repMax the range (use reps for both on a fixed target). For timed holds, reps 0.
+- Exercises marked "distance" are logged in metres: reps is metres per set (e.g. 1000 for a 1 km row, 25 for a sled push).
+- Cardio and HYROX stations ([cardio]) are conditioning: add them as finishers only when the goal is fat loss or the user's notes ask for conditioning or HYROX, and keep strength work first.
 - note: one short coaching cue, or empty.
 - Titles must reflect the session's focus (e.g. "PUSH — CHEST + SHOULDERS", "FULL BODY — A").`;
 }
@@ -335,9 +338,13 @@ const clampInt = (v, lo, hi, fallback) => {
 function finishExercise(raw, assessment) {
   const entry = EX_CATALOG_MAP[raw.id];
   const isPlank = !!entry?.isPlank;
-  const reps = isPlank ? 0 : clampInt(raw.reps, 1, 30, entry?.defaults.reps ?? 10);
-  const repMin = isPlank ? 0 : clampInt(raw.repMin, 1, 30, reps);
-  const repMax = isPlank ? 0 : Math.max(repMin, clampInt(raw.repMax, 1, 30, reps));
+  const dist = isDistanceExercise(raw.id);
+  // Distance targets are metres (a 25 m sled push, a 5 km run), not reps.
+  const reps = isPlank ? 0
+    : dist ? clampInt(raw.reps, 10, 20000, entry?.defaults.reps ?? 1000)
+    : clampInt(raw.reps, 1, 30, entry?.defaults.reps ?? 10);
+  const repMin = isPlank ? 0 : dist ? reps : clampInt(raw.repMin, 1, 30, reps);
+  const repMax = isPlank ? 0 : dist ? reps : Math.max(repMin, clampInt(raw.repMax, 1, 30, reps));
   return normalizeGeneratedExercise({
     id: raw.id,
     name: entry?.name,

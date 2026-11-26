@@ -4,7 +4,7 @@ import { X, Lightbulb, Check, History, Trophy, Calculator, TrendingUp } from 'lu
 import { FORM_TIPS } from '../data/gameData';
 import { getSetsForWeek, getWeightForExercise, convertWeight, kgFromDisplay, isDeloadWeek, DEFAULT_SETS } from '../utils/gameLogic';
 import { getLastPerformance, best1RM, platesPerSide } from '../utils/exerciseHistory';
-import { EX_CATALOG_MAP } from '../data/exerciseCatalog';
+import { EX_CATALOG_MAP, isDistanceExercise, formatDistance, formatDuration, parseDuration } from '../data/exerciseCatalog';
 import { haptic } from '../utils/haptics';
 import RestTimer from './RestTimer';
 
@@ -12,7 +12,7 @@ function makeDefaultSets(ex, count, weightKg) {
   const rows = Math.max(1, Number(count) || 0);
   const prescribed = Number(ex?.sets) > 0 ? Number(ex.sets) : DEFAULT_SETS;
   return Array.from({ length: rows }, (_, i) => ({
-    idx: i, weightKg, reps: '', rpe: 8, time: '', done: false,
+    idx: i, weightKg, reps: '', rpe: 8, time: '', meters: '', timeText: '', done: false,
     isExtra: i >= prescribed
   }));
 }
@@ -24,7 +24,17 @@ function makeDefaultSets(ex, count, weightKg) {
 function ReferenceStrip({ last, pr, unit, sessionBest1RM }) {
   const items = [];
 
-  if (last?.repsPerSet?.length) {
+  if (last?.metersPerSet?.length) {
+    const t = last.timePerSet?.filter(x => x > 0) || [];
+    items.push({
+      key: 'last',
+      Icon: History,
+      color: 'var(--color-text-secondary)',
+      label: 'Last time',
+      value: `${last.maxWeight > 0 ? `${convertWeight(last.maxWeight, unit)}${unit} · ` : ''}${last.metersPerSet.map(formatDistance).join(', ')}${t.length ? ` in ${t.map(formatDuration).join(', ')}` : ''}`,
+      sub: last.dateStr ? String(last.dateStr).split(',')[0] : null,
+    });
+  } else if (last?.repsPerSet?.length) {
     items.push({
       key: 'last',
       Icon: History,
@@ -234,7 +244,7 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
   function addExtraSet() {
     setSets(prev => [
       ...prev,
-      { idx: prev.length, weightKg: displayWt, reps: '', rpe: 8, time: '', done: false, isExtra: true }
+      { idx: prev.length, weightKg: displayWt, reps: '', rpe: 8, time: '', meters: '', timeText: '', done: false, isExtra: true }
     ]);
   }
 
@@ -263,13 +273,30 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
   function handleComplete() {
     haptic('success');
     // Convert display weights to kg
-    const processedSets = sets.map(s => ({
-      ...s,
-      weightKg: Math.max(0, Math.min(1000, unit === 'lbs' ? kgFromDisplay(parseFloat(s.weightKg) || 0, unit) : (parseFloat(s.weightKg) || 0))),
-      reps: Math.max(0, Math.min(100, parseFloat(s.reps) || 0)),
-      rpe: parseInt(s.rpe) || 0,
-      time: Math.max(0, parseFloat(s.time) || 0)
-    }));
+    const dist = isDistanceExercise(ex);
+    const processedSets = sets.map(s => {
+      const weightKg = Math.max(0, Math.min(1000, unit === 'lbs' ? kgFromDisplay(parseFloat(s.weightKg) || 0, unit) : (parseFloat(s.weightKg) || 0)));
+      if (dist) {
+        // Distance sets: metres + time. A ticked set left blank counts as the
+        // target distance, the way a ticked weight set keeps its weight.
+        const typed = parseFloat(s.meters);
+        const meters = Number.isFinite(typed) && typed > 0 ? typed : (s.done ? Number(ex.reps) || 0 : 0);
+        return {
+          // No RPE column for distance sets: the default 8 would otherwise read
+          // as "easy, add weight" on a run.
+          ...s, weightKg: ex.isBodyweight ? 0 : weightKg, reps: 0, rpe: 0,
+          meters: Math.min(100000, Math.max(0, meters)),
+          time: parseDuration(s.timeText) ?? 0,
+        };
+      }
+      return {
+        ...s,
+        weightKg,
+        reps: Math.max(0, Math.min(100, parseFloat(s.reps) || 0)),
+        rpe: parseInt(s.rpe) || 0,
+        time: Math.max(0, parseFloat(s.time) || 0)
+      };
+    });
     onComplete(exId, processedSets);
     onClose();
   }
@@ -331,7 +358,10 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
           <div style={{ padding: '0 18px 18px' }}>
             {/* Note */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-              {[`RPE ${isDeload ? '5-6' : ex.rpe}`, ex.rest && `Rest ${ex.rest}`].filter(Boolean).map(t => (
+              {[
+                isDistanceExercise(ex) ? `${formatDistance(ex.reps)} / set` : `RPE ${isDeload ? '5-6' : ex.rpe}`,
+                ex.rest && `Rest ${ex.rest}`,
+              ].filter(Boolean).map(t => (
                 <span key={t} style={{ fontSize: 11, fontWeight: 600, padding: '4px 8px', background: 'rgba(0,229,255,0.08)', color: 'var(--color-text-secondary)' }}>{t}</span>
               ))}
             </div>
@@ -412,6 +442,9 @@ export default function ExerciseModal({ state, exId, exercises, week, unit, lift
                 <div style={{ background: 'rgba(14,20,40,0.85)', padding: 12, marginBottom: 12, border: '1px solid rgba(0,229,255,0.14)' }}>
                   {ex.isPlank ? (
                     <PlankSets sets={sets} onToggle={toggleSetDone} onUpdate={updateSet} />
+                  ) : isDistanceExercise(ex) ? (
+                    <DistanceSets sets={sets} unit={unit} displayWt={displayWt} ex={ex}
+                      onToggle={toggleSetDone} onUpdate={updateSet} />
                   ) : (
                     <WeightSets sets={sets} unit={unit} displayWt={displayWt} ex={ex}
                       onToggle={toggleSetDone} onUpdate={updateSet} />
@@ -550,6 +583,92 @@ function WeightSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
           }}><Check size={18} strokeWidth={3} aria-hidden="true" /></button>
         </div>
       ))}
+    </>
+  );
+}
+
+/**
+ * Sets for runs, ergs, sleds and carries: metres and time, plus load when
+ * the exercise carries one (sled, farmers carry, sandbag). A stopwatch fills
+ * the time. Time is typed as m:ss.
+ */
+function DistanceSets({ sets, unit, displayWt, ex, onToggle, onUpdate }) {
+  const loaded = !ex.isBodyweight;
+  const [running, setRunning] = React.useState(null); // { setIdx, elapsed }
+  const intervalRef = React.useRef(null);
+  const startRef = React.useRef(null);
+
+  function toggleWatch(i) {
+    clearInterval(intervalRef.current);
+    if (running?.setIdx === i) {
+      onUpdate(i, 'timeText', formatDuration((Date.now() - startRef.current) / 1000));
+      setRunning(null);
+      return;
+    }
+    startRef.current = Date.now();
+    setRunning({ setIdx: i, elapsed: 0 });
+    intervalRef.current = setInterval(() => {
+      setRunning(prev => prev ? { ...prev, elapsed: (Date.now() - startRef.current) / 1000 } : null);
+    }, 250);
+  }
+  React.useEffect(() => () => clearInterval(intervalRef.current), []);
+
+  const cols = loaded ? '20px 1.2fr 1.2fr 1.5fr 44px 40px' : '20px 1.4fr 1.6fr 44px 40px';
+  const heads = loaded ? ['#', unit.toUpperCase(), 'M', 'TIME', '', ''] : ['#', 'M', 'TIME', '', ''];
+  const small = { ...inputStyle, fontSize: 16 };
+
+  return (
+    <>
+      <div style={{
+        display: 'grid', gridTemplateColumns: cols, gap: 6, marginBottom: 6, paddingBottom: 6,
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      }}>
+        {heads.map((h, i) => (
+          <span key={i} style={{ fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--text3)', textAlign: 'center', fontWeight: 600, letterSpacing: 0.5 }}>{h}</span>
+        ))}
+      </div>
+      {sets.map((s, i) => {
+        const isRunning = running?.setIdx === i;
+        return (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: cols, gap: 6, alignItems: 'center',
+            padding: '4px 2px', margin: '0 -2px 6px',
+            background: s.done ? 'rgba(0,230,118,0.07)' : 'transparent',
+            boxShadow: s.done ? 'inset 0 0 0 1px rgba(0,230,118,0.25)' : 'none',
+          }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: s.isExtra ? 'var(--cyan)' : 'var(--text3)', textAlign: 'center', fontWeight: 600 }}>
+              {i + 1}{s.isExtra ? '+' : ''}
+            </span>
+            {loaded && (
+              <input type="number" inputMode="decimal" aria-label={`Set ${i + 1} weight`}
+                value={s.weightKg} onChange={e => onUpdate(i, 'weightKg', e.target.value)}
+                placeholder={String(displayWt)} style={small} />
+            )}
+            <input type="number" inputMode="numeric" aria-label={`Set ${i + 1} metres`}
+              value={s.meters ?? ''} onChange={e => onUpdate(i, 'meters', e.target.value)}
+              placeholder={String(ex.reps)} style={small} />
+            <input type="text" inputMode="numeric" aria-label={`Set ${i + 1} time (minutes:seconds)`}
+              value={isRunning ? formatDuration(running.elapsed) : (s.timeText ?? '')}
+              readOnly={isRunning}
+              onChange={e => onUpdate(i, 'timeText', e.target.value)}
+              placeholder="m:ss" style={small} />
+            <button onClick={() => toggleWatch(i)} aria-label={isRunning ? `Stop timer for set ${i + 1}` : `Start timer for set ${i + 1}`} style={{
+              height: 48, border: `1px solid ${isRunning ? 'rgba(255,109,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              background: isRunning ? 'rgba(255,109,0,0.12)' : 'rgba(255,255,255,0.04)',
+              color: isRunning ? 'var(--fire2)' : 'var(--text3)',
+              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12,
+            }}>{isRunning ? '■' : '▶'}</button>
+            <button onClick={() => onToggle(i)} aria-label={`${s.done ? 'Undo' : 'Complete'} set ${i + 1}`} aria-pressed={s.done} style={{
+              width: 40, height: 48,
+              border: `2px solid ${s.done ? 'var(--green)' : 'rgba(0,229,255,0.35)'}`,
+              background: s.done ? 'var(--green)' : 'transparent',
+              color: s.done ? '#05070f' : 'var(--color-action)',
+              boxShadow: s.done ? '0 0 12px rgba(0,230,118,0.5)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}><Check size={18} strokeWidth={3} aria-hidden="true" /></button>
+          </div>
+        );
+      })}
     </>
   );
 }

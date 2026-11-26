@@ -1,6 +1,7 @@
 import { EXERCISES, ACHIEVEMENTS } from '../data/gameData';
 import { getPhase, convertWeight } from './gameLogic';
 import { sortedTrainingDays, templateForDay, exercisesForDay } from './session';
+import { formatTarget, formatDistance, isDistanceExercise } from '../data/exerciseCatalog';
 
 function getExercises(state) {
   return state.activeExercises?.length ? state.activeExercises : EXERCISES;
@@ -66,7 +67,7 @@ export function formatForCoach(state) {
       : s === 'deload' ? '→ DELOAD (back off)'
       : s === 'repeat' ? '→ REPEAT (not yet ready)'
       : '(no recommendation yet)';
-    lines.push(`  ${ex.name}: ${wt}${unit} × ${ex.sets} sets × ${ex.reps} reps  [RPE target ${ex.rpe}]  ${status}`);
+    lines.push(`  ${ex.name}: ${wt}${unit} × ${ex.sets} sets × ${formatTarget(ex)}${isDistanceExercise(ex) ? '' : ' reps'}  [RPE target ${ex.rpe}]  ${status}`);
   }
   lines.push('');
 
@@ -79,7 +80,7 @@ export function formatForCoach(state) {
     lines.push('---');
     for (const ex of (todayTemplate.exercises || [])) {
       const wt = ex.isBodyweight ? 'bodyweight' : convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit) + unit;
-      lines.push(`  ${ex.name}: ${ex.sets} sets × ${ex.reps} reps @ ${wt}`);
+      lines.push(`  ${ex.name}: ${ex.sets} sets × ${formatTarget(ex)}${isDistanceExercise(ex) ? '' : ' reps'} @ ${wt}`);
     }
     lines.push('');
   }
@@ -254,6 +255,7 @@ export function describeProgram(state) {
     exercises.forEach((ex, j) => {
       const reps = ex.isPlank
         ? (ex.duration ?? '30s')
+        : isDistanceExercise(ex) ? formatDistance(ex.reps)
         : (ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}-${ex.repMax}` : ex.reps);
       const kg = state.liftWeights?.[ex.id] ?? ex.startKg;
       const load = ex.isBodyweight || ex.isPlank || !(Number(kg) > 0)

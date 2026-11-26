@@ -5,7 +5,7 @@ import { EXERCISES } from '../data/gameData';
 import { getPhase, convertWeight } from '../utils/gameLogic';
 import { formatForCoach, describeProgram } from '../utils/coachExport';
 import { sortedTrainingDays, slotLabel } from '../utils/session';
-import { EX_CATALOG } from '../data/exerciseCatalog';
+import { EX_CATALOG, formatTarget } from '../data/exerciseCatalog';
 import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
 import { authPostJSON } from '../lib/authFetch';
 import { apiErrorMessage } from '../lib/apiError';
@@ -36,7 +36,7 @@ const SAVE_PROGRAM_TOOL = {
             id:          { type: 'string',  description: 'Exact ID from the exercise catalog' },
             name:        { type: 'string',  description: 'Display name' },
             sets:        { type: 'number' },
-            reps:        { type: 'number',  description: 'Mid-range target reps' },
+            reps:        { type: 'number',  description: 'Mid-range target reps; for [distance] exercises, metres per set' },
             repMin:      { type: 'number' },
             repMax:      { type: 'number' },
             startKg:     { type: 'number',  description: 'Starting weight in kg; 0 for bodyweight' },
@@ -127,7 +127,7 @@ EXERCISE SUBSTITUTIONS: If the user asks to swap or skip an exercise, suggest th
     const currentProgram = describeProgram(state);
     const availableCatalog = filterCatalogForEquipment(equipment);
     const catalog = availableCatalog.map(e =>
-      `${e.id}="${e.name}"${e.isBodyweight ? '[BW]' : e.isPlank ? '[Plank]' : `[${e.startKg}kg]`}`
+      `${e.id}="${e.name}"${e.isBodyweight ? '[BW]' : e.isPlank ? '[Plank]' : `[${e.startKg}kg]`}${e.metric === 'distance' ? '[distance]' : ''}`
     ).join(', ');
     return `${base}
 You are ${name}'s personal program designer. You build and save evidence-based workout programs directly into their training schedule.
@@ -152,7 +152,8 @@ CRITICAL RULES — FOLLOW EXACTLY:
 9. Keep sessions to 6-10 exercises max.
 10. Refer to sessions as "Session 1", "Session 2"… — never by weekday. The user trains on any days they like.
 11. save_day_program REPLACES the whole session. When asked to change part of a session, re-send every exercise the user didn't ask to change, unchanged, with its current weight as startKg.
-12. You can see the full current program above — never ask the user to list their exercises.`;
+12. You can see the full current program above — never ask the user to list their exercises.
+13. [distance] exercises (runs, ergs, sleds, carries, HYROX stations) are logged in metres: set reps to the metres per set (e.g. 1000 for a 1 km row, 25 for a sled push) and repMin = repMax = reps.`;
   }
 
   if (mode === 'physique') {
@@ -248,7 +249,7 @@ PHASE: ${weekLabel} — ${phase.name}: ${phase.desc}`;
       ? `TODAY'S WORKOUT (${todayKey.toUpperCase()} — ${todayTemplate.title || 'Session'}):\n` +
         (todayTemplate.exercises || []).map(ex => {
           const wt = ex.isBodyweight ? 'bodyweight' : `${convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit)}${unit}`;
-          return `  ${ex.name}: ${ex.sets}×${ex.reps} @ ${wt}`;
+          return `  ${ex.name}: ${ex.sets}×${formatTarget(ex)} @ ${wt}`;
         }).join('\n')
       : 'No workout scheduled today (rest day or no program set).';
     return `${base}
@@ -322,7 +323,7 @@ Be specific and energetic.`;
           ? `Today's plan (${tmpl.title || todayKey2}):\n` +
             (tmpl.exercises || []).map(ex => {
               const wt = ex.isBodyweight ? 'bodyweight' : `${convertWeight(state.liftWeights?.[ex.id] ?? ex.startKg ?? 0, unit)}${unit}`;
-              return `  ${ex.name}: ${ex.sets}×${ex.reps} @ ${wt}`;
+              return `  ${ex.name}: ${ex.sets}×${formatTarget(ex)} @ ${wt}`;
             }).join('\n')
           : 'No program set for today.';
         return `${state.name || 'Athlete'} hasn't started today (Week ${state.currentWeek}).\n${planStr}\n${userMessage ? `They said: "${userMessage}"\n` : ''}Give specific advice about today's workout — weights to use, cues, what to focus on.`;
@@ -1101,7 +1102,7 @@ function ExerciseList({ exercises }) {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>{ex.name}</div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
               {ex.isBodyweight ? 'BW' : `${ex.startKg ?? 0}kg`}
-              {' · '}{ex.sets}×{ex.repMin && ex.repMax && ex.repMin !== ex.repMax ? `${ex.repMin}–${ex.repMax}` : ex.reps}
+              {' · '}{ex.sets}×{formatTarget(ex)}
               {' · '}{ex.restSec >= 60 ? `${Math.round(ex.restSec / 60)}min` : `${ex.restSec}s`}
               {' · '}RPE {ex.rpe}
             </div>

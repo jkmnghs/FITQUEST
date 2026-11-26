@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, History, Dumbbell, Calendar, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import WorkoutTab from './WorkoutTab';
 import AICoachTab from './AICoachTab';
+import { formatTarget } from '../data/exerciseCatalog';
 
 // Recent session history from log (last 5 sessions)
 function SessionHistory({ log }) {
@@ -135,9 +136,7 @@ function NextWorkoutCard({ state, sessionDayKey }) {
                 fontFamily: 'var(--font-display)', fontSize: 'var(--text-xs)', fontWeight: 700,
                 color: 'var(--color-text-tertiary)',
               }}>
-                {ex.isPlank
-                  ? `${ex.sets} × ${ex.duration ?? '30s'}`
-                  : `${ex.sets} × ${ex.reps}`}
+                {`${ex.sets} × ${formatTarget(ex)}`}
               </span>
             </div>
           ))}

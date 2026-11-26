@@ -23,7 +23,7 @@ describe('catalog integrity', () => {
   });
 
   it('gives every entry a group, equipment class and category', () => {
-    const groups = ['push', 'pull', 'legs', 'core'];
+    const groups = ['push', 'pull', 'legs', 'core', 'cardio'];
     const equipment = ['barbell', 'dumbbell', 'cable', 'machine', 'bodyweight'];
     for (const e of EX_CATALOG) {
       expect(groups, `${e.id} group`).toContain(e.group);
