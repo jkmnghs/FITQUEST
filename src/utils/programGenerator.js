@@ -1,5 +1,6 @@
 import { EX_CATALOG_MAP, getExerciseGroup, filterCatalogForEquipment } from '../data/exerciseCatalog';
 import { authPostJSON } from '../lib/authFetch';
+import { apiErrorMessage } from '../lib/apiError';
 import { blockedExerciseIds, applySubstitutions, applyCompetencySubstitutions } from './exerciseSubstitutions';
 
 // Fewer than this and a day isn't a usable session.
@@ -483,11 +484,10 @@ export async function generateProgram(assessment, opts = {}) {
       continue;
     }
     if (res.status === 429) {
-      const data = await res.json().catch(() => ({}));
-      return { ok: false, error: 'quota', message: data.error || 'Weekly program generation limit reached.' };
+      return { ok: false, error: 'quota', message: await apiErrorMessage(res, 'Weekly program generation limit reached') };
     }
     if (!res.ok) {
-      last = { ok: false, error: 'network', message: `Coach unavailable (${res.status}).` };
+      last = { ok: false, error: 'network', message: await apiErrorMessage(res, 'Coach unavailable') };
       continue;
     }
     try {

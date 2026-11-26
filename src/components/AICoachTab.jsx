@@ -8,6 +8,7 @@ import { sortedTrainingDays, slotLabel } from '../utils/session';
 import { EX_CATALOG } from '../data/exerciseCatalog';
 import { filterCatalogForEquipment, EQUIPMENT_DESC } from '../utils/programGenerator';
 import { authPostJSON } from '../lib/authFetch';
+import { apiErrorMessage } from '../lib/apiError';
 import {
   getRecentPerformances, sessionEstimated1RM, getStrengthTrend,
   sessionsInLastDays, lastSessionDate,
@@ -668,13 +669,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
       const response = await authPostJSON('/api/coach', requestBody);
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        const msg = response.status === 429
-          ? (errData.error || 'Too many requests — wait a moment and try again.')
-          : response.status === 401
-          ? 'Session expired — please refresh the page.'
-          : (errData.error || `API error: ${response.status}`);
-        throw new Error(msg);
+        throw new Error(await apiErrorMessage(response, 'Coach unavailable'));
       }
       const data = await response.json();
 
@@ -862,7 +857,7 @@ export default function AICoachTab({ state, onSaveHistory, onSaveProgram, unread
           background: 'rgba(255,23,68,0.08)', border: '1px solid rgba(255,23,68,0.2)',
           fontSize: 12, color: 'var(--red)'
         }}>
-          Error: {error}. Make sure your API key is configured.
+          {error}
         </div>
       )}
       <div ref={messagesEndRef} />
