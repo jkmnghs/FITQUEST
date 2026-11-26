@@ -9,7 +9,7 @@ import { getSetsForWeek, getWeightForExercise, convertWeight, getPhase, isDeload
 import ExerciseModal from './ExerciseModal';
 import ProgramCompleteModal from './ProgramCompleteModal';
 import { getProgramExercisesForDay } from './OtherTabs';
-import { getPickerCategories } from '../data/exerciseCatalog';
+import { getPickerCategories, isDistanceExercise, formatDistance, formatDuration } from '../data/exerciseCatalog';
 import { useConfirm } from './ui/ConfirmDialog';
 import { haptic } from '../utils/haptics';
 import { getLastPerformance } from '../utils/exerciseHistory';
@@ -749,23 +749,34 @@ export default function WorkoutTab({ state, exercises, currentDayName, isRestDay
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                 {ex.isPlank ? (
                   <Tag type="sets">{setsCount} × 45-60s</Tag>
+                ) : isDistanceExercise(ex) ? (
+                  <Tag type="sets">{setsCount} × {formatDistance(ex.reps)}{!ex.isBodyweight && Number(convWt) > 0 ? ` @ ${convWt} ${unit}` : ''}</Tag>
                 ) : (
                   <Tag type="sets">{setsCount} × {ex.reps} @ {convWt} {unit}</Tag>
                 )}
-                {!ex.isPlank && <Tag type="rpe">RPE {isDeload ? '5-6' : ex.rpe}</Tag>}
+                {!ex.isPlank && !isDistanceExercise(ex) && <Tag type="rpe">RPE {isDeload ? '5-6' : ex.rpe}</Tag>}
                 <Tag type="rest">{ex.rest}</Tag>
               </div>
 
               {/* What you did last time, and your best ever — the two numbers
                   you actually want before picking today's weight. */}
-              {!isDone && (last?.repsPerSet.length > 0 || pr?.weight > 0) && (
+              {!isDone && (last?.repsPerSet.length > 0 || last?.metersPerSet?.length > 0 || pr?.weight > 0) && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap',
                   marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)',
                   borderTop: '1px solid var(--color-border-subtle)',
                   fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)',
                 }}>
-                  {last?.repsPerSet.length > 0 && (
+                  {last?.metersPerSet?.length > 0 && (
+                    <span>
+                      Last:{' '}
+                      <span style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                        {last.metersPerSet.map(formatDistance).join(', ')}
+                        {last.timePerSet?.some(t => t > 0) ? ` in ${last.timePerSet.filter(t => t > 0).map(formatDuration).join(', ')}` : ''}
+                      </span>
+                    </span>
+                  )}
+                  {last?.repsPerSet.length > 0 && !(last?.metersPerSet?.length > 0) && (
                     <span>
                       Last:{' '}
                       <span style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>

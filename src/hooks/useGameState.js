@@ -8,7 +8,7 @@ import { calcNutritionGoals, calcBMI, calcWaistToHeight } from '../utils/nutriti
 import { validateState, repairState } from '../utils/stateSchema';
 import { migrateState } from '../utils/stateMigrations';
 import { applySubstitutions, applyCompetencySubstitutions } from '../utils/exerciseSubstitutions';
-import { lookupExName, buildPrescription } from '../data/exerciseCatalog';
+import { lookupExName, buildPrescription, isDistanceExercise } from '../data/exerciseCatalog';
 import { todayDayKey, exercisesForDay, sortedTrainingDays } from '../utils/session';
 import { closeElapsedWeek, repairWeekAnchor } from '../utils/week';
 import { mergeCloudAndLocal, sameProgress } from '../utils/stateMerge';
@@ -709,14 +709,23 @@ export function useGameState(user) {
       let maxWeightUsed = 0;
       let totalRPE = 0, rpeCount = 0;
       const repsPerSet = [];
+      // Distance work (runs, ergs, sleds, carries) logs metres + time. It adds
+      // no lifting volume — 60 kg × 25 m is not 1,500 kg lifted.
+      const dist = isDistanceExercise(exId);
+      const metersPerSet = [];
+      const timePerSet = [];
 
       sets.forEach(s => {
         if (s.done) {
           setsCompleted++;
           repsPerSet.push(Number(s.reps) || 0);
+          if (dist) {
+            metersPerSet.push(Number(s.meters) || 0);
+            timePerSet.push(Number(s.time) || 0);
+          }
           if (!isDeload) {
             const wt = s.weightKg || 0;
-            const rp = s.reps || 0;
+            const rp = dist ? 0 : (s.reps || 0);
             vol += wt * rp;
             if (wt > maxWeightUsed) maxWeightUsed = wt;
             if ((s.rpe || 0) > maxRPE) maxRPE = s.rpe || 0;
@@ -770,9 +779,13 @@ export function useGameState(user) {
       const ex = exercisesForDay(prev, sessionDayKey || todayDayKey()).find(e => e.id === exId);
       const targetReps = ex?.repMax ?? ex?.reps ?? 10;
       const allSetsHitTarget = setsCompleted >= baseSets &&
-        sets.filter(s => !s.isExtra && s.done).every(s => (s.reps || 0) >= targetReps);
+        sets.filter(s => !s.isExtra && s.done).every(s => (dist ? (s.meters || 0) : (s.reps || 0)) >= targetReps);
 
-      if (!isDeload && allSetsHitTarget) {
+      // Unloaded distance work (a run, the ergs) has no weight to add.
+      const loadable = !(dist && !(maxWeightUsed > 0));
+      if (!loadable) {
+        // nothing to progress
+      } else if (!isDeload && allSetsHitTarget) {
         consecutiveCompletions[exId] = (consecutiveCompletions[exId] || 0) + 1;
         if (consecutiveCompletions[exId] >= 2) {
           overloadSuggestions[exId] = 'increase';
@@ -805,7 +818,10 @@ export function useGameState(user) {
       const todayExDone = [...new Set([...(prev.todayExDone || []), exId])];
       const todayExDetails = {
         ...prev.todayExDetails,
-        [exId]: { setsCompleted, setsPrescribed: baseSets, extraSets, volume: vol, maxRPE, maxWeight: maxWeightUsed, repsPerSet }
+        [exId]: {
+          setsCompleted, setsPrescribed: baseSets, extraSets, volume: vol, maxRPE, maxWeight: maxWeightUsed, repsPerSet,
+          ...(dist ? { metersPerSet, timePerSet } : {}),
+        }
       };
       const sessionStartTime = prev.sessionStartTime || Date.now();
       const logEntry = {
@@ -1407,6 +1423,7 @@ export function useGameState(user) {
       let addedVolume = 0;
       Object.entries(customSets).forEach(([exId, sets]) => {
         if (!sets || sets <= 0) return;
+        if (isDistanceExercise(exId)) return; // metres, not reps × kg
         const reps = { squat: 10, bench: 10, rdl: 8, pulldown: 10, ohp: 12, legcurl: 15 }[exId] || 10;
         const wt = customWeights[exId] ?? prev.liftWeights?.[exId] ?? 0;
         addedVolume += sets * reps * wt;

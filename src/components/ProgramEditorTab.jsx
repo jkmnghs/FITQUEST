@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
-import { EX_CATALOG } from '../data/exerciseCatalog';
+import { EX_CATALOG, isDistanceExercise, formatDistance, formatTarget } from '../data/exerciseCatalog';
 import { useConfirm } from './ui/ConfirmDialog';
 import { generateProgram } from '../utils/programGenerator';
 import { convertWeight } from '../utils/gameLogic';
@@ -30,6 +30,7 @@ function fmtRest(sec) {
 }
 
 function repLabel(ex) {
+  if (isDistanceExercise(ex)) return formatDistance(ex.reps);
   const mn = ex.repMin ?? ex.reps;
   const mx = ex.repMax ?? ex.reps;
   return mn !== mx ? `${mn}–${mx}` : String(mn ?? '?');
@@ -67,6 +68,13 @@ function ExForm({ ex, onChange, onDone }) {
           <input type="number" min="1" max="10" value={ex.sets ?? 3}
             onChange={e => onChange('sets', Math.max(1, parseInt(e.target.value) || 1))} style={inputSt} />
         </div>
+        {isDistanceExercise(ex) ? (
+        <div>
+          <FieldLabel>METRES / SET</FieldLabel>
+          <input type="number" min="1" value={ex.reps ?? 1000}
+            onChange={e => { const v = Math.max(1, parseInt(e.target.value) || 1); onChange('reps', v); onChange('repMin', v); onChange('repMax', v); }} style={inputSt} />
+        </div>
+        ) : (<>
         <div>
           <FieldLabel>REPS MIN</FieldLabel>
           <input type="number" min="1" value={ex.repMin ?? ex.reps ?? 10}
@@ -77,6 +85,7 @@ function ExForm({ ex, onChange, onDone }) {
           <input type="number" min="1" value={ex.repMax ?? ex.reps ?? 10}
             onChange={e => onChange('repMax', Math.max(1, parseInt(e.target.value) || 1))} style={inputSt} />
         </div>
+        </>)}
         <div>
           <FieldLabel>REST</FieldLabel>
           <select value={ex.restSec ?? 120}
@@ -188,11 +197,15 @@ export default function ProgramEditorTab({ state, updateSetting }) {
   }, [addSearch]);
 
   function pickFromCatalog(cat) {
+    // Distance work (runs, ergs, sleds) starts from its own prescription —
+    // "3 × 10" means nothing for a 1 km row.
+    const dist = isDistanceExercise(cat);
+    const reps = dist ? cat.defaults.reps : 10;
     setAddForm({
       id: cat.id,
       name: cat.name,
-      sets: 3, reps: 10, repMin: 10, repMax: 10,
-      restSec: 120, rest: '2 min', rpe: 8,
+      sets: dist ? cat.defaults.sets : 3, reps, repMin: reps, repMax: reps,
+      restSec: dist ? cat.defaults.restSec : 120, rest: dist ? cat.defaults.rest : '2 min', rpe: 8,
       startKg: cat.startKg ?? 0,
       note: '', isBodyweight: cat.isBodyweight ?? false, isPlank: cat.isPlank ?? false,
     });
@@ -577,7 +590,7 @@ function RegeneratePanel({ regen, unit, trainingDays, onStart, onAccept, onDisca
               <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
                 {t.exercises.map(ex => (
                   <li key={ex.id}>
-                    {ex.name} — {ex.sets} × {ex.isPlank ? (ex.duration ?? '30s') : ex.reps}
+                    {ex.name} — {ex.sets} × {formatTarget(ex)}
                     {!ex.isBodyweight && !ex.isPlank && ex.startKg > 0 ? ` @ ${kg(ex.startKg)}` : ''}
                   </li>
                 ))}

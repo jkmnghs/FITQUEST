@@ -17,14 +17,14 @@
  */
 
 const CHEST = 'Chest', BACK = 'Back', LEGS = 'Legs',
-      SHOULDERS = 'Shoulders', ARMS = 'Arms', CORE = 'Core', CARDIO = 'Cardio';
+      SHOULDERS = 'Shoulders', ARMS = 'Arms', CORE = 'Core', CARDIO = 'Cardio', HYROX = 'Hyrox';
 
 export const CATEGORY_ICONS = {
   [CHEST]: '🫁', [BACK]: '↩️', [LEGS]: '🦵',
-  [SHOULDERS]: '⚡', [ARMS]: '💪', [CORE]: '🔥', [CARDIO]: '🏃',
+  [SHOULDERS]: '⚡', [ARMS]: '💪', [CORE]: '🔥', [CARDIO]: '🏃', [HYROX]: '🏁',
 };
 
-export const CATEGORY_ORDER = [CHEST, BACK, LEGS, SHOULDERS, ARMS, CORE, CARDIO];
+export const CATEGORY_ORDER = [CHEST, BACK, LEGS, SHOULDERS, ARMS, CORE, CARDIO, HYROX];
 
 // Prescription presets — most exercises fall into one of these shapes.
 const COMPOUND  = { sets: 3, reps: 10, rest: '2 min',   restSec: 120, rpe: 8 };
@@ -33,6 +33,9 @@ const ACCESSORY = { sets: 3, reps: 12, rest: '90 sec',  restSec: 90,  rpe: 7 };
 const ISOLATION = { sets: 3, reps: 15, rest: '60 sec',  restSec: 60,  rpe: 7 };
 const BODYWEIGHT= { sets: 3, reps: 12, rest: '60 sec',  restSec: 60,  rpe: 7 };
 const PLANK     = { sets: 2, reps: 0,  rest: '60 sec',  restSec: 60,  rpe: 0 };
+// Distance work: `reps` is the target in metres per set.
+const distance = (sets, metres, restSec = 120) =>
+  ({ sets, reps: metres, rest: restSec >= 120 ? `${restSec / 60} min` : `${restSec} sec`, restSec, rpe: 8 });
 
 function ex(id, name, category, group, equipment, startKg, defaults, extra = {}) {
   const isBodyweight = equipment === 'bodyweight';
@@ -40,6 +43,9 @@ function ex(id, name, category, group, equipment, startKg, defaults, extra = {})
     id, name, category, group, equipment, startKg,
     isBodyweight,
     isPlank: !!extra.isPlank,
+    // 'distance': each set is logged as metres + time (runs, ergs, sleds,
+    // carries); `reps` in the prescription is the target in metres.
+    metric: extra.metric || 'reps',
     defaults: { ...defaults },
     note: extra.note || '',
   };
@@ -144,6 +150,18 @@ export const EX_CATALOG = [
   ex('highnknee',   'High Knees',             CARDIO, 'core', 'bodyweight', 0, { ...BODYWEIGHT, reps: 30 }),
   ex('boxjump',     'Box Jump',               CARDIO, 'core', 'bodyweight', 0, { ...BODYWEIGHT, reps: 10 }),
   ex('ropewave',    'Battle Rope Waves',      CARDIO, 'core', 'machine',    0, { ...BODYWEIGHT, reps: 20 }),
+  ex('run',         'Running',                CARDIO, 'cardio', 'bodyweight', 0, distance(1, 3000, 90),  { metric: 'distance', note: 'Outdoor or treadmill — log distance and time' }),
+  ex('bikeerg',     'Bike (BikeErg / Air Bike)', CARDIO, 'cardio', 'machine', 0, distance(1, 5000, 90),  { metric: 'distance' }),
+
+  // ── HYROX stations (race standard in the note) ───────────────────────────
+  ex('skierg',      'SkiErg',                 HYROX, 'cardio', 'machine',    0,  distance(2, 1000),      { metric: 'distance', note: 'Race: 1000 m' }),
+  ex('sledpush',    'Sled Push',              HYROX, 'cardio', 'machine',    60, distance(4, 25, 90),    { metric: 'distance', note: 'Race: 4 × 12.5 m, 102–202 kg incl. sled by division' }),
+  ex('sledpull',    'Sled Pull',              HYROX, 'cardio', 'machine',    40, distance(4, 25, 90),    { metric: 'distance', note: 'Race: 4 × 12.5 m, 78–153 kg incl. sled by division' }),
+  ex('burpeebj',    'Burpee Broad Jumps',     HYROX, 'cardio', 'bodyweight', 0,  distance(2, 40, 90),    { metric: 'distance', note: 'Race: 80 m' }),
+  ex('rowerg',      'Rowing (RowErg)',        HYROX, 'cardio', 'machine',    0,  distance(2, 1000),      { metric: 'distance', note: 'Race: 1000 m' }),
+  ex('farmerscarry','Farmers Carry',          HYROX, 'cardio', 'dumbbell',   20, distance(3, 100, 90),   { metric: 'distance', note: 'Race: 200 m, 2 × 16–32 kg by division' }),
+  ex('sandbaglunge','Sandbag Lunges',         HYROX, 'cardio', 'dumbbell',   10, distance(3, 50, 90),    { metric: 'distance', note: 'Race: 100 m, 10–30 kg — sandbag or dumbbells' }),
+  ex('wallball',    'Wall Balls',             HYROX, 'cardio', 'machine',    6,  { ...ACCESSORY, reps: 25 }, { note: 'Race: 100 reps, 4–9 kg ball' }),
 ];
 
 // Fast lookup by exercise ID
@@ -152,6 +170,49 @@ export const EX_CATALOG_MAP = Object.fromEntries(EX_CATALOG.map(e => [e.id, e]))
 export function lookupExName(exId) {
   return EX_CATALOG_MAP[exId]?.name
     ?? String(exId).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** True for exercises logged as distance + time (by id, or an exercise object). */
+export function isDistanceExercise(exOrId) {
+  const id = typeof exOrId === 'string' ? exOrId : exOrId?.id;
+  return (EX_CATALOG_MAP[id]?.metric ?? exOrId?.metric) === 'distance';
+}
+
+/** "1000 m" / "1.5 km". */
+export function formatDistance(metres) {
+  const m = Number(metres) || 0;
+  return m >= 1000 && m % 100 === 0 ? `${m / 1000} km` : `${m} m`;
+}
+
+/** Seconds → "m:ss" (or "h:mm:ss"). */
+export function formatDuration(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** "3:45", "1:02:30" or plain seconds "225" → seconds; null when unreadable. */
+export function parseDuration(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return null;
+  if (/^\d+(\.\d+)?$/.test(t)) return Math.round(Number(t));
+  const parts = t.split(':').map(Number);
+  if (parts.length < 2 || parts.length > 3 || parts.some(n => !Number.isFinite(n) || n < 0)) return null;
+  return parts.reduce((acc, n) => acc * 60 + n, 0);
+}
+
+/**
+ * The per-set target as shown on cards and in prompts: "1 km", "8–10",
+ * "45-60s".
+ */
+export function formatTarget(ex) {
+  if (ex?.isPlank) return ex.duration ?? '45-60s';
+  if (isDistanceExercise(ex)) return formatDistance(ex.reps);
+  const mn = ex?.repMin ?? ex?.reps;
+  const mx = ex?.repMax ?? ex?.reps;
+  return mn != null && mx != null && mn !== mx ? `${mn}–${mx}` : String(mn ?? '?');
 }
 
 export function getExerciseGroup(exId) {
