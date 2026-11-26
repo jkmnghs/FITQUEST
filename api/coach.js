@@ -20,6 +20,36 @@ const QUOTAS = {
 };
 const DEFAULT_PURPOSE = 'chat';
 
+// Both weekly counters share one week stamp. The browser used to reset them on
+// Monday, but they are server-owned keys the browser never writes back — so
+// the server's copy never reset, and anyone who hit 5/5 once stayed locked out
+// for good. The server now resets them itself when the week changes.
+const WEEK_FIELD = 'questMessagesWeekStart';
+
+/** Monday (UTC) of the current week, as YYYY-MM-DD. */
+export function currentWeekStamp(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+/** This week's count for a quota field, treating an older week stamp as zero. */
+export function weeklyCount(state, field, week = currentWeekStamp()) {
+  return state?.[WEEK_FIELD] === week ? (state?.[field] || 0) : 0;
+}
+
+/**
+ * The patch that charges one unit of `field` this week. On a new week it also
+ * zeroes the other counters, so they don't carry last week's count forward.
+ */
+export function chargePatch(state, field, week = currentWeekStamp()) {
+  const patch = { [field]: weeklyCount(state, field, week) + 1, [WEEK_FIELD]: week };
+  if (state?.[WEEK_FIELD] !== week) {
+    for (const q of Object.values(QUOTAS)) if (q.field !== field) patch[q.field] = 0;
+  }
+  return patch;
+}
+
 export default async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -63,10 +93,10 @@ export default async function handler(req, res) {
       .select('state')
       .eq('id', userId)
       .single();
-    const weeklyCount = profile?.state?.[quota.field] || 0;
-    if (weeklyCount >= quota.limit) {
+    const used = weeklyCount(profile?.state, quota.field);
+    if (used >= quota.limit) {
       return res.status(429).json({
-        error: `Weekly ${quota.label} limit reached (${quota.limit}/${quota.limit}).`,
+        error: `Weekly ${quota.label} limit reached (${quota.limit}/${quota.limit}). Resets Monday.`,
         resetDay: 'Monday'
       });
     }
@@ -74,7 +104,7 @@ export default async function handler(req, res) {
     // the check on the same count. Refunded below if the call never lands.
     const { error: mergeError } = await supabase.rpc('admin_merge_user_state', {
       p_user_id: userId,
-      p_patch: { [quota.field]: weeklyCount + 1 },
+      p_patch: chargePatch(profile?.state, quota.field),
     });
     if (mergeError) throw mergeError;
     charged = true;
@@ -85,12 +115,17 @@ export default async function handler(req, res) {
 
   try {
     const { status, data } = await callAnthropic(payload, apiKey);
+    if (status >= 400) {
+      // Surfaces in Vercel runtime logs; no user content is logged.
+      console.error('[coach] upstream', status, payload.model, data?.error?.type, data?.error?.message);
+    }
     // An upstream rejection produced nothing the user can read, so it should
     // not cost them a message. Charging up front is only there to close the
     // concurrency window — once we know the call failed, give it back.
     if (charged && status >= 400) await refund(supabase, userId, quota.field);
     res.status(status).json(data);
   } catch (err) {
+    console.error('[coach] upstream request failed:', err?.message);
     if (charged) await refund(supabase, userId, quota.field);
     res.status(502).json({ error: 'Upstream request failed' });
   }
@@ -104,7 +139,7 @@ async function refund(supabase, userId, field) {
       .select('state')
       .eq('id', userId)
       .single();
-    const count = profile?.state?.[field] || 0;
+    const count = weeklyCount(profile?.state, field);
     if (count <= 0) return;
     await supabase.rpc('admin_merge_user_state', {
       p_user_id: userId,

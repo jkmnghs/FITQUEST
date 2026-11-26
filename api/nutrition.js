@@ -47,8 +47,13 @@ export default async function handler(req, res) {
 
   try {
     const { status, data } = await callAnthropic(payload, apiKey);
+    if (status >= 400) {
+      // Surfaces in Vercel runtime logs; no user content is logged.
+      console.error('[nutrition] upstream', status, payload.model, data?.error?.type, data?.error?.message);
+    }
     res.status(status).json(data);
   } catch (err) {
+    console.error('[nutrition] upstream request failed:', err?.message);
     res.status(502).json({ error: 'Upstream request failed' });
   }
 }

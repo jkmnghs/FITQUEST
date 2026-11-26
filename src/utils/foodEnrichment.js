@@ -7,6 +7,7 @@
  * estimate into a logged food now lives here.
  */
 import { authPostJSON } from '../lib/authFetch';
+import { apiErrorMessage } from '../lib/apiError';
 import { findFoodReference } from './foodReference';
 import { searchUSDA, validateUSDAMacros, validateUSDAAgainstClaude } from './nutritionUtils';
 
@@ -52,14 +53,6 @@ const textPrompt = (query) => `Nutritional info for: "${query}".
 Use cooked-state values and a realistic serving gram weight for the amount described.
 ${COOKING_RULE}`;
 
-/** A user-facing message for a failed /api/nutrition response. */
-async function errorFrom(res) {
-  const data = await res.json().catch(() => ({}));
-  if (data?.error) return data.error;            // e.g. the daily limit message
-  if (res.status === 401) return 'Session expired — please sign in again.';
-  return `Food analysis failed (${res.status}). Try again.`;
-}
-
 async function callModel(content, schema, maxTokens) {
   const res = await authPostJSON(API_URL, {
     model: MODEL,
@@ -67,7 +60,7 @@ async function callModel(content, schema, maxTokens) {
     messages: [{ role: 'user', content }],
     output_config: { format: { type: 'json_schema', schema } },
   });
-  if (!res.ok) throw new Error(await errorFrom(res));
+  if (!res.ok) throw new Error(await apiErrorMessage(res, 'Food analysis failed'));
   const data = await res.json();
   if (data.stop_reason === 'refusal') throw new Error('The AI could not analyze this. Try a different photo or description.');
   if (data.stop_reason === 'max_tokens') throw new Error('Too many items to analyze at once. Try a closer photo.');
